@@ -106,7 +106,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		runner.SetLogPath(filepath.Join(cfg.Paths.MaaStateDir, "debug", "asst.log"))
 	}
 	maaActions := maaapp.NewService(cfg, logger, runner, executionManager, runs)
-	logService := logs.New(5000)
+	logService := logs.New(cfg.LogBufferSize)
 	configStore := configapp.NewStorage(cfg.Paths)
 	dropService := drops.NewWithOptions(cfg.Paths, drops.Options{
 		Materials: func() (map[string]drops.MaterialInfo, error) {

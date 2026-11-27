@@ -29,8 +29,7 @@ go/
 ├─ internal/infra/       ADB/MAA/scrcpy/store/OCR adapters
 ├─ internal/transport/   HTTP/agent/signaling
 ├─ internal/contract/    Agent API registry + OpenAPI/manifest
-├─ internal/desktop/     MyGo-only shell/native/tray/updater
-├─ internal/webassets/   embedded client dist
+├─ main.go               MyGo desktop entry (shell, tray, updater)
 └─ resources/            MyGo resources
 ```
 
@@ -42,7 +41,7 @@ go/
   - [x] graceful shutdown, TLS
   - [x] gzip parity
   - [x] tests green
-- [~] 1. Data + execution core
+- [x] 1. Data + execution core
   - [x] atomic JSON store + file locks
   - [x] cross-process data-directory lock (second instance fails closed)
   - [x] agent run FSM/idempotency/restore/flush
@@ -56,7 +55,7 @@ go/
   - [x] all 105 Agent route paths registered (some return stable 501 for unported scripts)
   - [x] assets/operator-quotes/health/signaling mounts
   - [x] golden contract tests against the former Node oracle (`internal/contract/testdata`)
-- [~] 3. Scheduling and task flows
+- [x] 3. Scheduling and task flows
   - [x] Go scheduler core: game timezone, flow validation/plan, sequential execution, startup restore, stop
   - [x] HTTP schedule routes; startup-only flow verified on MuMu
   - [x] tracked Run wrapper around scheduled flows (HTTP, cron, activity, copilot set, manual, updates)
@@ -71,7 +70,7 @@ go/
   - [x] remove the external WebRTC preview service from remaining paths (Go runtime is independent)
 - [x] 5. Domain modules
   - [x] training/operator materials (fetch action returns explicit unsupported)
-  - [x] copilot planning/discovery core (execution/manual session wiring pending)
+  - [x] copilot planning/discovery core (execution and manual sessions wired)
   - [x] drops/statistics + MAA result parsers
   - [x] notifications/Telegram service and bot
   - [x] config/profile storage, quotes, MaaResource assets
@@ -113,7 +112,8 @@ go/
 
 ## Open decisions / questions
 
-- MyGo CLI is not installed on this machine yet; install and pin v0.8.3+.
+- MyGo is pinned at v0.10.0 in `go.mod`; `mygo build` is documented in
+  `go/README.md`.
 - Real MuMu test: which device is the MuMu instance? `127.0.0.1:16384` (PHU110)
   is the likely target; confirm before driving tasks.
 - Real MAA task testing may consume sanity/medicine; needs explicit approval.

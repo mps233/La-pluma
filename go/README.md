@@ -29,7 +29,7 @@ under `internal/contract/testdata`.
 ## Run
 
 ```bash
-# from the repository root (so default paths resolve)
+# from the repository root; defaults resolve from the cwd after cd (go/)
 cd go
 go run ./cmd/server
 
@@ -86,9 +86,14 @@ and serves the React PWA from the same Go process.
 ```bash
 go test ./...
 go vet ./...
+npm run lint --prefix ../client
 npm run type-check --prefix ../client
+NODE_OPTIONS=--no-experimental-webstorage npm run test --prefix ../client
 npm run build --prefix ../client
 ```
+
+The `NODE_OPTIONS` flag is required on Node.js 26, whose built-in Web Storage
+breaks jsdom's `localStorage`.
 
 Real-device smoke tests were run against MuMu (`127.0.0.1:16384`) for Pion
 video/touch/key, MAA startup from a closed game, one fight, activity copilot,

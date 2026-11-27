@@ -262,11 +262,12 @@ func startDesktop() {
 	defaultPaths.ClientDist = clientDist
 	host := desktopHost()
 	cfg := config.Config{
-		Host:     host,
-		Port:     desktopPort,
-		BasePath: "/",
-		Token:    token,
-		Paths:    defaultPaths,
+		Host:          host,
+		Port:          desktopPort,
+		BasePath:      "/",
+		Token:         token,
+		LogBufferSize: 5000,
+		Paths:         defaultPaths,
 	}
 	application, err := app.New(cfg, logger)
 	if err != nil {

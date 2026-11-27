@@ -164,6 +164,20 @@ deleted, verification, and follow-ups.
 - Timezone strategies (game timezone vs business date vs provider time) were
   left alone; only the layout is shared.
 
+### Round 16 — documentation and config drift (2026-11-28)
+
+- Fixed the Chinese README's action count (26 → 40), the stale `src/store/`
+  path in both READMEs, the redundant Docker `ADB_PATH` instructions, and the
+  `go/README.md` verify list (lint/test and the Node 26 flag).
+- Renamed the root package `maa-prts` → `la-pluma`.
+- Implemented the documented `LA_PLUMA_MAX_REALTIME_LOGS` option in
+  `internal/config` (default 5000, range 100–1000000); the desktop entry uses
+  the 5000 default; added config tests and README rows.
+- Corrected stale `PLAN.md` entries (phase status, target layout, MyGo pin,
+  copilot wiring).
+- Verified: Go build/tests/vet in the touched packages.
+
+
 
 
 

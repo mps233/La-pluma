@@ -30,6 +30,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Host != "0.0.0.0" || cfg.Port != 3000 || cfg.BasePath != "/" {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
+	if cfg.LogBufferSize != 5000 {
+		t.Fatalf("unexpected log buffer default: %d", cfg.LogBufferSize)
+	}
 	if cfg.Paths.DataDir != filepath.Join("/repo", "server", "data") {
 		t.Fatalf("unexpected data dir: %s", cfg.Paths.DataDir)
 	}
@@ -49,6 +52,28 @@ func TestLoadRejectsInvalidHost(t *testing.T) {
 	env := map[string]string{"LA_PLUMA_HOST": "not-an-ip"}
 	if _, err := Load(func(key string) string { return env[key] }, "darwin", "/Users/test", "/repo"); err == nil {
 		t.Fatal("expected an error for an invalid host")
+	}
+}
+
+func TestLoadLogBufferSize(t *testing.T) {
+	cfg, err := Load(func(key string) string {
+		if key == "LA_PLUMA_MAX_REALTIME_LOGS" {
+			return "1200"
+		}
+		return ""
+	}, "darwin", "/Users/test", "/repo")
+	if err != nil || cfg.LogBufferSize != 1200 {
+		t.Fatalf("log buffer = %d, err = %v", cfg.LogBufferSize, err)
+	}
+
+	_, err = Load(func(key string) string {
+		if key == "LA_PLUMA_MAX_REALTIME_LOGS" {
+			return "10"
+		}
+		return ""
+	}, "darwin", "/Users/test", "/repo")
+	if err == nil {
+		t.Fatal("expected an error for an out-of-range log buffer")
 	}
 }
 

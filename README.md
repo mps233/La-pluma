@@ -161,9 +161,9 @@ docker run -d \
   miaona/la-pluma:latest
 ```
 
-Open http://localhost:3055. `ADB_ADDRESS` must point at the host or emulator from inside the container; with the default bridge network, `127.0.0.1` refers to the container itself. The `ADB_PATH` override is required in Docker because the image installs ADB at `/usr/bin/adb`. The Go image is built from `go/Dockerfile`.
+Open http://localhost:3055. `ADB_ADDRESS` must point at the host or emulator from inside the container; with the default bridge network, `127.0.0.1` refers to the container itself. The image already installs ADB at `/usr/bin/adb` and sets `ADB_PATH` to it; override the variable only when ADB lives elsewhere in the image. The Go image is built from `go/Dockerfile`.
 
-The image installs MaaCore on first start when it is missing. `docker-compose.yml` is also included; edit its host paths and ADB address, and add `ADB_PATH=/usr/bin/adb` under `environment`, before running `docker compose up -d`.
+The image installs MaaCore on first start when it is missing. `docker-compose.yml` is also included; edit its host paths and ADB address before running `docker compose up -d` (the image supplies `ADB_PATH`).
 
 ## Configuration
 
@@ -174,6 +174,7 @@ Key environment variables:
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `PORT` | HTTP port | `3000` |
+| `LA_PLUMA_MAX_REALTIME_LOGS` | Realtime log buffer size (100–1000000) | `5000` |
 | `LA_PLUMA_HOST` | Listen address (headless; the desktop app also honors it, default `127.0.0.1` — set `0.0.0.0` for LAN access) | `0.0.0.0` headless / `127.0.0.1` desktop |
 | `LA_PLUMA_DATA_DIR` | Config, run store and MAA task files | `<working-dir>/server/data` |
 | `LA_PLUMA_CLIENT_DIST` | Built React client | `<working-dir>/client/dist` |
@@ -245,7 +246,7 @@ La-pluma/
 │  ├─ src/lib/island/      Activity island engine (islandcn)
 │  ├─ src/hooks/           Backend, run, preview, sanity and update monitors
 │  ├─ src/services/api.ts  /api/agent client
-│  ├─ src/store/           Zustand stores
+│  ├─ src/state/           Zustand stores
 │  └─ public/              PWA icons and logo
 ├─ go/                     Go backend and MyGo desktop shell
 │  ├─ cmd/server/          headless HTTP server

@@ -14,9 +14,6 @@ without re-investigation.
 | G2 | P1 | go | One PRTS client in `internal/infra/prts`; unify retry/timeout semantics | `activity/prts.go:50-223` vs `copilot/prts.go:73-473` |
 | G9 | P1 | go | Tests for `internal/app/logs` and composition-root wiring; raise agentapi route coverage | only `app/logs` lacks tests; `app.New` covered indirectly |
 | G11 | P1 | go | Read environment only in `internal/config`; document all vars and defaults | 17 undocumented vars; `MAA_CLI_PATH` read in 4 places; `ADB_PATH` hardcoded in `notifications/bot.go:186` |
-| T2 | P1 | docs | Fix stale docs: 26 vs 40 actions, missing glass adapter (now fixed), stale paths, Docker ADB instructions, `go/README` verify | `README.zh.md:91`, `README.md:164`, `README.md:243,248`, `go/README.md:86-91` |
-| T3 | P2 | config | Resolve the dead `LA_PLUMA_MAX_REALTIME_LOGS` comment: implement the option or delete the claim | `docker-compose.yml:30`; capacity hardcoded at `app.go:109` |
-| T4 | P2 | toolchain | Rename the root package from `maa-prts` to `la-pluma` | `package.json:2` |
 
 ## Larger refactors
 
@@ -63,3 +60,5 @@ without re-investigation.
 - All Zustand stores consolidated under `src/state/` with one barrel; ~50 imports migrated.
 - `internal/util/jsval` created; `activity` and `copilot` local coercion copies deleted.
 - `internal/util/timefmt` created; all API timestamp and date layout literals migrated.
+- Docs drift fixed (action count, state path, Docker ADB, go/README verify, PLAN stale entries); root package renamed.
+- `LA_PLUMA_MAX_REALTIME_LOGS` implemented and documented; buffer size now config-owned.

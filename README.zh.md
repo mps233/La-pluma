@@ -88,7 +88,7 @@ La Pluma 是一个自托管的《明日方舟》自动化 Web 控制台。它把
 
 ### Agent API
 
-- **可发现接口** — `/api/agent/manifest` 与 `/api/agent/openapi.json` 由同一份注册表生成。Manifest 公开 26 个动作及其风险、dry-run、轮询与停止信息；OpenAPI 文档包含全部已注册操作。
+- **可发现接口** — `/api/agent/manifest` 与 `/api/agent/openapi.json` 由同一份注册表生成。Manifest 公开 40 个动作及其风险、dry-run、轮询与停止信息；OpenAPI 文档包含全部已注册操作。
 - **语义化动作** — 状态、连接测试、设备发现、当前活动预检、启动游戏、理智作战、日常流程、截图、最近日志、WebRTC 预览和可运行五个白名单工具的小工具入口，另有白名单 `run-task` 通用入口。
 - **可跟踪 Run** — 有副作用的动作返回 `runId`、`run`、`pollUrl` 与 `stopUrl`；后台执行返回 HTTP 202。Run 与幂等记录在外部副作用开始前持久化，重启后未完成的 Run 变为不可重试的 `interrupted`，终态最多保留 24 小时或 500 条。
 - **安全执行** — `dryRun` 只返回计划，不启动 MAA；`Idempotency-Key` 会重放原 Run；另一条 La Pluma 执行持有 MAA 租约时返回 HTTP 409。
@@ -160,9 +160,9 @@ docker run -d \
   miaona/la-pluma:latest
 ```
 
-打开 http://localhost:3055。`ADB_ADDRESS` 必须是容器内可访问的宿主机或模拟器地址；默认 bridge 网络下，`127.0.0.1` 指向容器自身。镜像把 ADB 安装在 `/usr/bin/adb`，因此 Docker 中必须覆盖 `ADB_PATH`。
+打开 http://localhost:3055。`ADB_ADDRESS` 必须是容器内可访问的宿主机或模拟器地址；默认 bridge 网络下，`127.0.0.1` 指向容器自身。镜像已把 ADB 安装在 `/usr/bin/adb` 并设置 `ADB_PATH`；仅当 ADB 位于镜像内其他位置时才需要覆盖。
 
-镜像首次启动时若缺少 MaaCore 会自动安装。Go 镜像由 `go/Dockerfile` 构建。仓库也提供 `docker-compose.yml`；运行 `docker compose up -d` 前请先修改其中的宿主机路径与 ADB 地址，并在 `environment` 中加入 `ADB_PATH=/usr/bin/adb`。
+镜像首次启动时若缺少 MaaCore 会自动安装。Go 镜像由 `go/Dockerfile` 构建。仓库也提供 `docker-compose.yml`；运行 `docker compose up -d` 前请先修改其中的宿主机路径与 ADB 地址（`ADB_PATH` 由镜像提供）。
 
 ## 配置
 
@@ -173,6 +173,7 @@ docker run -d \
 | 变量 | 用途 | 默认值 |
 | --- | --- | --- |
 | `PORT` | HTTP 端口 | `3000` |
+| `LA_PLUMA_MAX_REALTIME_LOGS` | 实时日志内存缓存上限（100–1000000） | `5000` |
 | `LA_PLUMA_HOST` | 监听地址（headless；桌面版也读取，默认 `127.0.0.1`，设为 `0.0.0.0` 可允许局域网访问） | `0.0.0.0` headless / `127.0.0.1` 桌面版 |
 | `LA_PLUMA_DATA_DIR` | 配置、Run 存储与 MAA 任务文件 | `<工作目录>/server/data` |
 | `LA_PLUMA_CLIENT_DIST` | 构建后的 React 客户端 | `<工作目录>/client/dist` |
@@ -242,7 +243,7 @@ La-pluma/
 │  ├─ src/lib/island/      活动岛引擎（islandcn）
 │  ├─ src/hooks/           后端、Run、预览、理智与更新状态监控
 │  ├─ src/services/api.ts  /api/agent 客户端
-│  ├─ src/store/           Zustand 状态
+│  ├─ src/state/           Zustand 状态
 │  └─ public/              PWA 图标与 Logo
 ├─ go/                     Go 后端与 MyGo 桌面外壳
 │  ├─ cmd/server/          headless HTTP 服务

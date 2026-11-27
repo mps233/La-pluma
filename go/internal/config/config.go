@@ -20,6 +20,9 @@ type Config struct {
 	TLSCertFile string
 	TLSKeyFile  string
 
+	// LogBufferSize caps the in-memory realtime log buffer.
+	LogBufferSize int
+
 	Paths Paths
 }
 
@@ -49,6 +52,15 @@ func Load(getenv Getenv, osName, home, cwd string) (Config, error) {
 		port = parsed
 	}
 
+	logBufferSize := 5000
+	if raw := strings.TrimSpace(getenv("LA_PLUMA_MAX_REALTIME_LOGS")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 100 || parsed > 1_000_000 {
+			return Config{}, fmt.Errorf("LA_PLUMA_MAX_REALTIME_LOGS 必须是 100-1000000 的整数，收到 %q", raw)
+		}
+		logBufferSize = parsed
+	}
+
 	cert := strings.TrimSpace(getenv("LA_PLUMA_HTTPS_CERT_PATH"))
 	key := strings.TrimSpace(getenv("LA_PLUMA_HTTPS_KEY_PATH"))
 	if (cert == "") != (key == "") {
@@ -75,13 +87,14 @@ func Load(getenv Getenv, osName, home, cwd string) (Config, error) {
 	}
 
 	return Config{
-		Host:        host,
-		Port:        port,
-		BasePath:    NormalizeBasePath(getenv("LA_PLUMA_BASE_PATH")),
-		Token:       strings.TrimSpace(getenv("LA_PLUMA_TOKEN")),
-		TLSCertFile: cert,
-		TLSKeyFile:  key,
-		Paths:       paths,
+		Host:          host,
+		Port:          port,
+		BasePath:      NormalizeBasePath(getenv("LA_PLUMA_BASE_PATH")),
+		Token:         strings.TrimSpace(getenv("LA_PLUMA_TOKEN")),
+		TLSCertFile:   cert,
+		TLSKeyFile:    key,
+		LogBufferSize: logBufferSize,
+		Paths:         paths,
 	}, nil
 }
 
