@@ -10,6 +10,7 @@ import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
 import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch, CjkText, TruncatedText, Select } from './common'
 import { CheckboxField, GlassSelectWithFill } from '@/components/common/fields'
+import { createConfigSyncGate } from '../utils/configSync'
 import { formatClockDuration } from '../utils/format'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '@/state'
@@ -136,9 +137,7 @@ const RECOVERY_STATUS_POLL_MS = 1000
 const RECOVERY_STATUS_TIMEOUT_MS = 30 * 60 * 1000
 const POINTER_SORT_ACTIVATION_PX = 10
 const AUTOMATION_CONFIG_SYNC_PENDING_KEY = 'automationConfigSyncPending'
-let automationConfigSyncSequence = 0
-
-const createAutomationConfigSyncToken = () => `${Date.now()}-${++automationConfigSyncSequence}`
+const configSync = createConfigSyncGate()
 
 type RecoveryWaitResult = 'completed' | 'timeout' | 'cancelled'
 
@@ -949,7 +948,6 @@ export default function AutomationTasks() {
   const [testingConnectionTaskId, setTestingConnectionTaskId] = useState<string | null>(null)
   const [lastExecutionSummary, setLastExecutionSummary] = useState<AutomationExecutionSummary | null>(null)
   const [executionDetailsOpen, setExecutionDetailsOpen] = useState(false)
-  const autoSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const autoSaveRevisionRef = useRef(0)
   const taskFlowHydratedRef = useRef(false)
   const taskFlowLoadRequestRef = useRef(0)
@@ -1733,10 +1731,10 @@ const appliedExecutionRevisionRef = useRef(-1)
     const normalizedEntries = normalizeScheduleEntries(entries)
     const normalizedTimes = activeScheduleTimes(normalizedEntries)
     const revision = ++autoSaveRevisionRef.current
-    const syncToken = createAutomationConfigSyncToken()
+    const syncToken = configSync.nextToken()
     const isCurrentSave = () => (
       revision === autoSaveRevisionRef.current
-      && localStorage.getItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY) === syncToken
+      && configSync.isCurrent(AUTOMATION_CONFIG_SYNC_PENDING_KEY, syncToken)
     )
 
     // 保存到 localStorage（快速访问）
@@ -1746,38 +1744,35 @@ const appliedExecutionRevisionRef = useRef(-1)
       times: normalizedTimes,
       entries: normalizedEntries,
     }))
-    localStorage.setItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY, syncToken)
+    configSync.markPending(AUTOMATION_CONFIG_SYNC_PENDING_KEY, syncToken)
 
-    autoSaveQueueRef.current = autoSaveQueueRef.current
-      .catch(() => undefined)
-      .then(async () => {
-        // 连续编辑时只提交队列中最新的一版，避免旧请求覆盖新配置。
-        if (!isCurrentSave()) return
+    void configSync.enqueue(async () => {
+      // 连续编辑时只提交队列中最新的一版，避免旧请求覆盖新配置。
+      if (!isCurrentSave()) return
 
-        const saveResult = await maaApi.saveUserConfig('automation-tasks', {
-          taskFlow: taskFlowToSave,
-          schedule: { enabled, times: normalizedTimes }
-        })
-        if (!saveResult.success) {
-          throw new Error(maaApi.getErrorMessage(saveResult))
-        }
-
-        if (!isCurrentSave()) return
-
-        const scheduleResult = enabled && normalizedTimes.length > 0
-          ? await maaApi.setupSchedule('default', normalizedTimes, taskFlowToSave)
-          : await maaApi.stopSchedule('default')
-
-        if (!scheduleResult.success) {
-          throw new Error(maaApi.getErrorMessage(scheduleResult))
-        }
-        if (isCurrentSave()) localStorage.removeItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY)
+      const saveResult = await maaApi.saveUserConfig('automation-tasks', {
+        taskFlow: taskFlowToSave,
+        schedule: { enabled, times: normalizedTimes }
       })
-      .catch((error: unknown) => {
-        if (!isCurrentSave()) return
-        const message = error instanceof Error ? error.message : '未知错误'
-        void showError(`配置同步失败: ${message}`)
-      })
+      if (!saveResult.success) {
+        throw new Error(maaApi.getErrorMessage(saveResult))
+      }
+
+      if (!isCurrentSave()) return
+
+      const scheduleResult = enabled && normalizedTimes.length > 0
+        ? await maaApi.setupSchedule('default', normalizedTimes, taskFlowToSave)
+        : await maaApi.stopSchedule('default')
+
+      if (!scheduleResult.success) {
+        throw new Error(maaApi.getErrorMessage(scheduleResult))
+      }
+      if (isCurrentSave()) configSync.clearPending(AUTOMATION_CONFIG_SYNC_PENDING_KEY)
+    }).catch((error: unknown) => {
+      if (!isCurrentSave()) return
+      const message = error instanceof Error ? error.message : '未知错误'
+      void showError(`配置同步失败: ${message}`)
+    })
   }
 
   const commitScheduleEntries = (entries: ScheduleTimeEntry[]) => {
@@ -2155,7 +2150,7 @@ const appliedExecutionRevisionRef = useRef(-1)
       }
     }
 
-    if (localStorage.getItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY)) {
+    if (configSync.pendingToken(AUTOMATION_CONFIG_SYNC_PENDING_KEY)) {
       loadLocalConfig()
       taskFlowHydratedRef.current = true
       return
@@ -2170,7 +2165,7 @@ const appliedExecutionRevisionRef = useRef(-1)
       taskFlowLoadRequestRef.current === requestId
       && !controller.signal.aborted
       && autoSaveRevisionRef.current === startingRevision
-      && !localStorage.getItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY)
+      && !configSync.pendingToken(AUTOMATION_CONFIG_SYNC_PENDING_KEY)
     )
 
     try {

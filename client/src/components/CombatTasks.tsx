@@ -31,6 +31,7 @@ import type {
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import { useTaskRestoreMonitor } from '../hooks/useTaskRestoreMonitor'
+import { createConfigSyncGate } from '../utils/configSync'
 import { useUIStore, type CombatCopilotPrefill } from '@/state'
 
 type CopilotSetExecutionMode = 'manual' | 'cli'
@@ -121,15 +122,7 @@ type CombatUserConfig = {
 }
 
 const COMBAT_CONFIG_SYNC_PENDING_KEY = 'combatConfigSyncPending'
-let combatConfigSyncSequence = 0
-let combatConfigSyncQueue: Promise<void> = Promise.resolve()
-
-const createCombatConfigSyncToken = () => `${Date.now()}-${++combatConfigSyncSequence}`
-const enqueueCombatConfigSync = <T,>(operation: () => Promise<T>) => {
-  const result = combatConfigSyncQueue.then(operation, operation)
-  combatConfigSyncQueue = result.then(() => undefined, () => undefined)
-  return result
-}
+const configSync = createConfigSyncGate()
 
 function SingleCopilotSummary({
   info,
@@ -450,10 +443,10 @@ export default function CombatTasks() {
     revision: number,
     syncToken: string,
     announceSuccess = false,
-  ) => enqueueCombatConfigSync(async () => {
+  ) => configSync.enqueue(async () => {
     if (
       revision !== configRevisionRef.current
-      || localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) !== syncToken
+      || !configSync.isCurrent(COMBAT_CONFIG_SYNC_PENDING_KEY, syncToken)
     ) return false
 
     try {
@@ -461,17 +454,17 @@ export default function CombatTasks() {
       if (!result.success) throw new Error(maaApi.getErrorMessage(result))
       if (
         revision !== configRevisionRef.current
-        || localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) !== syncToken
+        || !configSync.isCurrent(COMBAT_CONFIG_SYNC_PENDING_KEY, syncToken)
       ) return false
 
-      localStorage.removeItem(COMBAT_CONFIG_SYNC_PENDING_KEY)
+      configSync.clearPending(COMBAT_CONFIG_SYNC_PENDING_KEY)
       setConfigSyncError(null)
       if (announceSuccess) setStatusMessage('自动战斗配置已同步', 'success')
       return true
     } catch (error) {
       if (
         revision !== configRevisionRef.current
-        || localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) !== syncToken
+        || !configSync.isCurrent(COMBAT_CONFIG_SYNC_PENDING_KEY, syncToken)
       ) return false
 
       const detail = error instanceof Error && error.message ? error.message : '暂时无法连接服务器'
@@ -654,7 +647,7 @@ export default function CombatTasks() {
 
     // A failed or interrupted save leaves a durable local draft. Never replace it
     // with an older server copy on the next mount.
-    const hasPendingLocalDraft = localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) !== null
+    const hasPendingLocalDraft = configSync.pendingToken(COMBAT_CONFIG_SYNC_PENDING_KEY) !== null
     if (hasPendingLocalDraft) {
       if (loadLocalConfig()) {
         configHydratedRef.current = true
@@ -662,7 +655,7 @@ export default function CombatTasks() {
         setConfigLoaded(true)
         return cleanup
       }
-      localStorage.removeItem(COMBAT_CONFIG_SYNC_PENDING_KEY)
+      configSync.clearPending(COMBAT_CONFIG_SYNC_PENDING_KEY)
     }
 
     // 加载保存的配置 - 优先从服务器加载
@@ -748,14 +741,14 @@ export default function CombatTasks() {
 
     const revision = configRevisionRef.current + 1
     configRevisionRef.current = revision
-    const syncToken = createCombatConfigSyncToken()
+    const syncToken = configSync.nextToken()
 
     localStorage.setItem('combatTaskInputs', JSON.stringify(taskInputs))
     localStorage.setItem('combatAdvancedParams', JSON.stringify(advancedParams))
     localStorage.setItem('combatAutoFormation', JSON.stringify(autoFormation))
     localStorage.setItem('combatCopilotSetExecutionMode', copilotSetExecutionMode)
     localStorage.setItem('combatCopilotSetSelections', JSON.stringify(copilotSetSelections))
-    localStorage.setItem(COMBAT_CONFIG_SYNC_PENDING_KEY, syncToken)
+    configSync.markPending(COMBAT_CONFIG_SYNC_PENDING_KEY, syncToken)
 
     const saveTimer = window.setTimeout(() => {
       lastQueuedConfigFingerprintRef.current = fingerprint
@@ -768,8 +761,8 @@ export default function CombatTasks() {
   const handleRetryConfigSave = async () => {
     if (isRetryingConfigSave) return
     const revision = configRevisionRef.current
-    const syncToken = localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) ?? createCombatConfigSyncToken()
-    localStorage.setItem(COMBAT_CONFIG_SYNC_PENDING_KEY, syncToken)
+    const syncToken = configSync.pendingToken(COMBAT_CONFIG_SYNC_PENDING_KEY) ?? configSync.nextToken()
+    configSync.markPending(COMBAT_CONFIG_SYNC_PENDING_KEY, syncToken)
     setIsRetryingConfigSave(true)
     try {
       await syncConfig({

@@ -21,6 +21,7 @@ import type {
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import { useTaskRestoreMonitor } from '../hooks/useTaskRestoreMonitor'
+import { createConfigSyncGate } from '../utils/configSync'
 import {
   getRoguelikeModeChoices,
   getRoguelikeRoleChoices,
@@ -35,15 +36,7 @@ type RoguelikeUserConfig = {
 }
 
 const ROGUELIKE_CONFIG_SYNC_PENDING_KEY = 'roguelikeConfigSyncPending'
-let roguelikeConfigSyncSequence = 0
-let roguelikeConfigSyncQueue: Promise<void> = Promise.resolve()
-
-const createRoguelikeConfigSyncToken = () => `${Date.now()}-${++roguelikeConfigSyncSequence}`
-const enqueueRoguelikeConfigSync = <T,>(operation: () => Promise<T>) => {
-  const result = roguelikeConfigSyncQueue.then(operation, operation)
-  roguelikeConfigSyncQueue = result.then(() => undefined, () => undefined)
-  return result
-}
+const configSync = createConfigSyncGate()
 
 const THEME_PRESETS: Record<RoguelikeMode, Array<{ value: string; label: string }>> = {
   roguelike: [
@@ -140,10 +133,10 @@ export default function RoguelikeTasks() {
     revision: number,
     syncToken: string,
     announceSuccess = false,
-  ) => enqueueRoguelikeConfigSync(async () => {
+  ) => configSync.enqueue(async () => {
     if (
       revision !== configRevisionRef.current
-      || localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) !== syncToken
+      || !configSync.isCurrent(ROGUELIKE_CONFIG_SYNC_PENDING_KEY, syncToken)
     ) return false
 
     try {
@@ -151,17 +144,17 @@ export default function RoguelikeTasks() {
       if (!result.success) throw new Error(maaApi.getErrorMessage(result))
       if (
         revision !== configRevisionRef.current
-        || localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) !== syncToken
+        || !configSync.isCurrent(ROGUELIKE_CONFIG_SYNC_PENDING_KEY, syncToken)
       ) return false
 
-      localStorage.removeItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY)
+      configSync.clearPending(ROGUELIKE_CONFIG_SYNC_PENDING_KEY)
       setConfigSyncError(null)
       if (announceSuccess) setStatusMessage('肉鸽配置已同步', 'success')
       return true
     } catch (error) {
       if (
         revision !== configRevisionRef.current
-        || localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) !== syncToken
+        || !configSync.isCurrent(ROGUELIKE_CONFIG_SYNC_PENDING_KEY, syncToken)
       ) return false
 
       const detail = error instanceof Error && error.message ? error.message : '暂时无法连接服务器'
@@ -207,7 +200,7 @@ export default function RoguelikeTasks() {
     }
 
     // A pending local draft is newer than the server copy by definition.
-    const hasPendingLocalDraft = localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) !== null
+    const hasPendingLocalDraft = configSync.pendingToken(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) !== null
     if (hasPendingLocalDraft) {
       if (loadLocalConfig()) {
         configHydratedRef.current = true
@@ -215,7 +208,7 @@ export default function RoguelikeTasks() {
         setConfigLoaded(true)
         return cleanup
       }
-      localStorage.removeItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY)
+      configSync.clearPending(ROGUELIKE_CONFIG_SYNC_PENDING_KEY)
     }
 
     // 加载保存的配置 - 优先从服务器加载
@@ -273,11 +266,11 @@ export default function RoguelikeTasks() {
 
     const revision = configRevisionRef.current + 1
     configRevisionRef.current = revision
-    const syncToken = createRoguelikeConfigSyncToken()
+    const syncToken = configSync.nextToken()
 
     localStorage.setItem('roguelikeTaskInputs', JSON.stringify(taskInputs))
     localStorage.setItem('roguelikeAdvancedParams', JSON.stringify(advancedParams))
-    localStorage.setItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY, syncToken)
+    configSync.markPending(ROGUELIKE_CONFIG_SYNC_PENDING_KEY, syncToken)
     const saveTimer = window.setTimeout(() => {
       lastQueuedConfigFingerprintRef.current = fingerprint
       void syncConfig(config, revision, syncToken)
@@ -289,8 +282,8 @@ export default function RoguelikeTasks() {
   const handleRetryConfigSave = async () => {
     if (isRetryingConfigSave) return
     const revision = configRevisionRef.current
-    const syncToken = localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) ?? createRoguelikeConfigSyncToken()
-    localStorage.setItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY, syncToken)
+    const syncToken = configSync.pendingToken(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) ?? configSync.nextToken()
+    configSync.markPending(ROGUELIKE_CONFIG_SYNC_PENDING_KEY, syncToken)
     setIsRetryingConfigSave(true)
     try {
       await syncConfig({ taskInputs, advancedParams }, revision, syncToken, true)

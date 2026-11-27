@@ -25,7 +25,6 @@ without re-investigation.
 | G5 | P2 | go | Shared HTTP client/retry factory | 10 `&http.Client{...}` sites; retries only in PRTS |
 | G10 | P2 | go | One bootstrap for desktop and headless mounts | `go/main.go:277-289` vs `cmd/server/main.go:40-50` |
 | C5 | P1 | client | Derive page `isRunning` from the global run projection; keep local state only for submit-in-flight | four local flags; `statusStore.runStatus` + `runStore` already project runs; behavior-sensitive |
-| C6 | P1 | client | One persisted-draft/sync module with per-domain adapters | three `*ConfigSyncPending` implementations; 84 raw `localStorage` references |
 | C7 | P2 | client | Split `services/api.ts` into `api/client.ts` + endpoint modules; unify `maaApi` and standalone exports | 1,305 lines, 89 calls, 37 standalone functions |
 | C10 | P2 | client | Complete the common barrel; move page skeletons next to pages; remove env-specific DOM branches | `Loading.tsx` 967 lines; 11 deep imports; `fields.tsx:64,172` test-only branches |
 | C11 | P2 | client | Extract pure helpers from giant pages | `AutomationTasks.tsx:29-150,283,1745-1785`; `Dashboard.tsx:146-300,348-378` |
@@ -63,3 +62,4 @@ without re-investigation.
 - Docs drift fixed (action count, state path, Docker ADB, go/README verify, PLAN stale entries); root package renamed.
 - `LA_PLUMA_MAX_REALTIME_LOGS` implemented and documented; buffer size now config-owned.
 - Storage filenames and the `user-configs` path owned by `config.Paths`; seven packages migrated.
+- Config sync token/queue/pending-key protocol centralized in `utils/configSync.ts`; three task pages migrated.

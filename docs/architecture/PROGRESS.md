@@ -189,6 +189,19 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite, vet, gofmt; added path tests.
 - Follow-up: the JSON schemas themselves remain untyped (G3).
 
+### Round 18 — one draft-sync protocol (2026-11-28)
+
+- AutomationTasks, CombatTasks, and RoguelikeTasks each had their own token
+  sequence, serialization queue, and pending-key localStorage calls.
+- Added `utils/configSync.ts` (`createConfigSyncGate`) with token generation,
+  serialization, and pending-token semantics, plus tests for ordering,
+  failure recovery, and per-key tracking.
+- Migrated all three pages; automation's save now runs through the same gate
+  instead of a page-local promise ref.
+- Deleted: three token/queue implementations and one promise ref.
+- Verified: type-check, 75 test files / 517 tests, lint at the ratchet.
+
+
 
 
 
