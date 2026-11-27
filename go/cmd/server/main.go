@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/app"
-	"github.com/mps233/la-pluma/go/internal/app/quotes"
 	"github.com/mps233/la-pluma/go/internal/config"
 	scwebrtc "github.com/mps233/la-pluma/go/internal/infra/webrtc"
 	"github.com/mps233/la-pluma/go/internal/transport/agentapi"
 	"github.com/mps233/la-pluma/go/internal/transport/httpapi"
+	"github.com/mps233/la-pluma/go/internal/transport/quotesapi"
 	"github.com/mps233/la-pluma/go/internal/transport/signaling"
 )
 
@@ -49,7 +49,7 @@ func main() {
 	server := httpapi.New(cfg, logger,
 		httpapi.WithAgentHandler(agentapi.New(application, logger)),
 		httpapi.WithSignalingHandler(signalServer.Handler()),
-		httpapi.WithQuotesHandler(quotes.NewHandler(application.Quotes)),
+		httpapi.WithQuotesHandler(quotesapi.NewHandler(application.Quotes)),
 		httpapi.WithAssetsHandler(application.Assets),
 	)
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))

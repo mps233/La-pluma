@@ -1,8 +1,9 @@
-package quotes
+package quotesapi
 
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/mps233/la-pluma/go/internal/app/quotes"
 	"io"
 	"net/http"
 
@@ -17,12 +18,12 @@ const maxRequestBody = 1 << 20
 // The Node routes return raw JSON (not the success/message/data envelope), so
 // these handlers do the same to keep the client contract unchanged.
 type Handler struct {
-	service *Service
+	service *quotes.Service
 	mux     *http.ServeMux
 }
 
 // NewHandler builds the quotes router for a service.
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *quotes.Service) *Handler {
 	handler := &Handler{service: service, mux: http.NewServeMux()}
 	handler.mux.HandleFunc("GET /daily", handler.daily)
 	handler.mux.HandleFunc("GET /all", handler.all)
@@ -78,7 +79,7 @@ func (h *Handler) add(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "缺少干员名或台词")
 		return
 	}
-	quotes, err := h.service.AddQuote(OperatorQuote{OperatorID: "", Operator: operator, Quote: quote})
+	quotes, err := h.service.AddQuote(quotes.OperatorQuote{OperatorID: "", Operator: operator, Quote: quote})
 	if err != nil {
 		writeServiceError(w, err)
 		return

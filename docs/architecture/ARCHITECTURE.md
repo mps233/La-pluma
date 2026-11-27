@@ -92,8 +92,9 @@ depends on them.
    than one writer. The endpoint package is now split by domain (no file over
    800 lines); the remaining fix is to delegate lifecycle to an `app` run
    scope.
-2. Several `app`/`infra` packages expose `http.Handler` and write their own
-   envelopes (`quotes`, `assets`). Target: handlers in transport using `httpx`.
+2. `infra/assets` still owns its HTTP router and raw response writer. Quotes
+   moved to `transport/quotesapi`; assets needs a small transport wrapper
+   before the same is possible.
 3. `operbox.json` / `depot.json` and the `user-configs` path are composed in
    multiple packages without one typed owner.
 4. JS-coercion helpers and PRTS clients exist in more than one package.

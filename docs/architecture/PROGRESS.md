@@ -271,6 +271,19 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite, vet, gofmt.
 - Follow-up: the run lifecycle is still called from handlers (G7).
 
+### Round 22 — move the quotes router into transport (2026-11-28)
+
+- `app/quotes` owned a seven-route `http.Handler` with its own raw JSON
+  writer, so the application package depended on HTTP routing.
+- Moved the handler and its tests to `transport/quotesapi`; both entries mount
+  it from there. The raw JSON contract is unchanged (the Node routes never
+  used the success envelope).
+- Deleted: the handler from the application package; no route or payload
+  change.
+- Verified: quotes handler/service, httpapi, and full Go suite.
+- Follow-up: `infra/assets` still owns its router (G6 remainder).
+
+
 
 
 

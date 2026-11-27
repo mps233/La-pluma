@@ -1,8 +1,9 @@
-package quotes
+package quotesapi
 
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/mps233/la-pluma/go/internal/app/quotes"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,9 +12,9 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 )
 
-func newTestRouter(t *testing.T) (http.Handler, *Service) {
+func newTestRouter(t *testing.T) (http.Handler, *quotes.Service) {
 	t.Helper()
-	service := NewWithOptions(Options{
+	service := quotes.NewWithOptions(quotes.Options{
 		Paths:  config.Paths{DataDir: t.TempDir()},
 		Random: func(n int) int { return 0 },
 	})
@@ -41,7 +42,7 @@ func performRequest(t *testing.T, router http.Handler, method, target string, bo
 	return recorder
 }
 
-func decodeQuoteList(t *testing.T, recorder *httptest.ResponseRecorder) []OperatorQuote {
+func decodeQuoteList(t *testing.T, recorder *httptest.ResponseRecorder) []quotes.OperatorQuote {
 	t.Helper()
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
@@ -49,7 +50,7 @@ func decodeQuoteList(t *testing.T, recorder *httptest.ResponseRecorder) []Operat
 	if contentType := recorder.Header().Get("Content-Type"); contentType != "application/json; charset=utf-8" {
 		t.Fatalf("content type = %q", contentType)
 	}
-	var quotes []OperatorQuote
+	var quotes []quotes.OperatorQuote
 	if err := json.Unmarshal(recorder.Body.Bytes(), &quotes); err != nil {
 		t.Fatalf("decode: %v (%s)", err, recorder.Body.String())
 	}
@@ -60,7 +61,7 @@ func TestHandlerReads(t *testing.T) {
 	router, _ := newTestRouter(t)
 
 	all := decodeQuoteList(t, performRequest(t, router, http.MethodGet, "/api/operator-quotes/all", nil))
-	if len(all) != len(DefaultQuotes) {
+	if len(all) != len(quotes.DefaultQuotes) {
 		t.Fatalf("all len = %d", len(all))
 	}
 
@@ -68,7 +69,7 @@ func TestHandlerReads(t *testing.T) {
 	if dailyRecorder.Code != http.StatusOK {
 		t.Fatalf("daily status = %d", dailyRecorder.Code)
 	}
-	var daily OperatorQuote
+	var daily quotes.OperatorQuote
 	if err := json.Unmarshal(dailyRecorder.Body.Bytes(), &daily); err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +78,7 @@ func TestHandlerReads(t *testing.T) {
 	}
 
 	randomRecorder := performRequest(t, router, http.MethodGet, "/api/operator-quotes/random", nil)
-	var random OperatorQuote
+	var random quotes.OperatorQuote
 	if err := json.Unmarshal(randomRecorder.Body.Bytes(), &random); err != nil || random.Operator == "" {
 		t.Fatalf("random = %#v err=%v", random, err)
 	}
@@ -87,7 +88,7 @@ func TestHandlerReads(t *testing.T) {
 	if operatorRecorder.Code != http.StatusOK {
 		t.Fatalf("operator status = %d", operatorRecorder.Code)
 	}
-	var quote OperatorQuote
+	var quote quotes.OperatorQuote
 	if err := json.Unmarshal(operatorRecorder.Body.Bytes(), &quote); err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +118,7 @@ func TestHandlerCRUD(t *testing.T) {
 		"operator": "自定义干员",
 		"quote":    "第一条",
 	}))
-	if len(created) != len(DefaultQuotes)+1 {
+	if len(created) != len(quotes.DefaultQuotes)+1 {
 		t.Fatalf("created len = %d", len(created))
 	}
 	last := created[len(created)-1]
@@ -132,7 +133,7 @@ func TestHandlerCRUD(t *testing.T) {
 	if updatedRecorder.Code != http.StatusOK {
 		t.Fatalf("update status = %d body=%s", updatedRecorder.Code, updatedRecorder.Body.String())
 	}
-	var updated OperatorQuote
+	var updated quotes.OperatorQuote
 	if err := json.Unmarshal(updatedRecorder.Body.Bytes(), &updated); err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +142,7 @@ func TestHandlerCRUD(t *testing.T) {
 	}
 
 	deleted := decodeQuoteList(t, performRequest(t, router, http.MethodDelete, "/api/operator-quotes/operator/"+name, nil))
-	if len(deleted) != len(DefaultQuotes) {
+	if len(deleted) != len(quotes.DefaultQuotes) {
 		t.Fatalf("deleted len = %d", len(deleted))
 	}
 

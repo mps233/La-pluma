@@ -19,7 +19,7 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
-| G6 | P1 | go | Move `quotes`/`assets` HTTP handlers into `transport/` and use `httpx` for every response | 4 envelope implementations; `app/quotes/handler.go:38`, `infra/assets/handler.go:84` |
+| G6 | P1 | go | Move the `assets` HTTP router into `transport/` while keeping its raw-image contract | Quotes moved to `transport/quotesapi`; `infra/assets/handler.go:84` still owns routing and its own writer |
 | G7 | P1 | go | Give `app/agentrun` a run scope so transport only decodes/validates/delegates | `handlers_runs.go`, `handlers_copilot.go`, `handlers_schedule.go` still call begin/start/fail/stop; 5 lifecycle writers; high risk |
 | G5 | P2 | go | Shared HTTP client/retry factory | 10 `&http.Client{...}` sites; retries only in PRTS |
 | G10 | P2 | go | One bootstrap for desktop and headless mounts | `go/main.go:277-289` vs `cmd/server/main.go:40-50` |
@@ -65,3 +65,4 @@ without re-investigation.
 - `internal/app/logs` and the composition root now have direct tests.
 - Notifications and WebRTC use the shared platform-aware connection defaults; every environment variable is documented.
 - `agentapi/handler.go` split into 15 domain files (3,450 → 775 lines); file-size guard added.
+- Quotes HTTP handler moved from `app/quotes` to `transport/quotesapi`; raw JSON contract preserved.

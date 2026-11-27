@@ -29,11 +29,11 @@ import (
 
 	"github.com/mps233/la-pluma/go/internal/app"
 	configapp "github.com/mps233/la-pluma/go/internal/app/config"
-	"github.com/mps233/la-pluma/go/internal/app/quotes"
 	"github.com/mps233/la-pluma/go/internal/config"
 	scwebrtc "github.com/mps233/la-pluma/go/internal/infra/webrtc"
 	"github.com/mps233/la-pluma/go/internal/transport/agentapi"
 	"github.com/mps233/la-pluma/go/internal/transport/httpapi"
+	"github.com/mps233/la-pluma/go/internal/transport/quotesapi"
 	"github.com/mps233/la-pluma/go/internal/transport/signaling"
 )
 
@@ -282,7 +282,7 @@ func startDesktop() {
 	handler := httpapi.New(cfg, logger,
 		httpapi.WithAgentHandler(agentapi.New(application, logger)),
 		httpapi.WithSignalingHandler(signalServer.Handler()),
-		httpapi.WithQuotesHandler(quotes.NewHandler(application.Quotes)),
+		httpapi.WithQuotesHandler(quotesapi.NewHandler(application.Quotes)),
 		httpapi.WithAssetsHandler(application.Assets),
 		httpapi.WithTokenSource(func() string { return tokenHolder.Load().(string) }),
 	).Handler()
