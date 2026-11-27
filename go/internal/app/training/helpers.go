@@ -2,6 +2,7 @@ package training
 
 import (
 	"encoding/json"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 	"math"
 	"strconv"
 	"strings"
@@ -241,7 +242,7 @@ func settingString(settings TrainingSettings, key string) (string, bool) {
 }
 
 func formatISO(now time.Time) string {
-	return now.UTC().Format("2006-01-02T15:04:05.000Z")
+	return timefmt.FormatMillis(now)
 }
 
 func roundProgress(value float64) int {

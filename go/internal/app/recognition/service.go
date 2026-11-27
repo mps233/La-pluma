@@ -12,9 +12,8 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
-
-const timestampLayout = "2006-01-02T15:04:05.000Z"
 
 // LogReader reads the MAA debug log. Tests inject a fake reader so no MAA
 // process is started and no real log location is required.
@@ -312,7 +311,7 @@ func (s *Service) effectiveDataDir(request Request) string {
 }
 
 func (s *Service) timestamp() string {
-	return s.now().UTC().Format(timestampLayout)
+	return timefmt.FormatMillis(s.now())
 }
 
 func hasDepotPayload(payload Payload) bool {

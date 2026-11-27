@@ -3,6 +3,7 @@ package gamedata
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 	"math"
 	"regexp"
 	"strconv"
@@ -253,7 +254,7 @@ func roundToFixed4(value float64) float64 {
 }
 
 func dateOnly(now time.Time) string {
-	return now.UTC().Format("2006-01-02")
+	return now.UTC().Format(timefmt.DateLayout)
 }
 
 func stringValue(value any) (string, bool) {

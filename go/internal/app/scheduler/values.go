@@ -3,6 +3,7 @@ package scheduler
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 	"math"
 	"regexp"
 	"sort"
@@ -256,5 +257,5 @@ func isoMillis(epochMillis int64) string {
 	if epochMillis == 0 {
 		return ""
 	}
-	return time.UnixMilli(epochMillis).UTC().Format("2006-01-02T15:04:05.000Z")
+	return timefmt.FormatMillis(time.UnixMilli(epochMillis))
 }

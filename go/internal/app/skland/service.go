@@ -11,6 +11,7 @@ import (
 
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 // Options wires the Skland client and local snapshot store.
@@ -313,7 +314,7 @@ func (s *Service) Snapshot() (Snapshot, bool, error) {
 }
 
 func (s *Service) nowISO() string {
-	return s.now().UTC().Format("2006-01-02T15:04:05.000Z")
+	return timefmt.FormatMillis(s.now())
 }
 
 func chooseAccount(accounts []BindingAccount, uid string) (BindingAccount, error) {
@@ -429,7 +430,7 @@ func buildSanity(currentPtr, maxPtr *int, completePtr *int64) *Sanity {
 	return &Sanity{
 		Current:              current,
 		Max:                  max,
-		ReportAt:             time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
+		ReportAt:             timefmt.FormatMillis(time.Now()),
 		CompleteRecoveryTime: complete,
 	}
 }

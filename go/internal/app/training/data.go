@@ -11,6 +11,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 // battleDataCharPattern excludes reserve operators (char_5xx / char_6xx) from
@@ -566,7 +567,7 @@ func gameDay(now time.Time, clientType string) (string, int) {
 		offset = 9
 	}
 	shifted := now.UTC().Add(time.Duration(offset-4) * time.Hour)
-	return shifted.Format("2006-01-02"), int(shifted.Weekday())
+	return shifted.Format(timefmt.DateLayout), int(shifted.Weekday())
 }
 
 var errBattleDataUnavailable = &battleDataError{}

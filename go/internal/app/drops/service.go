@@ -18,6 +18,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 const (
@@ -208,7 +209,7 @@ func GetLocalDateString(at time.Time, timeZone string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return at.In(location).Format("2006-01-02"), nil
+	return at.In(location).Format(timefmt.DateLayout), nil
 }
 
 func loadLocation(timeZone string) (*time.Location, error) {
@@ -285,7 +286,7 @@ func (s *Service) RecordDrops(dropData any) (DropRecordFile, error) {
 
 	input := asRecord(dropData)
 	entry := DropRecordEntry{
-		Timestamp: s.now().UTC().Format("2006-01-02T15:04:05.000Z"),
+		Timestamp: timefmt.FormatMillis(s.now()),
 		Stage:     stringOrEmpty(coalesceValue(input, "stage")),
 		Times:     numberOrZero(coalesceValue(input, "times")),
 		Sanity:    numberOrZero(coalesceValue(input, "sanity")),
@@ -362,7 +363,7 @@ func (s *Service) GetRecentDrops(days int) ([]DropRecordFile, error) {
 
 	records := make([]DropRecordFile, 0, normalizedDays)
 	for index := 0; index < normalizedDays; index++ {
-		businessDate := base.AddDate(0, 0, -index).Format("2006-01-02")
+		businessDate := base.AddDate(0, 0, -index).Format(timefmt.DateLayout)
 		record, err := readRecordFile(s.recordPath(businessDate))
 		if err != nil {
 			return nil, dropError("DROP_RECORD_RECENT_READ_FAILED", "获取历史记录失败", err)

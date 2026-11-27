@@ -9,6 +9,7 @@ import (
 
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 const activityCacheTTL = 24 * 60 * 60 * 1000
@@ -331,7 +332,7 @@ func timeValueMillis(value any) (int64, bool) {
 			time.RFC3339,
 			"2006-01-02T15:04:05",
 			"2006-01-02 15:04:05",
-			"2006-01-02",
+			timefmt.DateLayout,
 		}
 		for _, layout := range layouts {
 			if parsed, err := time.Parse(layout, text); err == nil {

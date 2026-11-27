@@ -13,6 +13,7 @@ import (
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 // PartialResultsError lets a plan executor expose entries completed before a
@@ -367,7 +368,7 @@ func (s *Service) recordActivityCompletion(activity any, entries []CompletionEnt
 	sort.Strings(stages)
 	progress[code] = ActivityProgressEntry{
 		Stages:    stages,
-		UpdatedAt: s.now().UTC().Format("2006-01-02T15:04:05.000Z"),
+		UpdatedAt: timefmt.FormatMillis(s.now()),
 	}
 	return s.SaveActivityProgress(progress)
 }

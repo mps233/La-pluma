@@ -60,6 +60,7 @@ transport → app → infra / domain
 | User configs, MAA profiles, `cli.toml` | `internal/app/config` | JSON + TOML; atomic writes via `jsonstore` |
 | JSON persistence and atomic file replace | `internal/util/jsonstore` | `Read`/`Write`/`WriteRaw` |
 | JS value coercion for upstream JSON | `internal/util/jsval` | `Record`/`Array`/`Text`/`String`/`Number`/`Truthy`; migrate remaining packages |
+| API timestamp format | `internal/util/timefmt` | One millis layout + UTC formatter; offset/date layouts |
 | Public Agent API contract | `internal/contract` | Manifest and OpenAPI derive from one registry |
 | HTTP envelope and error mapping | `internal/transport/httpx` | `success/message/data/error/meta` |
 | Agent route registration | `internal/transport/agentapi` | Every advertised operation must resolve (tested) |

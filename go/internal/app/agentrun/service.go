@@ -15,6 +15,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 const (
@@ -897,7 +898,7 @@ func agentRunPersistenceError(filePath string, cause error) *apperrors.Error {
 }
 
 func formatTime(value time.Time) string {
-	return value.UTC().Format("2006-01-02T15:04:05.000Z")
+	return timefmt.FormatMillis(value)
 }
 
 func parseTime(value string) (time.Time, error) {

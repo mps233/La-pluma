@@ -8,6 +8,7 @@ import (
 	"time"
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 const (
@@ -78,7 +79,7 @@ func firstString(values ...*string) *string {
 }
 
 func formatISO(value time.Time) string {
-	return value.UTC().Format("2006-01-02T15:04:05.000Z")
+	return timefmt.FormatMillis(value)
 }
 
 // ageDays mirrors Date.parse + Math.round against the current clock.
@@ -101,7 +102,7 @@ func ageDays(timestamp *string, now time.Time) *int {
 func parseTimestamp(value string) (time.Time, bool) {
 	layouts := []string{
 		time.RFC3339Nano,
-		"2006-01-02",
+		timefmt.DateLayout,
 		"2006-01-02 15:04:05",
 	}
 	for _, layout := range layouts {

@@ -12,6 +12,7 @@ import (
 
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 // StaleResourceDays is the threshold from resourceUpdateService.ts: resources
@@ -90,7 +91,7 @@ func BuildResourceInfo(versionData any, modifiedAt *time.Time, now time.Time) Ma
 
 	var modified *string
 	if modifiedAt != nil {
-		formatted := modifiedAt.UTC().Format("2006-01-02T15:04:05.000Z07:00")
+		formatted := modifiedAt.UTC().Format(timefmt.OffsetMillisLayout)
 		modified = &formatted
 	}
 
@@ -168,7 +169,7 @@ func parseResourceTimestamp(value string) (time.Time, bool) {
 		{time.RFC3339Nano, time.UTC},
 		{"2006-01-02T15:04:05", time.Local},
 		{"2006-01-02T15:04:05.999999999", time.Local},
-		{"2006-01-02", time.UTC},
+		{timefmt.DateLayout, time.UTC},
 	}
 	for _, candidate := range layouts {
 		parsed, err := time.ParseInLocation(candidate.layout, normalized, candidate.location)

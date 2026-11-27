@@ -152,6 +152,19 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite, vet, gofmt.
 - Follow-up: thirteen packages still carry local copies (tracked in G1).
 
+### Round 15 — one timestamp format (2026-11-28)
+
+- Added `internal/util/timefmt` with the millis API layout, the offset layout
+  used by resource metadata, and the calendar-date layout; `FormatMillis`
+  always renders UTC.
+- Migrated 10 timestamp format sites (agentrun, mastery, activity, training,
+  drops, scheduler, skland ×2, recognition, updates) and six date-format
+  sites; deleted recognition's private `timestampLayout` constant.
+- Verified: full Go test suite, vet, gofmt.
+- Timezone strategies (game timezone vs business date vs provider time) were
+  left alone; only the layout is shared.
+
+
 
 
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 const (
@@ -115,7 +116,7 @@ func (c *Client) credByCode(ctx context.Context, code, deviceID string) (Credent
 	return Credentials{
 		Cred:      result.Data.Cred,
 		Token:     result.Data.Token,
-		UpdatedAt: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
+		UpdatedAt: timefmt.FormatMillis(time.Now()),
 	}, nil
 }
 
