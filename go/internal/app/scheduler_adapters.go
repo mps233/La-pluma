@@ -310,8 +310,7 @@ func (c trainingStageChecker) IsStageOpen(stage, clientType string) (bool, strin
 	return c.service.IsStageOpen(stage, clientType)
 }
 
-func newScheduler(cfg config.Config, logger *slog.Logger, runs *runapp.Service, executor *maaapp.Service, dropService *drops.Service, trainingService *training.Service, activityService *activity.Service, recognitionService *recognition.Service, notificationService *notifications.Service, configSource scheduler.ConfigSource, autoUpdater scheduler.AutoUpdater) *scheduler.Service {
-	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
+func newScheduler(cfg config.Config, logger *slog.Logger, runs *runapp.Service, executor *maaapp.Service, dropService *drops.Service, trainingService *training.Service, activityService *activity.Service, recognitionService *recognition.Service, notificationService *notifications.Service, configSource scheduler.ConfigSource, autoUpdater scheduler.AutoUpdater, profiles *configapp.Profiles) *scheduler.Service {
 	profile, _ := profiles.Load(configapp.DefaultProfileName)
 	resolved, _ := configapp.ResolveConnection(profile, nil)
 	defaults := scheduler.ConnectionDefaults{

@@ -8,6 +8,8 @@ import (
 	"regexp"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 )
 
 const DefaultProfileName = "default"
@@ -127,7 +129,7 @@ func (p *Profiles) Save(name string, value map[string]any) error {
 	if err != nil {
 		return profileSaveError(err)
 	}
-	if err := writeAtomic(path, encoded); err != nil {
+	if err := jsonstore.WriteRaw(path, encoded); err != nil {
 		return profileSaveError(err)
 	}
 	return nil

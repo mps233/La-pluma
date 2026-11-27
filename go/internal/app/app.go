@@ -160,11 +160,11 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Logger: logger,
 		Runner: maaServiceAdapter{service: maaActions},
 	})
-	schedulerService := newScheduler(cfg, logger, runs, maaActions, dropService, trainingService, activityService, recognitionService, notificationService, configStore, updatesAutoUpdater{service: updatesService})
+	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
+	schedulerService := newScheduler(cfg, logger, runs, maaActions, dropService, trainingService, activityService, recognitionService, notificationService, configStore, updatesAutoUpdater{service: updatesService}, profiles)
 	sklandService := skland.NewService(skland.Options{Paths: cfg.Paths, Logger: logger})
 	masteryService := newMasteryService(cfg, logger, maaServiceAdapter{service: maaActions}, executionManager, notificationService, masteryTrainingProbe{service: sklandService})
 	connectionService := connectionapp.New(connectionapp.Options{Logger: logger})
-	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
 	maaActions.SetLineHandler(func(stream, line string) {
 		runID, operationID := "", ""
 		if current, ok := runs.Current(); ok {
@@ -284,6 +284,3 @@ func instanceRole() string {
 	}
 	return "la-pluma"
 }
-
-// MAAServiceService exposes the MAA action service to transport layers.
-func (a *App) MAAServiceService() *maaapp.Service { return a.MAAService }

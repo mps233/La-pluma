@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 )
 
 var coreChannelNames = map[string]string{
@@ -119,7 +121,7 @@ func (c *CLIConfig) SetCoreChannel(channel any) (string, error) {
 	if err != nil {
 		return "", cliConfigWriteError(err)
 	}
-	if err := writeAtomic(c.path(), encoded); err != nil {
+	if err := jsonstore.WriteRaw(c.path(), encoded); err != nil {
 		return "", cliConfigWriteError(err)
 	}
 	return normalized, nil

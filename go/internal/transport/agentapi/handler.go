@@ -1079,7 +1079,7 @@ func (h *Handler) startGame(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
 	defer cancel()
-	run, replayed, err := h.app.MAAServiceService().StartGameWithOptions(ctx, maaapp.StartGameOptions{
+	run, replayed, err := h.app.MAAService.StartGameWithOptions(ctx, maaapp.StartGameOptions{
 		ClientType:       connection.ClientType,
 		Address:          connection.Address,
 		AccountName:      accountName,
@@ -1127,7 +1127,7 @@ func (h *Handler) runTask(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
 		defer cancel()
-		run, replayed, err := h.app.MAAServiceService().RunTaskWithOptions(ctx, taskConfig, wait, idempotencyKey(r), maaapp.RunTaskOptions{
+		run, replayed, err := h.app.MAAService.RunTaskWithOptions(ctx, taskConfig, wait, idempotencyKey(r), maaapp.RunTaskOptions{
 			Address: connection.Address,
 		})
 		if err != nil {
@@ -1166,7 +1166,7 @@ func (h *Handler) runTask(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
 	defer cancel()
-	run, replayed, err := h.app.MAAServiceService().Run(ctx, maaapp.RunRequest{
+	run, replayed, err := h.app.MAAService.Run(ctx, maaapp.RunRequest{
 		OperationID:    "run_task",
 		Command:        command,
 		Args:           args,
@@ -1225,7 +1225,7 @@ func (h *Handler) fight(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
 	defer cancel()
-	run, replayed, err := h.app.MAAServiceService().RunTaskWithOptions(ctx, taskConfig, effectiveWait, idempotencyKey(r), maaapp.RunTaskOptions{
+	run, replayed, err := h.app.MAAService.RunTaskWithOptions(ctx, taskConfig, effectiveWait, idempotencyKey(r), maaapp.RunTaskOptions{
 		Address: connection.Address,
 	})
 	if err != nil {
@@ -1292,7 +1292,7 @@ func (h *Handler) stopActions(w http.ResponseWriter, r *http.Request) {
 			stopOperationID = current.OperationID
 		}
 	}
-	outcome := h.app.MAAServiceService().StopCurrent(ctx)
+	outcome := h.app.MAAService.StopCurrent(ctx)
 	scheduleStopped := h.app.Scheduler.Stop(ctx)
 	webrtcStopped := false
 	if stopOperationID == "webrtc_start" {

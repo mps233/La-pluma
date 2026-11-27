@@ -76,6 +76,32 @@ func TestWriteMode(t *testing.T) {
 	}
 }
 
+func TestWriteRawPreservesBytesAndReplaces(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "cli.toml")
+	if err := WriteRaw(path, []byte("channel = \"Stable\"\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteRaw(path, []byte("channel = \"Beta\"\n")); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "channel = \"Beta\"\n" {
+		t.Fatalf("data = %q", data)
+	}
+	if os.PathSeparator != '\\' {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("mode = %o", info.Mode().Perm())
+		}
+	}
+}
+
 func numericInt(value any) int {
 	switch typed := value.(type) {
 	case json.Number:

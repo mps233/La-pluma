@@ -39,6 +39,14 @@ func Write(path string, value any, pretty bool) error {
 	if err != nil {
 		return err
 	}
+	return WriteRaw(path, data)
+}
+
+// WriteRaw atomically replaces path with already-encoded data using the same
+// same-directory temporary file, fsync, and rename contract as Write. Callers
+// that serialize a non-JSON format (for example TOML) use this so there is one
+// atomic write implementation in the backend.
+func WriteRaw(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	if err := EnsureDir(dir); err != nil {
 		return err
