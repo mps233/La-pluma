@@ -22,6 +22,41 @@ Observation from the baseline: `internal/app/logs`, `internal/domain/agentrun`,
 two are contract-critical (shared HTTP/error envelope) and are tracked in
 `TASKS.md`.
 
+## Convergence snapshot — 2026-11-28
+
+After twenty rounds the worktree has one declared owner for each of these
+concepts, with the old copies deleted:
+
+| Concept | Canonical owner | Enforced by |
+| --- | --- | --- |
+| Go layer direction | `internal/archguard` rules | `go test ./internal/archguard` |
+| Agent operation → route | `internal/contract` + `agentapi` mux | `route_contract_test.go` |
+| HTTP envelope and error mapping | `transport/httpx` + `util/errors` | unit tests |
+| Run status/record/DTO | `domain/agentrun` | contract tests |
+| Atomic persistence | `util/jsonstore` (`Write`, `WriteRaw`) | store tests |
+| JS value coercion | `util/jsval` | coercion tests |
+| Timestamp layouts | `util/timefmt` | layout tests |
+| Data file names and user-config dir | `config.Paths` | path tests |
+| Connection defaults | `app/config.ConnectionDefaultsFromEnv` | precedence tests |
+| Client global state | `client/src/state` + one barrel | type-check/tests |
+| Client HTTP access | `services/api.ts` | component tests + service boundary |
+| Client glass kit boundary | `components/glass` | ESLint `no-restricted-imports` |
+| Client formatting/errors | `utils/format.ts`, `utils/errorMessage.ts` | unit tests |
+| Client draft-sync protocol | `utils/configSync.ts` | gate tests |
+| Client lint level | `client/package.json` ratchet | `npm run lint` |
+
+Deleted along the way: the private atomic writer, `MAAServiceService`, the
+second `Profiles` cache, the dead `uibrik` kit, the `store/` vs `stores/`
+split, three token/queue implementations, and the local duration/timestamp/
+error copies.
+
+Remaining high-value work is recorded in `TASKS.md`; the largest items are the
+transport-owned run lifecycle (`G7`), the `handler.go` split that follows it
+(`G8`), typed operbox/depot schemas (`G3`), the remaining `jsval` packages
+(`G1`), one PRTS client (`G2`, blocked on retry semantics), the API module
+split (`C7`), and the visual token/CSS migrations (`C8`, `C9`). Workflow
+changes (`PD1`) remain intentionally untouched.
+
 ## Round log
 
 Rounds are appended in order. Each entry states scope, what changed, what was
