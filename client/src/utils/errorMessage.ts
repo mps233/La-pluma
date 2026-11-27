@@ -14,3 +14,15 @@ export function getResponseErrorMessage(error: unknown): string | null {
   const message = response?.data?.error
   return typeof message === 'string' ? message : null
 }
+
+/** Error message with a caller-supplied fallback for non-Error values. */
+export function getErrorMessageOr(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'string' && error) return error
+  return fallback
+}
+
+/** Prefer a server-provided response error, then the error's own message. */
+export function getApiErrorMessage(error: unknown): string {
+  return getResponseErrorMessage(error) || getErrorMessage(error)
+}

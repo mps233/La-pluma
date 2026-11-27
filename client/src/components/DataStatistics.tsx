@@ -9,6 +9,7 @@ import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxD
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { motion, useReducedMotion } from 'framer-motion'
 import { GlassCard, GlassSegmented } from '@/components/glass'
+import { formatDateTime } from '../utils/format'
 import {
   ChevronDown,
   Download,
@@ -144,18 +145,6 @@ const taskPanelClass = (isActive: boolean) =>
   `data-statistics-task-card !p-0${isActive ? ' is-active' : ''}`
 
 const chipClass = 'rounded-full bg-[var(--app-surface-muted)] px-2 py-0.5 text-xs whitespace-nowrap text-secondary'
-const timestampFormatter = new Intl.DateTimeFormat('zh-CN', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
-const formatTimestamp = (value: string) => {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : timestampFormatter.format(date)
-}
 const statisticsTabs = [
   {
     id: 'operbox',
@@ -1426,7 +1415,7 @@ export default function DataStatistics() {
                     { label: '全干员', value: operatorCatalogCount, unit: '位' },
                   ]}
                   meta={operBoxData.timestamp
-                    ? [{ label: '更新于', value: formatTimestamp(operBoxData.timestamp) }]
+                    ? [{ label: '更新于', value: formatDateTime(operBoxData.timestamp) }]
                     : undefined}
                 />
 
@@ -1669,7 +1658,7 @@ export default function DataStatistics() {
                   meta={[
                     { label: '库存最多', value: depotOverview.topItemName },
                     ...(depotData.timestamp
-                      ? [{ label: '最近识别', value: formatTimestamp(depotData.timestamp) }]
+                      ? [{ label: '最近识别', value: formatDateTime(depotData.timestamp) }]
                       : []),
                   ]}
                 />

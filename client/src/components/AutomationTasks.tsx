@@ -10,6 +10,7 @@ import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
 import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch, CjkText, TruncatedText, Select } from './common'
 import { CheckboxField, GlassSelectWithFill } from '@/components/common/fields'
+import { formatClockDuration } from '../utils/format'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
@@ -62,16 +63,6 @@ const formatScheduleTime = (hour: number, minute: number) => (
   `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 )
 
-const formatElapsedTime = (elapsedMs: number): string => {
-  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000))
-  const seconds = totalSeconds % 60
-  const totalMinutes = Math.floor(totalSeconds / 60)
-  const minutes = totalMinutes % 60
-  const hours = Math.floor(totalMinutes / 60)
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`
-}
-
 function RunElapsed({ startedAt }: { startedAt: number }) {
   const [now, setNow] = useState(() => Date.now())
 
@@ -80,7 +71,7 @@ function RunElapsed({ startedAt }: { startedAt: number }) {
     return () => window.clearInterval(timer)
   }, [startedAt])
 
-  return <>{formatElapsedTime(now - startedAt)}</>
+  return <>{formatClockDuration(now - startedAt)}</>
 }
 
 const parseScheduleTime = (time: string) => {

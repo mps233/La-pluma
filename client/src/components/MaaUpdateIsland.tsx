@@ -28,7 +28,7 @@ import {
   type MaaUpdateKind,
   type MaaUpdateOperation,
 } from '@/store/maaUpdateStore'
-import { formatDurationMs } from '@/utils/runIsland'
+import { formatDurationMs } from '@/utils/format'
 
 const ACTIVITY_ID = 'la-pluma-maa-update'
 

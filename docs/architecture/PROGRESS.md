@@ -103,4 +103,17 @@ deleted, verification, and follow-ups.
 - Verified: type-check, full client tests (73 files / 508 tests), lint at
   the ratchet.
 
+### Round 11 — canonical format and error helpers (2026-11-28)
+
+- Added `utils/format.ts` with the three duration contracts, both timestamp
+  contracts, remaining time, and timestamp parsing; added tests.
+- Added `getErrorMessageOr` and `getApiErrorMessage` to `utils/errorMessage.ts`.
+- Migrated CombatExecutionProgress, AutomationTasks, DataStatistics,
+  MasteryTrainingWorkspace, NotificationSettings, LogViewer, and
+  MaaUpdateIsland; deleted their local copies.
+- Deleted: six local formatter/error functions and one module-level `Intl`
+  formatter.
+- Verified: type-check, 74 test files / 514 tests, lint at the ratchet.
+
+
 

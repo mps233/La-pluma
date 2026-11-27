@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import '../styles/pages/logs.css'
 import { GlassSegmented } from '@/components/glass'
+import { getErrorMessageOr } from '@/utils/errorMessage'
 import {
   AlertCircle,
   ArrowDown,
@@ -120,10 +121,6 @@ function parseHistoryLine(line: string): LogEntry {
     level: normalizeLevel(match[3]),
     message: match[4] || line,
   }
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
 }
 
 const TASK_NAMES: Record<string, string> = {
@@ -728,7 +725,7 @@ export default function LogViewer() {
         && requestId === realtimeRequestIdRef.current
         && !viewingHistoryRef.current
       ) {
-        setRealtimeError(getErrorMessage(error, '暂时无法获取实时日志'))
+        setRealtimeError(getErrorMessageOr(error, '暂时无法获取实时日志'))
       }
     } finally {
       if (realtimeAbortRef.current === controller) realtimeAbortRef.current = null
@@ -745,7 +742,7 @@ export default function LogViewer() {
       setHistoryError(null)
     } catch (error) {
       if (mountedRef.current) {
-        setHistoryError(getErrorMessage(error, '暂时无法获取历史日志'))
+        setHistoryError(getErrorMessageOr(error, '暂时无法获取历史日志'))
       }
     }
   }, [])
@@ -777,7 +774,7 @@ export default function LogViewer() {
     } catch (error) {
       if (!mountedRef.current || !viewingHistoryRef.current || requestId !== historyRequestIdRef.current) return
       setLogs([])
-      setHistoryError(getErrorMessage(error, '读取日志文件失败'))
+      setHistoryError(getErrorMessageOr(error, '读取日志文件失败'))
     } finally {
       if (mountedRef.current && requestId === historyRequestIdRef.current) setLoading(false)
     }
@@ -914,7 +911,7 @@ export default function LogViewer() {
       setNotice({ type: 'success', text: result.message || '历史日志清理完成' })
       await loadHistoryFiles()
     } catch (error) {
-      const message = getErrorMessage(error, '清理历史日志失败')
+      const message = getErrorMessageOr(error, '清理历史日志失败')
       setNotice({ type: 'error', text: message })
       throw new Error(message)
     } finally {

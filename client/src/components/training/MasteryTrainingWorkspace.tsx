@@ -32,7 +32,8 @@ import {
   CjkText,
   TruncatedText,
 } from '../common'
-import { getResponseErrorMessage } from '../../utils/errorMessage'
+import { formatDateTimeCompact, formatRemainingDuration } from '../../utils/format'
+import { getApiErrorMessage } from '../../utils/errorMessage'
 import { useMasteryStore } from '../../store/masteryStore'
 import { getOperatorAvatarUrl } from '../../services/operatorQuotes'
 import {
@@ -97,44 +98,11 @@ const DISABLED_REASON_LABELS: Record<string, string> = {
   invalid_skill: '技能无效',
 }
 
-function getErrorMessageText(error: unknown): string {
-  return getResponseErrorMessage(error) || (error instanceof Error ? error.message : String(error))
-}
-
-function formatDateTime(value: string | null): string {
-  if (!value) return '—'
-  const time = Date.parse(value)
-  if (!Number.isFinite(time)) return '—'
-  const date = new Date(time)
-  if (date.getFullYear() !== new Date().getFullYear()) {
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 function phaseTone(phase: MasteryItemPhase): string {
   if (phase === 'completed') return 'status-success'
   if (phase === 'blocked' || phase === 'failed') return 'status-warning'
   if (phase === 'training' || phase === 'running' || phase === 'starting' || phase === 'verifying') return 'status-info'
   return 'surface-soft text-secondary'
-}
-
-function formatRemain(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return '已完成或空闲'
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  return hours > 0 ? `${hours} 小时 ${minutes} 分` : `${minutes} 分钟`
 }
 
 function itemProgress(item: MasteryQueueItem): string {
@@ -483,7 +451,7 @@ export default function MasteryTrainingWorkspace() {
       useMasteryStore.getState().applyStatus(response.data)
       setStatusError(null)
     } catch (error) {
-      setStatusError(getErrorMessageText(error))
+      setStatusError(getApiErrorMessage(error))
     } finally {
       setStatusLoading(false)
     }
@@ -508,7 +476,7 @@ export default function MasteryTrainingWorkspace() {
       setCatalog(response.data.operators || [])
       setCatalogError(null)
     } catch (error) {
-      if (requestId === catalogRequestRef.current) setCatalogError(getErrorMessageText(error))
+      if (requestId === catalogRequestRef.current) setCatalogError(getApiErrorMessage(error))
     } finally {
       if (requestId === catalogRequestRef.current) setCatalogLoading(false)
     }
@@ -542,7 +510,7 @@ export default function MasteryTrainingWorkspace() {
       setSklandStatus(response.data || null)
       await loadSkland(true)
     } catch (error) {
-      setSklandError(getErrorMessageText(error))
+      setSklandError(getApiErrorMessage(error))
     } finally {
       setSklandPending(null)
     }
@@ -579,7 +547,7 @@ export default function MasteryTrainingWorkspace() {
       }
       await loadSkland(true)
     } catch (error) {
-      setSklandError(getErrorMessageText(error))
+      setSklandError(getApiErrorMessage(error))
     } finally {
       setSklandPending(null)
     }
@@ -609,7 +577,7 @@ export default function MasteryTrainingWorkspace() {
       setSklandStatus(syncResponse.data || null)
       await loadSkland(true)
     } catch (error) {
-      setSklandError(getErrorMessageText(error))
+      setSklandError(getApiErrorMessage(error))
     } finally {
       setSklandPending(null)
     }
@@ -627,7 +595,7 @@ export default function MasteryTrainingWorkspace() {
       setSklandStatus({ configured: false, characterCount: 0 })
       setSklandSnapshot(null)
     } catch (error) {
-      setSklandError(getErrorMessageText(error))
+      setSklandError(getApiErrorMessage(error))
     } finally {
       setSklandPending(null)
       setSklandClearOpen(false)
@@ -650,7 +618,7 @@ export default function MasteryTrainingWorkspace() {
         setPreflight(response.data)
       })
       .catch(error => {
-        if (active) setPreflightError(getErrorMessageText(error))
+        if (active) setPreflightError(getApiErrorMessage(error))
       })
       .finally(() => {
         if (active) setPreflightLoading(false)
@@ -692,7 +660,7 @@ export default function MasteryTrainingWorkspace() {
       }
       setDetail(response.data)
     } catch (error) {
-      if (requestId === requestRef.current) setDetailError(getErrorMessageText(error))
+      if (requestId === requestRef.current) setDetailError(getApiErrorMessage(error))
     } finally {
       if (requestId === requestRef.current) setDetailLoading(false)
     }
@@ -719,7 +687,7 @@ export default function MasteryTrainingWorkspace() {
       setDetail(null)
       await loadStatus()
     } catch (error) {
-      setAddError(getErrorMessageText(error))
+      setAddError(getApiErrorMessage(error))
     } finally {
       setAddSubmitting(false)
     }
@@ -736,7 +704,7 @@ export default function MasteryTrainingWorkspace() {
       }
       await loadStatus()
     } catch (error) {
-      setActionError(getErrorMessageText(error))
+      setActionError(getApiErrorMessage(error))
     } finally {
       setActionPending(null)
     }
@@ -1003,7 +971,7 @@ export default function MasteryTrainingWorkspace() {
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-tertiary">
                     <span>等待 {waitingCount} · 执行 {runningCount} · 训练 {status?.counts.training || 0} · 需处理 {attentionCount} · 完成 {status?.counts.completed || 0}</span>
                     <span className="flex items-center gap-2">
-                      {status?.scheduler?.lastTickAt && <span>检查 {formatDateTime(status.scheduler.lastTickAt)}</span>}
+                      {status?.scheduler?.lastTickAt && <span>检查 {formatDateTimeCompact(status.scheduler.lastTickAt)}</span>}
                       {status?.scheduler?.lastTickError && <span className="status-warning" title={status.scheduler.lastTickError}>上次检查失败</span>}
                     </span>
                   </div>
@@ -1064,7 +1032,7 @@ export default function MasteryTrainingWorkspace() {
                               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-tertiary">
                                 <span className="font-semibold text-secondary">{itemProgress(item)}</span>
                                 {item.startedLevel && <span>已开始 M{item.startedLevel}</span>}
-                                {item.nextProbeAt && item.phase === 'training' && <span>下次检查 {formatDateTime(item.nextProbeAt)}</span>}
+                                {item.nextProbeAt && item.phase === 'training' && <span>下次检查 {formatDateTimeCompact(item.nextProbeAt)}</span>}
                               </div>
                               {item.blocked?.message && (
                                 <div className="mt-2 text-xs leading-5 status-warning">{item.blocked.message}</div>
@@ -1317,11 +1285,11 @@ export default function MasteryTrainingWorkspace() {
                 {sklandStatus.nickname || '森空岛账号'} · {sklandStatus.uid || '未绑定'}
               </div>
               <div className="mt-1 text-xs text-tertiary">
-                {sklandStatus.channel || '未知区服'} · 上次同步 {formatDateTime(sklandStatus.lastSyncedAt || null)} · {sklandStatus.characterCount} 名干员{sklandStatus.autoRefresh ? ' · 自动续期已开启' : ''}
+                {sklandStatus.channel || '未知区服'} · 上次同步 {formatDateTimeCompact(sklandStatus.lastSyncedAt || null)} · {sklandStatus.characterCount} 名干员{sklandStatus.autoRefresh ? ' · 自动续期已开启' : ''}
               </div>
               {sklandStatus.training && (
                 <div className="mt-1 text-xs text-secondary">
-                  训练室：{sklandStatus.training.traineeName || sklandStatus.training.traineeId || '未知'} · {formatRemain(sklandStatus.training.remainSecs)}
+                  训练室：{sklandStatus.training.traineeName || sklandStatus.training.traineeId || '未知'} · {formatRemainingDuration(sklandStatus.training.remainSecs)}
                 </div>
               )}
             </div>

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentRun } from '@/types/run'
 import {
-  formatDurationMs,
   formatRunDuration,
   runFinishedWithin,
   runProgressOf,
@@ -103,10 +102,6 @@ describe('formatRunDuration', () => {
     expect(formatRunDuration('2026-11-14T10:00:00Z', '2026-11-14T10:00:48Z')).toBe('48 秒')
     expect(formatRunDuration('2026-11-14T10:00:00Z', '2026-11-14T10:03:20Z')).toBe('3 分 20 秒')
     expect(formatRunDuration('2026-11-14T10:00:00Z', '2026-11-14T11:05:00Z')).toBe('1 小时 5 分')
-  })
-
-  it('drops the seconds once the run passes an hour', () => {
-    expect(formatDurationMs(3_725_000)).toBe('1 小时 2 分')
   })
 
   it('refuses a missing or backwards interval', () => {

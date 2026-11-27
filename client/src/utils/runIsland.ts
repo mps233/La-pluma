@@ -1,5 +1,6 @@
 import type { AgentRun, RunTaskResult, RunTaskResultStatus } from '@/types/run'
 import { isActiveRunState } from '@/types/run'
+import { formatDurationMs } from './format'
 
 /**
  * The server writes task results with `state` ("succeeded", "failed", …) while the copilot path
@@ -108,15 +109,4 @@ export function formatRunDuration(startedAt?: string | null, finishedAt?: string
   const end = Date.parse(finishedAt)
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null
   return formatDurationMs(end - start)
-}
-
-/** "48 秒", "3 分 20 秒", "1 小时 5 分". */
-export function formatDurationMs(durationMs: number): string {
-  const totalSeconds = Math.max(0, Math.round(durationMs / 1000))
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  if (hours > 0) return `${hours} 小时 ${minutes} 分`
-  if (minutes > 0) return seconds > 0 ? `${minutes} 分 ${seconds} 秒` : `${minutes} 分钟`
-  return `${seconds} 秒`
 }

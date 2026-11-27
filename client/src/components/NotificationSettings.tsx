@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { getErrorMessageOr } from '../utils/errorMessage'
 import { Bell, Save, Send } from 'lucide-react'
 import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from '@/services/api'
 import { CjkText, Button, Switch } from './common'
@@ -51,9 +52,6 @@ const cloneConfig = (config: NotificationConfig = emptyConfig): NotificationConf
 
 const getResponseMessage = (data: NotificationResponse, fallback: string) =>
   data.message || data.errorInfo?.message || data.error || fallback
-
-const getErrorMessage = (error: unknown, fallback: string) =>
-  error instanceof Error && error.message ? error.message : fallback
 
 const requestNotificationConfig = (force = false): Promise<NotificationConfig> => {
   if (!force && cachedNotificationConfig) {
@@ -127,7 +125,7 @@ export default function NotificationSettings() {
       }
     } catch (error) {
       if (!mountedRef.current || activationRevision !== activationRevisionRef.current) return
-      setLoadError(getErrorMessage(error, '加载通知配置失败'))
+      setLoadError(getErrorMessageOr(error, '加载通知配置失败'))
     } finally {
       if (mountedRef.current && activationRevision === activationRevisionRef.current) setLoading(false)
     }
@@ -184,7 +182,7 @@ export default function NotificationSettings() {
       }
     } catch (error) {
       if (controller.signal.aborted || saveAbortRef.current !== controller) return
-      if (mountedRef.current) setNotice({ type: 'error', text: getErrorMessage(error, '通知配置保存失败') })
+      if (mountedRef.current) setNotice({ type: 'error', text: getErrorMessageOr(error, '通知配置保存失败') })
     } finally {
       if (saveAbortRef.current === controller) {
         saveAbortRef.current = null
@@ -216,7 +214,7 @@ export default function NotificationSettings() {
         : { type: 'error', text: getResponseMessage(data, '测试通知失败') })
     } catch (error) {
       if (controller.signal.aborted || !mountedRef.current || testAbortRef.current !== controller) return
-      setNotice({ type: 'error', text: getErrorMessage(error, '测试通知失败') })
+      setNotice({ type: 'error', text: getErrorMessageOr(error, '测试通知失败') })
     } finally {
       if (testAbortRef.current === controller) {
         testAbortRef.current = null
