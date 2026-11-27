@@ -19,6 +19,8 @@ La Pluma is a local web console for Arknights automation. The frontend configure
 Read these before broad work:
 
 - `README.md` for architecture, setup, Agent API behavior, and deployment.
+- `docs/architecture/` for the current module/ownership map, enforceable
+  invariants, the governance task pool, and decision records.
 - `DESIGN.md` for the authoritative visual and component rules.
 - `client/src/components/common/README.md` for component props and usage examples only; the visual rules live in the guide.
 - `go/README.md` and `go/docs/go-rewrite/PLAN.md` for backend setup, status, and known gaps.

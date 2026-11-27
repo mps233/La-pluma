@@ -1,0 +1,102 @@
+# Architecture Map
+
+This is the current intended architecture. It describes ownership and
+dependency direction; `DESIGN.md` remains authoritative for visual rules and
+`AGENTS.md` for working rules. Known deviations are listed at the end and
+tracked in `TASKS.md`.
+
+## System shape
+
+```
+React client (SPA / PWA / MyGo WebView)
+  │  HTTP /api/*, /webrtc-signaling, WebSocket
+  ▼
+Go backend
+  ├─ transport/httpapi      health, auth, static SPA, mounts
+  ├─ transport/agentapi     /api/agent surface (107 routes)
+  ├─ transport/signaling    WebRTC signaling
+  ├─ internal/app           composition root + cross-service adapters
+  ├─ internal/app/*         feature services
+  ├─ internal/domain        pure contract types
+  ├─ internal/infra         ADB, MAA CLI, scrcpy, Pion, gamedata, assets
+  ├─ internal/contract      Agent API registry → manifest + OpenAPI
+  └─ internal/util          errors, JSON store, instance lock
+  │
+  ▼
+External: maa CLI / MaaCore, adb, scrcpy-server, Telegram, PRTS, Skland
+```
+
+Entries: `go/cmd/server` (headless/Docker/NAS) and `go/main.go` (MyGo desktop)
+share `internal/app`. Both must mount the same transport surface.
+
+## Go layers and dependency direction
+
+Enforced by `go/internal/archguard` (`TestInternalDependenciesPointDownward`):
+
+```
+transport → app → infra / domain
+                ↘ util / config
+```
+
+- `internal/domain` and `internal/config` import no internal package.
+- `internal/contract` and `internal/archguard` are pure and import no internal package.
+- `internal/util` may import only `internal/util/*`.
+- `internal/infra` may import `internal/infra`, `internal/util`, `internal/config`, `internal/domain`.
+- `internal/app` may import any of the above, but an app subpackage must not
+  import the `internal/app` composition root.
+- `internal/transport` may import anything internal.
+- A new top-level `internal/<layer>` must be added to the guard's rule table;
+  the guard fails otherwise.
+
+## Canonical owners
+
+| Concept | Owner | Notes |
+| --- | --- | --- |
+| Run status strings, record, DTO, links | `internal/domain/agentrun` | Public API contract; tested |
+| Run persistence, idempotency, restore | `internal/app/agentrun` | Single writer in-process |
+| MAA process lifecycle | `internal/infra/maa` + `internal/app/maa` | CLI spawn/stop/line capture |
+| MAA execution lease | `internal/app/execution` | Cross-process admission |
+| Data directory and env-derived paths | `internal/config` | Services should not read env directly (known deviations) |
+| User configs, MAA profiles, `cli.toml` | `internal/app/config` | JSON + TOML; atomic writes via `jsonstore` |
+| JSON persistence and atomic file replace | `internal/util/jsonstore` | `Read`/`Write`/`WriteRaw` |
+| Public Agent API contract | `internal/contract` | Manifest and OpenAPI derive from one registry |
+| HTTP envelope and error mapping | `internal/transport/httpx` | `success/message/data/error/meta` |
+| Agent route registration | `internal/transport/agentapi` | Every advertised operation must resolve (tested) |
+| Scheduler state and flows | `internal/app/scheduler` | Startup resume + tracked runs |
+| Client HTTP access | `client/src/services/api.ts` | `fetchWithAuth`; known bypasses in `TASKS.md` |
+| Client global state | `client/src/store/` + `client/src/stores/` | Split is arbitrary; target is one `state/` module |
+| Client design system | `DESIGN.md`, `components/common`, `components/glass` | Tokens in `index.css` + `ios-theme.css` |
+| Vendored glass kit | `components/liquid-glass` | Verbatim; app imports go through `components/glass` |
+
+## Client layout
+
+- `App.tsx` owns routing and the visited-workspace keep-alive (max 4 pages).
+- Pages are lazy-loaded by `utils/pagePreload`; page-only CSS lives in
+  `styles/pages/*.css` and loads with the route.
+- `components/common/` holds shared primitives exported from the barrel;
+  page-specific visual compositions stay with their page.
+- `components/glass/` is the only application-facing Liquid Glass surface.
+- `services/api.ts` is the single HTTP client; page components should not
+  call `fetch` directly.
+- `store/` (dashboard/run/status/mastery/maaUpdate) and `stores/`
+  (ui/preview) are both Zustand; the directory split has no semantic basis.
+
+## Known deviations
+
+These are real today and tracked in `TASKS.md`; do not add new code that
+depends on them.
+
+1. `agentapi/handler.go` is 3,450 lines and can begin/stop runs directly, so
+   run lifecycle has more than one writer. Target: handlers delegate to an
+   `app` run scope.
+2. Several `app`/`infra` packages expose `http.Handler` and write their own
+   envelopes (`quotes`, `assets`). Target: handlers in transport using `httpx`.
+3. `operbox.json` / `depot.json` and the `user-configs` path are composed in
+   multiple packages without one typed owner.
+4. JS-coercion helpers and PRTS clients exist in more than one package.
+5. The client keeps local run flags alongside the global run projection, and
+   configuration-sync drafts are implemented per page.
+6. `client/src/store/` and `client/src/stores/` both exist.
+7. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
+   aspirational; page CSS and some JS colors still use literals.
+8. `internal/app/logs` has no tests; `agentapi` exercises ~17% of its routes.
