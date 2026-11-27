@@ -85,7 +85,8 @@ type Options struct {
 	// Platform returns the Node-style platform name (darwin, linux, win32).
 	// An empty function uses runtime.GOOS with windows mapped to win32.
 	Platform func() string
-	// IsDocker mirrors the Node `NODE_ENV=production` + /.dockerenv check.
+	// IsDocker reports whether the process runs inside a container. It is used
+	// to downgrade CLI self-update failures that cannot succeed in an image.
 	IsDocker func() bool
 	// Now supplies the clock used for resource age calculations.
 	Now func() time.Time
@@ -735,8 +736,11 @@ func defaultPlatform() string {
 }
 
 func defaultIsDocker() bool {
-	if os.Getenv("NODE_ENV") != "production" {
-		return false
+	// Docker writes /.dockerenv for every container; DOCKER_ENV is an explicit
+	// override for compatible runtimes that do not. NODE_ENV is a Node.js
+	// convention and is not set by the Go image, so it cannot be the signal.
+	if os.Getenv("DOCKER_ENV") != "" {
+		return true
 	}
 	_, err := os.Stat("/.dockerenv")
 	return err == nil

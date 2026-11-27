@@ -1014,3 +1014,21 @@ func TestGetResourceInfoUsesUntrackedDirQuery(t *testing.T) {
 		t.Fatalf("tracked calls = %#v", calls)
 	}
 }
+
+func TestDefaultIsDockerHonorsExplicitOverride(t *testing.T) {
+	t.Setenv("DOCKER_ENV", "1")
+	if !defaultIsDocker() {
+		t.Fatal("DOCKER_ENV override was ignored")
+	}
+}
+
+func TestDefaultIsDockerIgnoresNodeEnv(t *testing.T) {
+	t.Setenv("DOCKER_ENV", "")
+	t.Setenv("NODE_ENV", "production")
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		t.Skip("test host is a container")
+	}
+	if defaultIsDocker() {
+		t.Fatal("NODE_ENV alone must not mark the process as Docker")
+	}
+}
