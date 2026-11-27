@@ -34,11 +34,25 @@ export const createNavigateFallbackDenylist = (basePath: string): RegExp[] => {
   return denylist
 }
 
+/**
+ * Matches the app's own pages (the root and every `/app/<tab>` route) so the
+ * navigation route can try the network first. Anchored to the full URL the way
+ * Workbox matches RegExp routes; API, health, signaling and asset URLs fall
+ * outside it.
+ */
+export const createPageCachePattern = (basePath: string): RegExp => {
+  const escapedBasePath = basePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^https?://[^/]+${escapedBasePath}(?:app/[a-z]+/?)?$`)
+}
+
 export const createWorkboxConfig = (basePath: string): Options['workbox'] => {
   const escapedBasePath = basePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
   return {
     cleanupOutdatedCaches: true,
+    // Pages are network-first with a 4 s timeout (see the route below); the
+    // precached shell alone would always win over a fresh deployment.
+    navigateFallback: null,
     globPatterns: [
       // Only the entry stylesheet is part of the shell. Route CSS is emitted
       // next to its lazy chunk and cached on first visit instead of being
@@ -47,7 +61,6 @@ export const createWorkboxConfig = (basePath: string): Options['workbox'] => {
       '**/*.{html,ico,svg,woff,woff2}',
       'assets/{index,rolldown-runtime,react-vendor,motion-vendor,workbox-window.prod.es5}-*.js',
     ],
-    navigateFallbackDenylist: createNavigateFallbackDenylist(basePath),
     runtimeCaching: [
       {
         // Workbox matches RegExp routes against the full URL. Leaving the
@@ -90,6 +103,25 @@ export const createWorkboxConfig = (basePath: string): Options['workbox'] => {
           expiration: {
             maxEntries: 1200,
             maxAgeSeconds: 60 * 60 * 24 * 30,
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+      {
+        // App pages: the network first, and the cached copy only when the
+        // network is offline or slower than four seconds. This keeps a newly
+        // deployed shell from being masked by the precache, while a page the
+        // person has already visited still opens offline.
+        urlPattern: createPageCachePattern(basePath),
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'la-pluma-pages',
+          networkTimeoutSeconds: 4,
+          expiration: {
+            maxEntries: 16,
+            maxAgeSeconds: 60 * 60 * 24 * 7,
           },
           cacheableResponse: {
             statuses: [0, 200],
@@ -142,6 +174,37 @@ export const createWebManifest = (basePath: string): Partial<ManifestOptions> =>
   id: basePath,
   scope: basePath,
   start_url: basePath,
+  // Reuse an open app window instead of stacking a new one, and fall back to
+  // the browser's own choice when no window exists.
+  launch_handler: {
+    client_mode: ['navigate-existing', 'auto'],
+  },
+  // Long-press shortcuts to the places people open most often.
+  shortcuts: [
+    { name: '自动化', short_name: '自动化', url: `${basePath}app/automation` },
+    { name: '作业', short_name: '作业', url: `${basePath}app/combat` },
+    { name: '日志', short_name: '日志', url: `${basePath}app/logs` },
+    { name: '配置', short_name: '配置', url: `${basePath}app/config` },
+  ],
+  // One narrow (phone) and one wide shot for a richer install sheet.
+  screenshots: [
+    {
+      src: `${basePath}screenshots/app-phone.png`,
+      sizes: '390x770',
+      type: 'image/png',
+      form_factor: 'narrow',
+      label: '手机上的控制台',
+    },
+    {
+      src: `${basePath}screenshots/app-wide.png`,
+      sizes: '1440x900',
+      type: 'image/png',
+      form_factor: 'wide',
+      label: '桌面上的控制台',
+    },
+  ],
+  // A single canonical set: the browser snapshots one of these at install
+  // time and cannot follow the app's light/dark setting afterwards.
   icons: [
     {
       src: 'pwa-graphite-192x192.png',
@@ -155,25 +218,6 @@ export const createWebManifest = (basePath: string): Partial<ManifestOptions> =>
     },
     {
       src: 'pwa-maskable-512x512.png',
-      sizes: '512x512',
-      type: 'image/png',
-      purpose: 'maskable'
-    },
-    // Light-appearance variants. The browser picks one at install time and
-    // bakes it into the home screen, so the theme is only advisory; shipping
-    // both keeps a light-theme install from getting a black square.
-    {
-      src: 'pwa-graphite-light-192x192.png',
-      sizes: '192x192',
-      type: 'image/png'
-    },
-    {
-      src: 'pwa-graphite-light-512x512.png',
-      sizes: '512x512',
-      type: 'image/png'
-    },
-    {
-      src: 'pwa-maskable-light-512x512.png',
       sizes: '512x512',
       type: 'image/png',
       purpose: 'maskable'

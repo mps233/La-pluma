@@ -5,6 +5,7 @@ import {
   createDevPwaSupportPlugin,
   createDevServiceWorkerCleanupScript,
   createNavigateFallbackDenylist,
+  createPageCachePattern,
   createWebManifest,
   createWorkboxConfig,
   normalizeBasePath,
@@ -96,6 +97,39 @@ describe('PWA base path configuration', () => {
     expect(isDenied('/la-pluma/health?probe=1')).toBe(true)
     expect(isDenied('/la-pluma/webrtc-signaling/socket')).toBe(true)
     expect(isDenied('/la-pluma/automation')).toBe(false)
+  })
+
+  it('serves app pages network-first with a four-second fallback', () => {
+    const workbox = createWorkboxConfig('/la-pluma/')
+    const pageRoute = workbox.runtimeCaching?.find(
+      route => route.options?.cacheName === 'la-pluma-pages',
+    )
+
+    expect(workbox.navigateFallback).toBeNull()
+    expect(pageRoute).toBeDefined()
+    if (!pageRoute) throw new Error('Expected a page caching route')
+    expect(pageRoute.handler).toBe('NetworkFirst')
+    expect(pageRoute.options?.networkTimeoutSeconds).toBe(4)
+
+    const pattern = createPageCachePattern('/la-pluma/')
+    expect(matchesWorkboxRegExpRoute(pattern, 'https://la-pluma.test/la-pluma/')).toBe(true)
+    expect(matchesWorkboxRegExpRoute(pattern, 'https://la-pluma.test/la-pluma/app/automation')).toBe(true)
+    expect(matchesWorkboxRegExpRoute(pattern, 'https://la-pluma.test/la-pluma/app/logs/')).toBe(true)
+    expect(matchesWorkboxRegExpRoute(pattern, 'https://la-pluma.test/la-pluma/api/agent/manifest')).toBe(false)
+    expect(matchesWorkboxRegExpRoute(pattern, 'https://la-pluma.test/la-pluma/health')).toBe(false)
+    expect(matchesWorkboxRegExpRoute(pattern, 'https://la-pluma.test/la-pluma/assets/index-abc.js')).toBe(false)
+  })
+
+  it('ships install metadata with one canonical icon set', () => {
+    const manifest = createWebManifest('/la-pluma/')
+
+    expect(manifest.launch_handler).toEqual({ client_mode: ['navigate-existing', 'auto'] })
+    expect(manifest.shortcuts?.length).toBeGreaterThanOrEqual(2)
+    expect(manifest.shortcuts?.every(shortcut => shortcut.url.startsWith('/la-pluma/app/'))).toBe(true)
+    expect(manifest.screenshots?.map(screenshot => screenshot.form_factor)).toEqual(['narrow', 'wide'])
+    expect(manifest.icons?.map(icon => icon.sizes)).toEqual(['192x192', '512x512', '512x512'])
+    expect(manifest.icons?.some(icon => String(icon.src).includes('light'))).toBe(false)
+    expect(manifest.short_name?.length).toBeLessThanOrEqual(12)
   })
 
   it('precaches only the app shell and caches page chunks after use', () => {
