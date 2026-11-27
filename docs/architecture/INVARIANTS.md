@@ -18,6 +18,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | The `internal/app` layer owns no HTTP handlers (`ServeHTTP`/`http.Handler`) | `TestAppLayerHasNoHTTPHandlers` | `cd go && go test ./internal/archguard` |
 | Agent API endpoint files stay split by domain (≤ 800 production lines per file) | `TestAgentAPIFilesStaySmall` | `cd go && go test ./internal/archguard` |
 | Raw `fetch(` appears only in `services/api.ts`; everything else uses `fetchWithAuth`/`maaApi` | `services/apiBoundary.test.ts` | `npm run test --prefix client` |
+| New TS/TSX files contain no hex/rgb/hsl color literals outside the documented migration allowlist and vendored kits | `styles/themeColorBoundary.test.ts` | `npm run test --prefix client` |
 | Client lint does not exceed the current warning count | `--max-warnings 1` in `client/package.json` | `npm run lint --prefix client` |
 | Strict TypeScript, including `noUnusedLocals` and `noUnusedParameters` | `tsc --noEmit` | `npm run type-check --prefix client` |
 | Pages are code-split and PWA/page caching configuration is covered | `vite.config.test.ts` | `npm run test --prefix client` |
@@ -29,6 +30,7 @@ These are known gaps; do not treat them as guaranteed by CI:
 - `gofmt`, `-race`, staticcheck, or govulncheck in CI.
 - Client lint/type-check/test on non-main branches (only `docker-publish.yml`
   runs the client; `.github/` is intentionally untouched).
-- No hard-coded hex colors outside the token files.
+- No hard-coded hex colors in migrated files; the ratchet allowlist shrinks as
+  each file moves to semantic tokens.
 - No page CSS selectors duplicated in global CSS.
 - No HTTP handlers in `infra` (the assets router remains; `app` is enforced).

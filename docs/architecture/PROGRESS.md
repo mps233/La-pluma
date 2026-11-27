@@ -358,6 +358,15 @@ deleted, verification, and follow-ups.
   `os.LookupEnv`. Entry points remain allowed to snapshot paths into Config.
 - Verified: full Go test suite, vet, gofmt.
 
+### Round 29 — ratchet new color literals (2026-11-28)
+
+- Added `styles/themeColorBoundary.test.ts`: a build-time glob rejects new
+  hex/rgb/hsl literals in TS/TSX outside the vendored kits and a documented
+  allowlist of files awaiting visual migration.
+- The allowlist is the shrinking mechanism for C8; existing rendering is
+  untouched.
+- Verified: type-check and the boundary test.
+
 
 
 
