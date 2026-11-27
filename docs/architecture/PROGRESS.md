@@ -24,7 +24,7 @@ two are contract-critical (shared HTTP/error envelope) and are tracked in
 
 ## Convergence snapshot — 2026-11-28
 
-After twenty rounds the worktree has one declared owner for each of these
+After twenty-four rounds the worktree has one declared owner for each of these
 concepts, with the old copies deleted:
 
 | Concept | Canonical owner | Enforced by |
@@ -38,6 +38,9 @@ concepts, with the old copies deleted:
 | Timestamp layouts | `util/timefmt` | layout tests |
 | Data file names and user-config dir | `config.Paths` | path tests |
 | Connection defaults | `app/config.ConnectionDefaultsFromEnv` | precedence tests |
+| MAA executable | `config.Config.MAAExecutable` | config tests |
+| Quotes HTTP surface | `transport/quotesapi` | handler tests |
+| Agent API file layout | 15 domain files + 800-line guard | `TestAgentAPIFilesStaySmall` |
 | Client global state | `client/src/state` + one barrel | type-check/tests |
 | Client HTTP access | `services/api.ts` | `apiBoundary.test.ts` + component tests |
 | Client glass kit boundary | `components/glass` | ESLint `no-restricted-imports` |
@@ -47,15 +50,18 @@ concepts, with the old copies deleted:
 
 Deleted along the way: the private atomic writer, `MAAServiceService`, the
 second `Profiles` cache, the dead `uibrik` kit, the `store/` vs `stores/`
-split, three token/queue implementations, and the local duration/timestamp/
-error copies.
+split, three token/queue implementations, the local duration/timestamp/
+error copies, the 3,450-line `handler.go`, and the quotes router inside the
+application package.
 
 Remaining high-value work is recorded in `TASKS.md`; the largest items are the
-transport-owned run lifecycle (`G7`), the `handler.go` split that follows it
-(`G8`), typed operbox/depot schemas (`G3`), the remaining `jsval` packages
-(`G1`), one PRTS client (`G2`, blocked on retry semantics), the API module
-split (`C7`), and the visual token/CSS migrations (`C8`, `C9`). Workflow
-changes (`PD1`) remain intentionally untouched.
+transport-owned run lifecycle (`G7`), typed operbox/depot schemas (`G3`), the
+remaining `jsval` packages (`G1`, blocked on intentional null/undefined
+differences), one PRTS client (`G2`, blocked on retry semantics), the assets
+router move (`G6`), the API module split (`C7`), and the visual token/CSS
+migrations (`C8`, `C9`). Workflow changes (`PD1`) remain intentionally
+untouched. Each is either a decision-blocked item or a dedicated multi-round
+refactor; no half-migrated state was left behind.
 
 ## Round log
 
