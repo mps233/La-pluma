@@ -1,89 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getErrorMessageOr } from '../utils/errorMessage'
 import { Bell, Save, Send } from 'lucide-react'
-import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from '@/services/api'
+import {
+  cloneNotificationConfig,
+  maaApi,
+  notificationsApi,
+  type NotificationConfig,
+  type TelegramConfig,
+} from '@/services/api'
 import { CjkText, Button, Switch } from './common'
 
-interface TelegramConfig {
-  enabled: boolean
-  botToken: string
-  chatId: string
-}
-
-interface NotificationConfig {
-  enabled: boolean
-  channels: {
-    telegram: TelegramConfig
-  }
-}
-
-const emptyConfig: NotificationConfig = {
-  enabled: false,
-  channels: {
-    telegram: {
-      enabled: false,
-      botToken: '',
-      chatId: ''
-    }
-  }
-}
-
-interface NotificationResponse {
-  success: boolean
-  data?: NotificationConfig
-  message?: string
-  error?: string
-  errorInfo?: { message?: string }
-}
-
-let cachedNotificationConfig: NotificationConfig | null = null
-let pendingNotificationConfig: Promise<NotificationConfig> | null = null
-
-const cloneConfig = (config: NotificationConfig = emptyConfig): NotificationConfig => ({
-  enabled: Boolean(config.enabled),
-  channels: {
-    telegram: {
-      enabled: Boolean(config.channels?.telegram?.enabled),
-      botToken: config.channels?.telegram?.botToken || '',
-      chatId: config.channels?.telegram?.chatId || '',
-    },
-  },
-})
-
-const getResponseMessage = (data: NotificationResponse, fallback: string) =>
-  data.message || data.errorInfo?.message || data.error || fallback
-
-const requestNotificationConfig = (force = false): Promise<NotificationConfig> => {
-  if (!force && cachedNotificationConfig) {
-    return Promise.resolve(cloneConfig(cachedNotificationConfig))
-  }
-  if (pendingNotificationConfig) {
-    return pendingNotificationConfig.then(cloneConfig)
-  }
-
-  const request = (async () => {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/notifications/config`)
-    const data = await parseJsonResponse<NotificationResponse>(response)
-    if (!data.success) throw new Error(getResponseMessage(data, '加载通知配置失败'))
-
-    const config = cloneConfig(data.data)
-    cachedNotificationConfig = config
-    return config
-  })()
-
-  const sharedRequest = request.finally(() => {
-    if (pendingNotificationConfig === sharedRequest) pendingNotificationConfig = null
-  })
-  pendingNotificationConfig = sharedRequest
-  return sharedRequest.then(cloneConfig)
-}
-
-const updateNotificationConfigCache = (config: NotificationConfig) => {
-  cachedNotificationConfig = cloneConfig(config)
-}
-
 export default function NotificationSettings() {
-  const [config, setConfig] = useState<NotificationConfig>(() => cloneConfig())
+  const [config, setConfig] = useState<NotificationConfig>(() => cloneNotificationConfig())
   const [loading, setLoading] = useState(true)
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -117,7 +45,9 @@ export default function NotificationSettings() {
     if (force) setNotice(null)
 
     try {
-      const loadedConfig = await requestNotificationConfig(force)
+      const result = await notificationsApi.getConfig(force)
+      if (!result.success) throw new Error(maaApi.getErrorMessage(result, '加载通知配置失败'))
+      const loadedConfig = result.data ?? cloneNotificationConfig()
       if (!mountedRef.current || activationRevision !== activationRevisionRef.current) return
 
       if (draftRevisionRef.current === committedRevisionRef.current) {
@@ -156,7 +86,7 @@ export default function NotificationSettings() {
 
   const saveConfig = async () => {
     const controller = new AbortController()
-    const configSnapshot = cloneConfig(config)
+    const configSnapshot = cloneNotificationConfig(config)
     const revisionSnapshot = draftRevisionRef.current
     saveAbortRef.current?.abort()
     saveAbortRef.current = controller
@@ -164,21 +94,14 @@ export default function NotificationSettings() {
     setNotice(null)
 
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/agent/notifications/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(configSnapshot),
-        signal: controller.signal,
-      })
-      const data = await parseJsonResponse<NotificationResponse>(response)
+      const data = await notificationsApi.saveConfig(configSnapshot, controller.signal)
       if (controller.signal.aborted || saveAbortRef.current !== controller) return
 
       if (data.success) {
-        updateNotificationConfigCache(configSnapshot)
         committedRevisionRef.current = revisionSnapshot
         if (mountedRef.current) setNotice({ type: 'success', text: data.message || '通知配置已保存' })
       } else if (mountedRef.current) {
-        setNotice({ type: 'error', text: getResponseMessage(data, '通知配置保存失败') })
+        setNotice({ type: 'error', text: maaApi.getErrorMessage(data, '通知配置保存失败') })
       }
     } catch (error) {
       if (controller.signal.aborted || saveAbortRef.current !== controller) return
@@ -200,18 +123,12 @@ export default function NotificationSettings() {
     setNotice(null)
 
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/test-notification-channel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: 'telegram', config: telegramSnapshot }),
-        signal: controller.signal,
-      })
-      const data = await parseJsonResponse<NotificationResponse>(response)
+      const data = await notificationsApi.testChannel('telegram', telegramSnapshot, controller.signal)
       if (controller.signal.aborted || !mountedRef.current || testAbortRef.current !== controller) return
 
       setNotice(data.success
         ? { type: 'success', text: data.message || '测试通知已发送' }
-        : { type: 'error', text: getResponseMessage(data, '测试通知失败') })
+        : { type: 'error', text: maaApi.getErrorMessage(data, '测试通知失败') })
     } catch (error) {
       if (controller.signal.aborted || !mountedRef.current || testAbortRef.current !== controller) return
       setNotice({ type: 'error', text: getErrorMessageOr(error, '测试通知失败') })

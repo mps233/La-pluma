@@ -4,17 +4,74 @@ import { Activity, type ComponentType } from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { NotificationConfig } from '@/services/api'
 
 const mocks = vi.hoisted(() => ({
   fetchWithAuth: vi.fn(),
   parseJsonResponse: vi.fn(async (response: unknown) => response),
+  resetNotificationCache: vi.fn(),
 }))
 
-vi.mock('@/services/api', () => ({
-  API_BASE_URL: 'http://la-pluma.test/api',
-  fetchWithAuth: mocks.fetchWithAuth,
-  parseJsonResponse: mocks.parseJsonResponse,
-}))
+// The component talks to the notification service; the service's own request
+// shaping lives in services/api.ts. Keep the real clone/message helpers and
+// route the service calls through the fetch spies so the Activity lifecycle
+// assertions still see the actual request options and abort signals.
+vi.mock('@/services/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api')>()
+  const base = 'http://la-pluma.test/api'
+  type NotificationResult = { success: boolean; data?: NotificationConfig; message?: string }
+  let cached: ReturnType<typeof actual.cloneNotificationConfig> | null = null
+  let pending: Promise<NotificationResult> | null = null
+  mocks.resetNotificationCache.mockImplementation(() => {
+    cached = null
+    pending = null
+  })
+
+  return {
+    ...actual,
+    API_BASE_URL: base,
+    fetchWithAuth: mocks.fetchWithAuth,
+    parseJsonResponse: mocks.parseJsonResponse,
+    notificationsApi: {
+      async getConfig(force = false) {
+        if (!force && cached) return { success: true, data: cached }
+        if (pending) return pending
+        pending = (async () => {
+          const data = (await mocks.parseJsonResponse(
+            await mocks.fetchWithAuth(`${base}/agent/notifications/config`),
+          )) as NotificationResult
+          if (data.success) cached = actual.cloneNotificationConfig(data.data)
+          return data
+        })().finally(() => {
+          pending = null
+        })
+        return pending
+      },
+      async saveConfig(config: Parameters<typeof actual.notificationsApi.saveConfig>[0], signal?: AbortSignal) {
+        const data = (await mocks.parseJsonResponse(
+          await mocks.fetchWithAuth(`${base}/agent/notifications/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+            signal,
+          }),
+        )) as NotificationResult
+        if (data.success) cached = actual.cloneNotificationConfig(config)
+        return data
+      },
+      async testChannel(channel: string, config: Parameters<typeof actual.notificationsApi.testChannel>[1], signal?: AbortSignal) {
+        return (await mocks.parseJsonResponse(
+          await mocks.fetchWithAuth(`${base}/agent/actions/test-notification-channel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channel, config }),
+            signal,
+          }),
+        )) as NotificationResult
+      },
+    },
+  }
+})
 
 interface NotificationConfigFixture {
   enabled: boolean
@@ -73,6 +130,7 @@ describe('NotificationSettings Activity lifecycle', () => {
     vi.resetModules()
     mocks.fetchWithAuth.mockReset().mockResolvedValue({ success: true, data: loadedConfig })
     mocks.parseJsonResponse.mockClear()
+    mocks.resetNotificationCache()
     NotificationSettings = (await import('./NotificationSettings')).default
   })
 

@@ -115,5 +115,19 @@ deleted, verification, and follow-ups.
   formatter.
 - Verified: type-check, 74 test files / 514 tests, lint at the ratchet.
 
+### Round 12 — move the notification API into the service layer (2026-11-28)
+
+- `NotificationSettings.tsx` contained its own response types, cache, request
+  dedupe, and three raw `fetchWithAuth` calls.
+- Added `notificationsApi` (get/save/test), the config types, the clone
+  helper, and the shared cache to `services/api.ts`; the component keeps only
+  its draft/save lifecycle.
+- Merged the duplicated `AutoUpdateConfig` into the `types/components` import.
+- `maaApi.getErrorMessage` now accepts a caller fallback.
+- Updated the component test to mock the service boundary while keeping the
+  request-option and abort assertions.
+- Deleted: one embedded API module (~70 lines), one duplicate type.
+- Verified: type-check, 74 test files / 514 tests, lint at the ratchet.
+
 
 
