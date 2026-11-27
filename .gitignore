@@ -37,3 +37,6 @@ client/tsconfig.tsbuildinfo
 
 # 本地 agent 工作流（仅本机使用，不进版本库）
 .agents/upstream-watch/
+
+# 本地生成的 logo / README 头图素材（候选与中间产物，不进版本库）
+generated-images/
