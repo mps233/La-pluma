@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"fmt"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"net/url"
 	"regexp"
 	"sort"
@@ -42,35 +43,35 @@ func parseContent(item map[string]any) map[string]any {
 	}
 	content := item["content"]
 	if text, ok := content.(string); ok {
-		value, err := parseJSONValue([]byte(text))
+		value, err := jsval.ParseJSON([]byte(text))
 		if err != nil {
 			return map[string]any{}
 		}
-		if record := asRecord(value); record != nil {
+		if record := jsval.Record(value); record != nil {
 			return record
 		}
 		return map[string]any{}
 	}
-	if record := asRecord(content); record != nil {
+	if record := jsval.Record(content); record != nil {
 		return record
 	}
 	return map[string]any{}
 }
 
 func contentStageName(content map[string]any) string {
-	return jsStringOrEmpty(content["stage_name"])
+	return jsval.StringOrEmpty(content["stage_name"])
 }
 
 func contentTitle(content map[string]any) string {
-	doc := asRecord(content["doc"])
-	if doc == nil || !truthy(doc["title"]) {
+	doc := jsval.Record(content["doc"])
+	if doc == nil || !jsval.Truthy(doc["title"]) {
 		return ""
 	}
-	return jsString(doc["title"])
+	return jsval.String(doc["title"])
 }
 
-func contentOpers(content map[string]any) []any  { return asArray(content["opers"]) }
-func contentGroups(content map[string]any) []any { return asArray(content["groups"]) }
+func contentOpers(content map[string]any) []any  { return jsval.Array(content["opers"]) }
+func contentGroups(content map[string]any) []any { return jsval.Array(content["groups"]) }
 
 func isPresetFormation(content map[string]any) bool {
 	opers := contentOpers(content)
@@ -81,8 +82,8 @@ func isPresetFormation(content map[string]any) bool {
 func escapeRegExp(value string) string { return regexp.QuoteMeta(value) }
 
 func stageTitleMatches(title any, stage any) bool {
-	pattern := `(?i)(?:^|[\s\-_【（(】\[])` + escapeRegExp(jsStringOrEmpty(stage)) + `(?:\s|$|[-_:：,【（(】\]])`
-	return regexp.MustCompile(pattern).MatchString(jsStringOrEmpty(title))
+	pattern := `(?i)(?:^|[\s\-_【（(】\[])` + escapeRegExp(jsval.StringOrEmpty(stage)) + `(?:\s|$|[-_:：,【（(】\]])`
+	return regexp.MustCompile(pattern).MatchString(jsval.StringOrEmpty(title))
 }
 
 func findKnownStage(title any, stages []string) string {
@@ -95,8 +96,8 @@ func findKnownStage(title any, stages []string) string {
 }
 
 func activityStageTitleMatches(title any, code any) bool {
-	pattern := `(?i)(?:^|[\s\-_【（(】])` + escapeRegExp(jsStringOrEmpty(code)) + `-(?:\d+|EX-\d+|S-\d+|MO-\d+|TR-\d+)(?:\s|$|[-_:：,【（(])`
-	return regexp.MustCompile(pattern).MatchString(jsStringOrEmpty(title))
+	pattern := `(?i)(?:^|[\s\-_【（(】])` + escapeRegExp(jsval.StringOrEmpty(code)) + `-(?:\d+|EX-\d+|S-\d+|MO-\d+|TR-\d+)(?:\s|$|[-_:：,【（(])`
+	return regexp.MustCompile(pattern).MatchString(jsval.StringOrEmpty(title))
 }
 
 // CoversActivityStages reports whether a set covers every main stage and
@@ -110,7 +111,7 @@ func CoversActivityStages(contents []any, activityCode string, stages []string) 
 		expected[stage] = struct{}{}
 	}
 	for _, raw := range contents {
-		content := asRecord(raw)
+		content := jsval.Record(raw)
 		title := ""
 		if content != nil {
 			title = contentTitle(content)
@@ -121,7 +122,7 @@ func CoversActivityStages(contents []any, activityCode string, stages []string) 
 	}
 	actual := map[string]struct{}{}
 	for _, raw := range contents {
-		content := asRecord(raw)
+		content := jsval.Record(raw)
 		title := ""
 		if content != nil {
 			title = contentTitle(content)
@@ -188,15 +189,15 @@ func (s *Service) fetchCopilotRecord(ctx context.Context, id int) (*copilotRecor
 	if err != nil {
 		return nil, err
 	}
-	recordID := int(jsNumber(data["id"]))
+	recordID := int(jsval.NumberOrZero(data["id"]))
 	if recordID == 0 {
 		recordID = id
 	}
 	return &copilotRecord{
 		ID:              recordID,
 		Content:         parseContent(data),
-		RatingLevel:     jsNumber(data["rating_level"]),
-		RatingRatio:     jsNumber(data["rating_ratio"]),
+		RatingLevel:     jsval.NumberOrZero(data["rating_level"]),
+		RatingRatio:     jsval.NumberOrZero(data["rating_ratio"]),
 		NotEnoughRating: data["not_enough_rating"] == true,
 	}, nil
 }
@@ -239,8 +240,8 @@ func (s *Service) findMatchingCopilotSets(
 	matches := make([]CopilotSetMatch, 0)
 	considered := 0
 	for _, rawSet := range sets {
-		set := asRecord(rawSet)
-		if set == nil || asString(set["status"]) != "PUBLIC" {
+		set := jsval.Record(rawSet)
+		if set == nil || jsval.Text(set["status"]) != "PUBLIC" {
 			continue
 		}
 		if considered >= setCandidateLimit {
@@ -249,8 +250,8 @@ func (s *Service) findMatchingCopilotSets(
 		considered++
 
 		ids := make([]int, 0)
-		for _, rawID := range asArray(set["copilot_ids"]) {
-			if id, ok := integerValue(rawID); ok {
+		for _, rawID := range jsval.Array(set["copilot_ids"]) {
+			if id, ok := jsval.Integer(rawID); ok {
 				ids = append(ids, id)
 			}
 		}
@@ -323,8 +324,8 @@ func (s *Service) findMatchingCopilotSets(
 				matchStages = append(matchStages, *member.Stage)
 			}
 		}
-		setID := jsString(set["id"])
-		name := asString(set["name"])
+		setID := jsval.String(set["id"])
+		name := jsval.Text(set["name"])
 		if name == "" {
 			name = "作业集 " + setID
 		}
@@ -334,7 +335,7 @@ func (s *Service) findMatchingCopilotSets(
 		}
 		var updatedAt *string
 		timestampValue := set["update_time"]
-		if !truthy(timestampValue) {
+		if !jsval.Truthy(timestampValue) {
 			timestampValue = set["create_time"]
 		}
 		if value, ok := timestampValue.(string); ok {
@@ -386,7 +387,7 @@ func (s *Service) findMatchingCopilotSets(
 func RankActivityCopilotsForStage(items []any, stage, stageID string, selection *SelectionContext) []CopilotCandidate {
 	candidates := make([]CopilotCandidate, 0)
 	for _, rawItem := range items {
-		item := asRecord(rawItem)
+		item := jsval.Record(rawItem)
 		if item == nil {
 			continue
 		}
@@ -395,17 +396,17 @@ func RankActivityCopilotsForStage(items []any, stage, stageID string, selection 
 		allowed := selection == nil || CanRunWithOperators(&missing, selectionPreferences(selection))
 
 		titleValue := any(nil)
-		if doc := asRecord(content["doc"]); doc != nil {
+		if doc := jsval.Record(content["doc"]); doc != nil {
 			titleValue = doc["title"]
 		}
-		if !truthy(titleValue) {
-			if doc := asRecord(item["doc"]); doc != nil {
+		if !jsval.Truthy(titleValue) {
+			if doc := jsval.Record(item["doc"]); doc != nil {
 				titleValue = doc["title"]
 			}
 		}
 		title := ""
-		if truthy(titleValue) {
-			title = strings.TrimSpace(jsString(titleValue))
+		if jsval.Truthy(titleValue) {
+			title = strings.TrimSpace(jsval.String(titleValue))
 		}
 
 		var uploader *string
@@ -418,7 +419,7 @@ func RankActivityCopilotsForStage(items []any, stage, stageID string, selection 
 		if value, ok := item["upload_time"].(string); ok {
 			uploadTime = stringPtr(value)
 		}
-		id, idOK := integerValue(item["id"])
+		id, idOK := jsval.Integer(item["id"])
 		if !idOK || id <= 0 {
 			continue
 		}
@@ -438,11 +439,11 @@ func RankActivityCopilotsForStage(items []any, stage, stageID string, selection 
 			PresetFormation:      isPresetFormation(content),
 			Uploader:             uploader,
 			UploadTime:           uploadTime,
-			RatingLevel:          jsNumber(item["rating_level"]),
-			RatingRatio:          jsNumber(item["rating_ratio"]),
+			RatingLevel:          jsval.NumberOrZero(item["rating_level"]),
+			RatingRatio:          jsval.NumberOrZero(item["rating_ratio"]),
 			NotEnoughRating:      item["not_enough_rating"] == true,
-			HotScore:             jsNumber(item["hot_score"]),
-			Views:                jsNumber(item["views"]),
+			HotScore:             jsval.NumberOrZero(item["hot_score"]),
+			Views:                jsval.NumberOrZero(item["views"]),
 			MissingOperators:     missing.Names,
 			MissingOperatorCount: missing.Count,
 			RequiresSupport:      missing.Count > 0 && allowed,
@@ -572,20 +573,20 @@ func (s *Service) queryStageCandidatesForKeywords(
 			}
 			succeeded = true
 			for _, raw := range items {
-				record := asRecord(raw)
+				record := jsval.Record(raw)
 				if record == nil {
 					continue
 				}
 				if available, ok := record["available"].(bool); ok && !available {
 					continue
 				}
-				if asString(record["status"]) != "PUBLIC" {
+				if jsval.Text(record["status"]) != "PUBLIC" {
 					continue
 				}
 				if record["not_enough_rating"] == true {
 					continue
 				}
-				if id, ok := integerValue(record["id"]); ok {
+				if id, ok := jsval.Integer(record["id"]); ok {
 					if _, exists := seenIDs[id]; exists {
 						continue
 					}

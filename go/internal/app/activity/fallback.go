@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"io"
 	"log/slog"
 	"net/http"
@@ -110,23 +111,23 @@ func NewFallbackService(options FallbackOptions) *FallbackService {
 }
 
 func getActiveExistence(item any, server string, now int64) *activityExistence {
-	itemRecord := asRecord(item)
+	itemRecord := jsval.Record(item)
 	if itemRecord == nil {
 		itemRecord = map[string]any{}
 	}
-	existenceMap := asRecord(itemRecord["existence"])
+	existenceMap := jsval.Record(itemRecord["existence"])
 	if existenceMap == nil {
 		existenceMap = map[string]any{}
 	}
-	existence := asRecord(existenceMap[server])
-	if existence == nil || !truthy(existence["exist"]) {
+	existence := jsval.Record(existenceMap[server])
+	if existence == nil || !jsval.Truthy(existence["exist"]) {
 		return nil
 	}
-	openTime, openOK := numberValue(existence["openTime"])
+	openTime, openOK := jsval.Number(existence["openTime"])
 	if !openOK || openTime > float64(now) {
 		return nil
 	}
-	closeTime, closeOK := numberValue(existence["closeTime"])
+	closeTime, closeOK := jsval.Number(existence["closeTime"])
 	if closeOK && closeTime <= float64(now) {
 		return nil
 	}
@@ -163,8 +164,8 @@ func getPenguinStagePrefix(stageCodes []string) string {
 
 // SelectCurrentPenguinActivity mirrors selectCurrentPenguinActivity.
 func SelectCurrentPenguinActivity(zones any, stages any, server string, now int64) *PenguinActivity {
-	zoneList := asArray(zones)
-	stageList := asArray(stages)
+	zoneList := jsval.Array(zones)
+	stageList := jsval.Array(stages)
 	if zoneList == nil || stageList == nil {
 		return nil
 	}
@@ -175,7 +176,7 @@ func SelectCurrentPenguinActivity(zones any, stages any, server string, now int6
 	}
 	activeZones := make([]activeZone, 0)
 	for _, rawZone := range zoneList {
-		zone := asRecord(rawZone)
+		zone := jsval.Record(rawZone)
 		if zone == nil || zone["type"] != "ACTIVITY" {
 			continue
 		}
@@ -193,7 +194,7 @@ func SelectCurrentPenguinActivity(zones any, stages any, server string, now int6
 		zone := candidate.zone
 		stageCodes := make([]string, 0)
 		for _, rawStage := range stageList {
-			stage := asRecord(rawStage)
+			stage := jsval.Record(rawStage)
 			if stage == nil {
 				continue
 			}
@@ -203,7 +204,7 @@ func SelectCurrentPenguinActivity(zones any, stages any, server string, now int6
 			if getActiveExistence(stage, server, now) == nil {
 				continue
 			}
-			code := strings.TrimSpace(jsStringOrEmpty(stage["code"]))
+			code := strings.TrimSpace(jsval.StringOrEmpty(stage["code"]))
 			if code == "" {
 				continue
 			}
@@ -220,7 +221,7 @@ func SelectCurrentPenguinActivity(zones any, stages any, server string, now int6
 		name := ""
 		if zoneName, ok := zone["zoneName"].(string); ok && zoneName != "" {
 			name = zoneName
-		} else if i18n := asRecord(zone["zoneName_i18n"]); i18n != nil {
+		} else if i18n := jsval.Record(zone["zoneName_i18n"]); i18n != nil {
 			if zh, ok := i18n["zh"].(string); ok && zh != "" {
 				name = zh
 			}

@@ -12,6 +12,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -250,11 +251,11 @@ func (s *Service) BuildPlanUncached(ctx context.Context, setId, raid string) (*P
 	if err != nil {
 		return nil, err
 	}
-	setRecord := asRecord(set)
+	setRecord := jsval.Record(set)
 	if setRecord == nil {
 		setRecord = map[string]any{}
 	}
-	ids := asArray(setRecord["copilot_ids"])
+	ids := jsval.Array(setRecord["copilot_ids"])
 
 	type copilotContent struct {
 		id      int
@@ -263,11 +264,11 @@ func (s *Service) BuildPlanUncached(ctx context.Context, setId, raid string) (*P
 	contents := make([]copilotContent, 0, len(ids))
 	stageNames := make([]string, 0, len(ids))
 	for _, idValue := range ids {
-		data, err := s.prts.GetCopilot(ctx, jsString(idValue))
+		data, err := s.prts.GetCopilot(ctx, jsval.String(idValue))
 		if err != nil {
 			return nil, err
 		}
-		copilotID, _ := integerValue(idValue)
+		copilotID, _ := jsval.Integer(idValue)
 		content := ParseCopilotContent(data)
 		contents = append(contents, copilotContent{id: copilotID, content: content})
 		stageNames = append(stageNames, ContentStageName(content))
@@ -291,7 +292,7 @@ func (s *Service) BuildPlanUncached(ctx context.Context, setId, raid string) (*P
 			displayStage = GetNavigationStage(entry.content)
 		}
 		if displayStage == "" {
-			displayStage = "prts://" + jsString(entry.id)
+			displayStage = "prts://" + jsval.String(entry.id)
 		}
 		presetFormation := IsPresetFormationCopilot(entry.content)
 		opers := ContentOpers(entry.content)
@@ -346,7 +347,7 @@ func (s *Service) BuildPlanUncached(ctx context.Context, setId, raid string) (*P
 		}
 	}
 
-	name := asString(setRecord["name"])
+	name := jsval.Text(setRecord["name"])
 	if name == "" {
 		name = "作业集 " + setId
 	}
@@ -393,7 +394,7 @@ func (s *Service) ResetProgress(setId any) error {
 	s.progressMu.Lock()
 	defer s.progressMu.Unlock()
 	progress := s.LoadProgress()
-	delete(progress, jsString(setId))
+	delete(progress, jsval.String(setId))
 	return s.saveProgressLocked(progress)
 }
 
@@ -414,7 +415,7 @@ func (s *Service) saveProgressLocked(progress map[string][]string) error {
 }
 
 func normalizeProgress(value any) map[string][]string {
-	record := asRecord(value)
+	record := jsval.Record(value)
 	if record == nil {
 		return map[string][]string{}
 	}

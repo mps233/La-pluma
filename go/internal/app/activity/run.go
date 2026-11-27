@@ -12,6 +12,7 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // PartialResultsError lets a plan executor expose entries completed before a
@@ -74,7 +75,7 @@ func BuildActivityPreparationTasks(candidates *Candidates, clientType, navigatio
 func activityStageSet(stages []string) map[string]struct{} {
 	result := make(map[string]struct{}, len(stages))
 	for _, stage := range stages {
-		value := strings.ToUpper(jsStringOrEmpty(stage))
+		value := strings.ToUpper(jsval.StringOrEmpty(stage))
 		if value == "" {
 			continue
 		}
@@ -87,7 +88,7 @@ func activityStageSet(stages []string) map[string]struct{} {
 func SelectActivitySetEntries(entries []PlanEntry, activityStages any, selectedIndexes []int) []PlanEntry {
 	stages := map[string]struct{}{}
 	for _, stage := range strictStringSlice(activityStages) {
-		value := strings.ToUpper(jsStringOrEmpty(stage))
+		value := strings.ToUpper(jsval.StringOrEmpty(stage))
 		if value == "" {
 			continue
 		}
@@ -99,7 +100,7 @@ func SelectActivitySetEntries(entries []PlanEntry, activityStages any, selectedI
 	}
 	result := make([]PlanEntry, 0)
 	for _, entry := range entries {
-		if _, ok := stages[strings.ToUpper(jsStringOrEmpty(entry.DisplayStage))]; !ok {
+		if _, ok := stages[strings.ToUpper(jsval.StringOrEmpty(entry.DisplayStage))]; !ok {
 			continue
 		}
 		if len(requested) > 0 {
@@ -114,7 +115,7 @@ func SelectActivitySetEntries(entries []PlanEntry, activityStages any, selectedI
 
 // BuildActivityExecutionOptions mirrors buildActivityExecutionOptions.
 func BuildActivityExecutionOptions(preferences any, clientType, navigationMode string) map[string]any {
-	result := copyRecord(asRecord(preferences))
+	result := copyRecord(jsval.Record(preferences))
 	result["clientType"] = clientType
 	result["useSanityPotion"] = true
 	result["nativeDelegation"] = false
@@ -151,7 +152,7 @@ func BuildActivityCopilotRunPlan(candidates *Candidates, preferences map[string]
 		}
 	}
 
-	raid := asString(preferences["raid"])
+	raid := jsval.Text(preferences["raid"])
 	if raid == "" {
 		raid = "normal"
 	}
@@ -218,18 +219,18 @@ func HasCompletedActivityNavigation(logText string, expectedTaskID int) bool {
 		if index < 0 {
 			continue
 		}
-		value, err := parseJSONValue([]byte(line[index+len(marker):]))
+		value, err := jsval.ParseJSON([]byte(line[index+len(marker):]))
 		if err != nil {
 			continue
 		}
-		payload := asRecord(value)
+		payload := jsval.Record(value)
 		if payload == nil {
 			continue
 		}
-		if asString(payload["taskchain"]) != "Custom" {
+		if jsval.Text(payload["taskchain"]) != "Custom" {
 			continue
 		}
-		if jsNumber(payload["taskid"]) == float64(expectedTaskID) {
+		if jsval.NumberOrZero(payload["taskid"]) == float64(expectedTaskID) {
 			return true
 		}
 	}
@@ -247,13 +248,13 @@ func (s *Service) LoadActivityProgress() ActivityProgress {
 }
 
 func normalizeActivityProgress(value any) ActivityProgress {
-	record := asRecord(value)
+	record := jsval.Record(value)
 	if record == nil {
 		return ActivityProgress{}
 	}
 	progress := make(ActivityProgress, len(record))
 	for code, raw := range record {
-		entry := asRecord(raw)
+		entry := jsval.Record(raw)
 		if entry == nil {
 			continue
 		}
@@ -261,7 +262,7 @@ func normalizeActivityProgress(value any) ActivityProgress {
 		for _, stage := range strictStringSlice(entry["stages"]) {
 			stages = append(stages, stage)
 		}
-		updatedAt := asString(entry["updatedAt"])
+		updatedAt := jsval.Text(entry["updatedAt"])
 		progress[code] = ActivityProgressEntry{Stages: stages, UpdatedAt: updatedAt}
 	}
 	return progress
@@ -290,7 +291,7 @@ func SummarizeActivityCompletion(activity any, progress ActivityProgress) Progre
 	stages := make([]string, 0)
 	seen := map[string]struct{}{}
 	for _, raw := range strictStringSlice(record["stages"]) {
-		stage := strings.ToUpper(jsStringOrEmpty(raw))
+		stage := strings.ToUpper(jsval.StringOrEmpty(raw))
 		if stage == "" {
 			continue
 		}
@@ -301,7 +302,7 @@ func SummarizeActivityCompletion(activity any, progress ActivityProgress) Progre
 		stages = append(stages, stage)
 	}
 	source := "local-activity-progress"
-	if !truthy(record["code"]) || len(stages) == 0 {
+	if !jsval.Truthy(record["code"]) || len(stages) == 0 {
 		return ProgressSummary{
 			Known:           false,
 			Complete:        false,
@@ -310,7 +311,7 @@ func SummarizeActivityCompletion(activity any, progress ActivityProgress) Progre
 			Source:          source,
 		}
 	}
-	code := strings.ToUpper(jsString(record["code"]))
+	code := strings.ToUpper(jsval.String(record["code"]))
 	completed := map[string]struct{}{}
 	if entry, ok := progress[code]; ok {
 		for _, stage := range entry.Stages {
@@ -343,7 +344,7 @@ func (s *Service) GetActivityCompletion(_ context.Context, activity any) Progres
 func (s *Service) recordActivityCompletion(activity any, entries []CompletionEntry) error {
 	progress := s.LoadActivityProgress()
 	record := activityRecordForProgress(activity)
-	code := strings.ToUpper(jsString(record["code"]))
+	code := strings.ToUpper(jsval.String(record["code"]))
 	existing := map[string]struct{}{}
 	if entry, ok := progress[code]; ok {
 		for _, stage := range entry.Stages {
@@ -648,7 +649,7 @@ func (s *Service) ensureActivityZoneTasks(activityCode, zoneName string) error {
 	if err != nil {
 		value = map[string]any{}
 	}
-	existing := asRecord(value)
+	existing := jsval.Record(value)
 	if existing == nil {
 		existing = map[string]any{}
 	}
@@ -729,7 +730,7 @@ func (s *Service) resolvePreparationStage(requestedStage, activityCode string) s
 	installed := map[string]any{}
 	value, err := readJSONFile(filepath.Join(s.paths.MaaDataDir, "resource", "tasks", "Stages", code+".json"))
 	if err == nil {
-		if record := asRecord(value); record != nil {
+		if record := jsval.Record(value); record != nil {
 			installed = record
 		}
 	}
@@ -1326,7 +1327,7 @@ func (s *Service) RunCurrentActivityCopilotsWithConnection(ctx context.Context, 
 		selectedIndexes := make([]int, 0)
 		selectedSet := map[int]struct{}{}
 		for _, entry := range setPlan.Entries {
-			if _, ok := activityStages[strings.ToUpper(jsStringOrEmpty(entry.DisplayStage))]; !ok {
+			if _, ok := activityStages[strings.ToUpper(jsval.StringOrEmpty(entry.DisplayStage))]; !ok {
 				continue
 			}
 			if _, exists := selectedSet[entry.ItemIndex]; exists {
@@ -1343,7 +1344,7 @@ func (s *Service) RunCurrentActivityCopilotsWithConnection(ctx context.Context, 
 			if _, selected := selectedSet[entry.ItemIndex]; !selected {
 				continue
 			}
-			if _, ok := activityStages[strings.ToUpper(jsStringOrEmpty(entry.DisplayStage))]; ok {
+			if _, ok := activityStages[strings.ToUpper(jsval.StringOrEmpty(entry.DisplayStage))]; ok {
 				navigationStage = entry.DisplayStage
 				break
 			}
@@ -1359,7 +1360,7 @@ func (s *Service) RunCurrentActivityCopilotsWithConnection(ctx context.Context, 
 				if member.Stage == nil {
 					continue
 				}
-				if _, ok := activityStages[strings.ToUpper(jsStringOrEmpty(*member.Stage))]; !ok {
+				if _, ok := activityStages[strings.ToUpper(jsval.StringOrEmpty(*member.Stage))]; !ok {
 					continue
 				}
 				success := true

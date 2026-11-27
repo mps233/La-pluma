@@ -12,6 +12,7 @@ import (
 
 	"github.com/mps233/la-pluma/go/internal/config"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -127,9 +128,9 @@ func (r *ResourceIndex) StageIDsByCode(code string) []string {
 	ids := make([]string, 0, len(records))
 	seen := map[string]struct{}{}
 	for _, record := range records {
-		stageID := cleanStageSearchID(asString(record["stageId"]))
+		stageID := cleanStageSearchID(jsval.Text(record["stageId"]))
 		if stageID == "" {
-			stageID = cleanStageSearchID(asString(record["id"]))
+			stageID = cleanStageSearchID(jsval.Text(record["id"]))
 		}
 		if stageID == "" {
 			continue
@@ -184,15 +185,15 @@ func (r *ResourceIndex) loadStageCatalog() (map[string][]map[string]any, error) 
 		}
 		loaded = true
 		for _, record := range stageRecords(value) {
-			code := strings.ToUpper(strings.TrimSpace(asString(record["code"])))
+			code := strings.ToUpper(strings.TrimSpace(jsval.Text(record["code"])))
 			if code == "" {
 				continue
 			}
 			// The generated game-data catalog stores the internal id as `id`
 			// while MaaResource uses `stageId`; normalize once here so callers
 			// only need to know one shape.
-			if strings.TrimSpace(asString(record["stageId"])) == "" {
-				if id := strings.TrimSpace(asString(record["id"])); id != "" {
+			if strings.TrimSpace(jsval.Text(record["stageId"])) == "" {
+				if id := strings.TrimSpace(jsval.Text(record["id"])); id != "" {
 					record["stageId"] = id
 				}
 			}
@@ -265,17 +266,17 @@ func (r *ResourceIndex) StageCodeMap(
 	if len(missing) > 0 && stats != nil {
 		if stages, err := stats(ctx); err == nil {
 			for _, raw := range stages {
-				stage := asRecord(raw)
-				if stage == nil || !truthy(stage["code"]) {
+				stage := jsval.Record(raw)
+				if stage == nil || !jsval.Truthy(stage["code"]) {
 					continue
 				}
-				stageID := jsStringOrEmpty(stage["stageId"])
+				stageID := jsval.StringOrNullish(stage["stageId"])
 				if _, needed := missing[stageID]; !needed {
 					continue
 				}
 				result[stageID] = StageCodeInfo{
-					Code:   jsString(stage["code"]),
-					APCost: mathMaxZero(numberOrZero(stage["apCost"])),
+					Code:   jsval.String(stage["code"]),
+					APCost: mathMaxZero(jsval.NumberOrZero(stage["apCost"])),
 				}
 			}
 		}
@@ -311,11 +312,11 @@ func (r *ResourceIndex) loadStageCodeMapLocal(stageIDs []string) map[string]Stag
 		if err != nil {
 			continue
 		}
-		metadata := asRecord(value)
+		metadata := jsval.Record(value)
 		if metadata == nil {
 			continue
 		}
-		if code := asString(metadata["code"]); code != "" {
+		if code := jsval.Text(metadata["code"]); code != "" {
 			result[stageID] = StageCodeInfo{Code: code, APCost: 0}
 		}
 	}
@@ -325,11 +326,11 @@ func (r *ResourceIndex) loadStageCodeMapLocal(stageIDs []string) map[string]Stag
 			if rawStage == nil {
 				continue
 			}
-			if !truthy(rawStage["stageId"]) || !truthy(rawStage["code"]) {
+			if !jsval.Truthy(rawStage["stageId"]) || !jsval.Truthy(rawStage["code"]) {
 				continue
 			}
-			stageID := jsString(rawStage["stageId"])
-			code := jsString(rawStage["code"])
+			stageID := jsval.String(rawStage["stageId"])
+			code := jsval.String(rawStage["code"])
 			existing := result[stageID]
 			displayCode := code
 			if existing.Code != "" {
@@ -337,7 +338,7 @@ func (r *ResourceIndex) loadStageCodeMapLocal(stageIDs []string) map[string]Stag
 			}
 			result[stageID] = StageCodeInfo{
 				Code:   displayCode,
-				APCost: mathMaxZero(numberOrZero(rawStage["apCost"])),
+				APCost: mathMaxZero(jsval.NumberOrZero(rawStage["apCost"])),
 			}
 		}
 	}
@@ -394,7 +395,7 @@ func stageRecords(value any) []map[string]any {
 	case []any:
 		records := make([]map[string]any, 0, len(typed))
 		for _, raw := range typed {
-			if record := asRecord(raw); record != nil {
+			if record := jsval.Record(raw); record != nil {
 				records = append(records, record)
 			}
 		}
@@ -407,7 +408,7 @@ func stageRecords(value any) []map[string]any {
 		sort.Strings(keys)
 		records := make([]map[string]any, 0, len(keys))
 		for _, key := range keys {
-			if record := asRecord(typed[key]); record != nil {
+			if record := jsval.Record(typed[key]); record != nil {
 				records = append(records, record)
 			}
 		}

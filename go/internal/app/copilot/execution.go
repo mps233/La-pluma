@@ -13,6 +13,7 @@ import (
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -432,7 +433,7 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 		progressItems := make([]StageProgressItem, 0)
 		var buildErr error
 		for _, entry := range group.entries {
-			data, err := s.prts.GetCopilot(ctx, jsString(entry.CopilotID))
+			data, err := s.prts.GetCopilot(ctx, jsval.String(entry.CopilotID))
 			if err != nil {
 				buildErr = err
 				break
@@ -933,14 +934,14 @@ func executionErrorMessage(err error) string {
 }
 
 func dtoOutput(dto domainrun.DTO) string {
-	record := asRecord(dto.Result)
+	record := jsval.Record(dto.Result)
 	if record == nil {
 		return ""
 	}
-	if stdout := asString(record["stdout"]); strings.TrimSpace(stdout) != "" {
+	if stdout := jsval.Text(record["stdout"]); strings.TrimSpace(stdout) != "" {
 		return stdout
 	}
-	return asString(record["stderr"])
+	return jsval.Text(record["stderr"])
 }
 
 func emitExecutionStarted(lifecycle *ExecutionLifecycle) {
@@ -1194,14 +1195,14 @@ func optionPreTasks(options map[string]any) []any {
 	if options == nil {
 		return nil
 	}
-	return asArray(options["preTasks"])
+	return jsval.Array(options["preTasks"])
 }
 
 func optionString(options map[string]any, key string) string {
 	if options == nil {
 		return ""
 	}
-	return jsStringTruthyOrEmpty(options[key])
+	return jsval.StringOrEmpty(options[key])
 }
 
 func optionBool(options map[string]any, key string, fallback bool) bool {

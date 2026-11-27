@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const stageZoneCacheTTL = 5 * time.Minute
@@ -59,17 +60,17 @@ func (s *Service) loadStageZones() map[string]string {
 		switch typed := value.(type) {
 		case map[string]any:
 			for code, raw := range typed {
-				record := asRecord(raw)
-				name := strings.TrimSpace(asString(record["zoneName"]))
+				record := jsval.Record(raw)
+				name := strings.TrimSpace(jsval.Text(record["zoneName"]))
 				if name != "" {
 					byCode[strings.ToUpper(code)] = name
 				}
 			}
 		case []any:
 			for _, raw := range typed {
-				record := asRecord(raw)
-				code := strings.ToUpper(strings.TrimSpace(asString(record["code"])))
-				name := strings.TrimSpace(asString(record["zoneName"]))
+				record := jsval.Record(raw)
+				code := strings.ToUpper(strings.TrimSpace(jsval.Text(record["code"])))
+				name := strings.TrimSpace(jsval.Text(record["zoneName"]))
 				if code != "" && name != "" {
 					byCode[code] = name
 				}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"io"
 	"net/http"
 	"net/url"
@@ -85,8 +86,8 @@ func (c *prtsClient) GetCopilot(ctx context.Context, id int) (map[string]any, er
 	if err != nil {
 		return nil, err
 	}
-	record := asRecord(value)
-	if data := asRecord(record["data"]); data != nil {
+	record := jsval.Record(value)
+	if data := jsval.Record(record["data"]); data != nil {
 		return data, nil
 	}
 	if record != nil {
@@ -126,17 +127,17 @@ func (c *prtsClient) QueryCopilots(ctx context.Context, keyword string, page, li
 			c.baseURL, url.QueryEscape(keyword), page, limit, url.QueryEscape(orderBy))
 		value, err := c.fetchJSON(ctx, http.MethodGet, endpoint, nil)
 		if err == nil {
-			payload := asRecord(value)
+			payload := jsval.Record(value)
 			status := -1.0
 			if payload != nil {
-				status = jsNumber(payload["status_code"])
+				status = jsval.NumberOrZero(payload["status_code"])
 			}
 			if payload != nil && status == 200 {
-				data := asRecord(payload["data"])
+				data := jsval.Record(payload["data"])
 				if data == nil {
 					return []any{}, nil
 				}
-				return asArray(data["data"]), nil
+				return jsval.Array(data["data"]), nil
 			}
 			lastError = fmt.Errorf("作业站查询失败: status_code %v", status)
 		} else {
@@ -165,15 +166,15 @@ func (c *prtsClient) QuerySets(ctx context.Context, keyword string, page, limit 
 	if err != nil {
 		return nil, err
 	}
-	payload := asRecord(value)
-	if payload == nil || jsNumber(payload["status_code"]) != 200 {
+	payload := jsval.Record(value)
+	if payload == nil || jsval.NumberOrZero(payload["status_code"]) != 200 {
 		return []any{}, nil
 	}
-	data := asRecord(payload["data"])
+	data := jsval.Record(payload["data"])
 	if data == nil {
 		return []any{}, nil
 	}
-	return asArray(data["data"]), nil
+	return jsval.Array(data["data"]), nil
 }
 
 func (c *prtsClient) fetchJSON(ctx context.Context, method, endpoint string, body []byte) (any, error) {

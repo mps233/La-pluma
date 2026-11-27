@@ -12,6 +12,7 @@ import (
 
 	"github.com/mps233/la-pluma/go/internal/config"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func testPaths(t *testing.T) config.Paths {
@@ -243,11 +244,11 @@ func TestCurrentActivityFromStageActivity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	record := asRecord(value)
+	record := jsval.Record(value)
 	if record == nil {
 		t.Fatalf("cache = %#v", value)
 	}
-	entry := asRecord(record["Official"])
+	entry := jsval.Record(record["Official"])
 	if entry == nil || entry["code"] != "EA" {
 		t.Fatalf("cache entry = %#v", entry)
 	}

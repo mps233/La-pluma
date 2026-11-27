@@ -1,6 +1,7 @@
 package copilot
 
 import (
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"regexp"
 	"strings"
 )
@@ -17,14 +18,14 @@ var (
 // ParseCopilotContent mirrors parseCopilotContent in copilotPlanService.ts.
 // `data` is the already-unwrapped `/copilot/get` data object.
 func ParseCopilotContent(data any) Content {
-	record := asRecord(data)
+	record := jsval.Record(data)
 	if record == nil {
 		return Content{}
 	}
 	switch content := record["content"].(type) {
 	case string:
 		var parsed any
-		if err := decodeJSON([]byte(content), &parsed); err != nil {
+		if err := jsval.DecodeJSON([]byte(content), &parsed); err != nil {
 			return Content{}
 		}
 		if value, ok := parsed.(map[string]any); ok {
@@ -81,17 +82,17 @@ func normalizeContent(value map[string]any) Content {
 // ContentStageName returns stage_name or "" (the Node `content.stage_name || ”`
 // pattern used by plan building and preset detection).
 func ContentStageName(content Content) string {
-	return jsStringTruthyOrEmpty(content["stage_name"])
+	return jsval.StringOrEmpty(content["stage_name"])
 }
 
 // ContentDocTitle returns the doc title when it is a string.
 
 func ContentOpers(content Content) []any {
-	return asArray(content["opers"])
+	return jsval.Array(content["opers"])
 }
 
 func ContentGroups(content Content) []any {
-	return asArray(content["groups"])
+	return jsval.Array(content["groups"])
 }
 
 // IsPresetFormationCopilot mirrors isPresetFormationCopilot.
@@ -112,9 +113,9 @@ func GetNavigationStage(content Content) string {
 		return ""
 	}
 	title := ""
-	if doc := asRecord(content["doc"]); doc != nil {
+	if doc := jsval.Record(content["doc"]); doc != nil {
 		if raw, exists := doc["title"]; exists && raw != nil {
-			title = strings.TrimSpace(jsString(raw))
+			title = strings.TrimSpace(jsval.String(raw))
 		}
 	}
 	if match := navigationStagePattern.FindString(title); match != "" {

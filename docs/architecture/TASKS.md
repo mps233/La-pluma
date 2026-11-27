@@ -9,7 +9,7 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
-| G1 | P1 | go | Canonical JS-coercion helpers in `internal/util/jsval`; migrate one package per commit | `truthy`×8, `asRecord`×8, `numberValue`×8 across 12 packages |
+| G1 | P1 | go | Finish the `internal/util/jsval` migration: `drops`, `scheduler`, `notifications`, `updates`, `quotes`, `gamedata`, `maa/results`, `mastery`, `recognition`, `training`, `customtools`, `run_resume`, `agentapi` still carry local copies | `internal/util/jsval` now serves `activity` and `copilot`; compare each remaining helper body before mapping (`asString` is a type assertion → `jsval.Text`, not `jsval.String`) |
 | G4 | P1 | go | One timestamp format constant and one timezone helper | literal `"2006-01-02T15:04:05.000Z"` in 10 files; 3 zone strategies |
 | G3 | P1 | go | Typed owners for `operbox.json`, `depot.json`, and the `user-configs` path | written in `recognition/service.go:188,267`; read in `mastery/data.go:107,112`, `training/data.go:211,292`, `handler.go:1849,1858`; path composed in 7 packages |
 | G2 | P1 | go | One PRTS client in `internal/infra/prts`; unify retry/timeout semantics | `activity/prts.go:50-223` vs `copilot/prts.go:73-473` |
@@ -62,3 +62,4 @@ without re-investigation.
 - Shared duration/timestamp/error formatters in `utils/format.ts` and `utils/errorMessage.ts`; local copies deleted.
 - Notification config API, cache, and types moved into `services/api.ts`; `AutoUpdateConfig` duplication removed.
 - All Zustand stores consolidated under `src/state/` with one barrel; ~50 imports migrated.
+- `internal/util/jsval` created; `activity` and `copilot` local coercion copies deleted.

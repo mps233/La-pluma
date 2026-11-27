@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func TestAssessActivityNavigationReady(t *testing.T) {
@@ -346,7 +347,7 @@ func TestRecordActivityCompletionPersists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if asRecord(value) == nil {
+	if jsval.Record(value) == nil {
 		t.Fatalf("progress file = %#v", value)
 	}
 }

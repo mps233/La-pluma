@@ -14,6 +14,7 @@ import (
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 type fakeCommandCall struct {
@@ -193,11 +194,11 @@ func taskList(t *testing.T, config map[string]any) []any {
 
 func taskParams(t *testing.T, task any) map[string]any {
 	t.Helper()
-	record := asRecord(task)
+	record := jsval.Record(task)
 	if record == nil {
 		t.Fatalf("task = %#v", task)
 	}
-	params := asRecord(record["params"])
+	params := jsval.Record(record["params"])
 	if params == nil {
 		t.Fatalf("params = %#v", record)
 	}
@@ -294,7 +295,7 @@ func TestExecutePlanDynamicTask(t *testing.T) {
 		t.Fatalf("connection not injected: %#v", first)
 	}
 	tasks := taskList(t, first)
-	if len(tasks) != 2 || asRecord(tasks[0])["name"] != "导航" {
+	if len(tasks) != 2 || jsval.Record(tasks[0])["name"] != "导航" {
 		t.Fatalf("first task config = %#v", first)
 	}
 	copilotTask := tasks[1].(map[string]any)
@@ -305,7 +306,7 @@ func TestExecutePlanDynamicTask(t *testing.T) {
 	if len(firstList) != 2 {
 		t.Fatalf("first list = %#v", firstList)
 	}
-	firstItem := asRecord(firstList[0])
+	firstItem := jsval.Record(firstList[0])
 	if firstItem["stage_name"] != "T-1" || firstItem["is_raid"] != false {
 		t.Fatalf("first list item = %#v", firstItem)
 	}
@@ -315,7 +316,7 @@ func TestExecutePlanDynamicTask(t *testing.T) {
 	if !jsonstore.Exists(firstItem["filename"].(string)) {
 		t.Fatalf("repeat file missing at %s", firstItem["filename"])
 	}
-	if repeat := asRecord(firstList[1]); repeat["filename"] != filepath.Join(fixture.configDir, "copilot-plans", "1", "0-10-normal-2.json") {
+	if repeat := jsval.Record(firstList[1]); repeat["filename"] != filepath.Join(fixture.configDir, "copilot-plans", "1", "0-10-normal-2.json") {
 		t.Fatalf("second repeat = %#v", repeat)
 	}
 
@@ -379,7 +380,7 @@ func TestExecuteSelectedEntries(t *testing.T) {
 	if len(list) != 2 {
 		t.Fatalf("list = %#v", list)
 	}
-	if asRecord(list[0])["stage_name"] != "T-S-1" || asRecord(list[1])["stage_name"] != "T-1" {
+	if jsval.Record(list[0])["stage_name"] != "T-S-1" || jsval.Record(list[1])["stage_name"] != "T-1" {
 		t.Fatalf("selected entry order = %#v", list)
 	}
 	if len(result.Results) != 2 || !result.Results[0].Success || !result.Results[1].Success {
@@ -790,18 +791,18 @@ func TestExecutePlanAddsStartUpBeforeFirstCopilotGroup(t *testing.T) {
 	if len(firstTasks) != 2 {
 		t.Fatalf("first tasks = %#v", firstTasks)
 	}
-	startup := asRecord(firstTasks[0])
+	startup := jsval.Record(firstTasks[0])
 	if startup["type"] != "StartUp" {
 		t.Fatalf("first task = %#v", firstTasks[0])
 	}
-	if params := asRecord(startup["params"]); params == nil || params["start_game_enabled"] != true {
+	if params := jsval.Record(startup["params"]); params == nil || params["start_game_enabled"] != true {
 		t.Fatalf("startup params = %#v", startup["params"])
 	}
-	if asRecord(firstTasks[1])["type"] != "Copilot" {
+	if jsval.Record(firstTasks[1])["type"] != "Copilot" {
 		t.Fatalf("second task = %#v", firstTasks[1])
 	}
 	secondTasks := taskList(t, executor.taskConfig(1))
-	if len(secondTasks) != 1 || asRecord(secondTasks[0])["type"] != "Copilot" {
+	if len(secondTasks) != 1 || jsval.Record(secondTasks[0])["type"] != "Copilot" {
 		t.Fatalf("later group tasks = %#v", secondTasks)
 	}
 }

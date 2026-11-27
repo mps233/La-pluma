@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const navigationLogMaxBytes = 2 * 1024 * 1024
@@ -21,11 +22,11 @@ var activityCodePattern = regexp.MustCompile(`^[A-Z0-9]{2,8}$`)
 // <CODE>-OpenOpt / <CODE>-Open chain and a stage task that references it are
 // required before Copilot may run.
 func AssessActivityNavigation(activity any, tasks any) NavigationResult {
-	activityRecord := asRecord(activity)
+	activityRecord := jsval.Record(activity)
 	if activityRecord == nil {
 		activityRecord = map[string]any{}
 	}
-	code := strings.ToUpper(strings.TrimSpace(jsStringOrEmpty(activityRecord["code"])))
+	code := strings.ToUpper(strings.TrimSpace(jsval.StringOrEmpty(activityRecord["code"])))
 	if code == "" {
 		return blockedNavigation(activity, "activity-unavailable", "无法确认当前活动，未准备活动作业。")
 	}
@@ -33,17 +34,17 @@ func AssessActivityNavigation(activity any, tasks any) NavigationResult {
 		return blockedNavigation(activity, "activity-code-invalid", "当前活动代号格式异常，未准备活动作业。")
 	}
 
-	taskMap := asRecord(tasks)
+	taskMap := jsval.Record(tasks)
 	if tasks == nil || taskMap == nil {
 		return blockedNavigation(activity, "navigation-resource-unavailable", fmt.Sprintf("未找到 %s 的活动导航资源。", code))
 	}
 
 	openOptionKey := code + "-OpenOpt"
-	openOption := asRecord(taskMap[openOptionKey])
+	openOption := jsval.Record(taskMap[openOptionKey])
 	openKeys := []string{code + "-OpenOcr", code + "-Open"}
 	openKey := ""
 	for _, key := range openKeys {
-		if truthy(taskMap[key]) {
+		if jsval.Truthy(taskMap[key]) {
 			openKey = key
 			break
 		}
@@ -58,7 +59,7 @@ func AssessActivityNavigation(activity any, tasks any) NavigationResult {
 		if !stagePattern.MatchString(key) {
 			continue
 		}
-		task := asRecord(rawTask)
+		task := jsval.Record(rawTask)
 		if task == nil {
 			continue
 		}
@@ -67,7 +68,7 @@ func AssessActivityNavigation(activity any, tasks any) NavigationResult {
 
 	openSequenceTask := map[string]any(nil)
 	if openKey != "" {
-		openSequenceTask = asRecord(taskMap[openKey])
+		openSequenceTask = jsval.Record(taskMap[openKey])
 	}
 	hasOpenSequence := false
 	if openOption != nil && openKey != "" && openSequenceTask != nil {
@@ -131,7 +132,7 @@ func AssessActivityNavigation(activity any, tasks any) NavigationResult {
 }
 
 func blockedNavigation(activity any, reasonCode, reason string) NavigationResult {
-	record := asRecord(activity)
+	record := jsval.Record(activity)
 	if record == nil {
 		record = map[string]any{}
 	}
@@ -173,7 +174,7 @@ func toArrayValues(value any) []any {
 	if array, ok := value.([]any); ok {
 		return array
 	}
-	if truthy(value) {
+	if jsval.Truthy(value) {
 		return []any{value}
 	}
 	return nil
@@ -184,7 +185,7 @@ func referencesTask(values any, taskName string) bool {
 		if text, ok := value.(string); ok && text == taskName {
 			return true
 		}
-		if strings.HasSuffix(jsString(value), "@"+taskName) {
+		if strings.HasSuffix(jsval.String(value), "@"+taskName) {
 			return true
 		}
 	}

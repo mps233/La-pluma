@@ -10,6 +10,7 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 var (
@@ -37,12 +38,12 @@ type CopilotOptions struct {
 
 // ParseCopilotOptions converts a decoded JSON object to CopilotOptions.
 func ParseCopilotOptions(value any) CopilotOptions {
-	record := asRecord(value)
+	record := jsval.Record(value)
 	if record == nil {
 		return CopilotOptions{}
 	}
 	options := CopilotOptions{
-		FormationMode:  asString(record["formationMode"]),
+		FormationMode:  jsval.Text(record["formationMode"]),
 		UserAdditional: record["userAdditional"],
 		FormationIndex: record["formationIndex"],
 		SupportUsage:   record["supportUsage"],
@@ -75,14 +76,14 @@ func NormalizeUserAdditional(value any) []UserAdditional {
 	if array, ok := value.([]any); ok {
 		result := make([]UserAdditional, 0, len(array))
 		for _, raw := range array {
-			record := asRecord(raw)
+			record := jsval.Record(raw)
 			name := ""
 			skill := 0
 			if record != nil {
 				if record["name"] != nil {
-					name = strings.TrimSpace(jsString(record["name"]))
+					name = strings.TrimSpace(jsval.String(record["name"]))
 				}
-				if parsed, ok := integerValue(record["skill"]); ok && parsed >= 1 && parsed <= 3 {
+				if parsed, ok := jsval.Integer(record["skill"]); ok && parsed >= 1 && parsed <= 3 {
 					skill = parsed
 				}
 			}
@@ -108,7 +109,7 @@ func NormalizeUserAdditional(value any) []UserAdditional {
 		}
 		skill := 0
 		if len(parts) > 1 {
-			if parsed, ok := integerValue(strings.TrimSpace(parts[1])); ok && parsed >= 1 && parsed <= 3 {
+			if parsed, ok := jsval.Integer(strings.TrimSpace(parts[1])); ok && parsed >= 1 && parsed <= 3 {
 				skill = parsed
 			}
 		}
@@ -130,9 +131,9 @@ func BuildCopilotTaskParams(list []any, presetFormation bool, options CopilotOpt
 		"ignore_requirements": ignoreRequirements,
 		"use_sanity_potion":   options.UseSanityPotion,
 		"add_trust":           options.AddTrust,
-		"formation_index":     numberOrZero(options.FormationIndex),
-		"support_unit_usage":  numberOrZero(options.SupportUsage),
-		"support_unit_name":   jsStringTruthyOrEmpty(options.SupportName),
+		"formation_index":     jsval.NumberOrZero(options.FormationIndex),
+		"support_unit_usage":  jsval.NumberOrZero(options.SupportUsage),
+		"support_unit_name":   jsval.StringOrEmpty(options.SupportName),
 	}
 	if formation {
 		userAdditional := NormalizeUserAdditional(options.UserAdditional)
@@ -146,8 +147,8 @@ func BuildCopilotTaskParams(list []any, presetFormation bool, options CopilotOpt
 // NormalizeCopilotLoopTimes clamps loop times to 1..99 like parseInt(...)||1.
 func NormalizeCopilotLoopTimes(value any) int {
 	text := "1"
-	if truthy(value) {
-		text = jsString(value)
+	if jsval.Truthy(value) {
+		text = jsval.String(value)
 	}
 	number := parseLeadingInteger(text)
 	if number == 0 {
@@ -193,9 +194,9 @@ func parseLeadingInteger(text string) int {
 
 // SanitizePlanID rejects ids that could escape the copilot plan directory.
 func SanitizePlanID(value any) (string, error) {
-	id := strings.TrimSpace(jsStringTruthyOrEmpty(value))
+	id := strings.TrimSpace(jsval.StringOrEmpty(value))
 	if !planIDPattern.MatchString(id) {
-		return "", apperrors.WithStatus("COPILOT_PLAN_ID_INVALID", "作业集 ID 不合法", http.StatusBadRequest, false, map[string]any{"value": jsStringTruthyOrEmpty(value)})
+		return "", apperrors.WithStatus("COPILOT_PLAN_ID_INVALID", "作业集 ID 不合法", http.StatusBadRequest, false, map[string]any{"value": jsval.StringOrEmpty(value)})
 	}
 	return id, nil
 }
@@ -221,9 +222,9 @@ func BuildCopilotRepeatFiles(entry RepeatSource, loopTimes any, planDir string) 
 		files = append(files, RepeatFile{
 			Repeat: index + 1,
 			Filename: filepath.Join(planDir, fmt.Sprintf("%s-%s-%s-%d.json",
-				jsString(entry.ItemIndex),
-				jsString(entry.CopilotID),
-				jsString(entry.Mode),
+				jsval.String(entry.ItemIndex),
+				jsval.String(entry.CopilotID),
+				jsval.String(entry.Mode),
 				index+1,
 			)),
 		})
@@ -251,7 +252,7 @@ func BuildCopilotStartUpTask(clientType string) map[string]any {
 func BuildCopilotDynamicTaskConfig(preTasks []any, task map[string]any) map[string]any {
 	tasks := make([]any, 0, len(preTasks)+1)
 	for _, raw := range preTasks {
-		if asRecord(raw) != nil {
+		if jsval.Record(raw) != nil {
 			tasks = append(tasks, raw)
 		}
 	}
@@ -262,7 +263,7 @@ func BuildCopilotDynamicTaskConfig(preTasks []any, task map[string]any) map[stri
 // OrderEntriesForNavigation places entries for the navigated stage first. The
 // partition is stable, matching the two-filter implementation in Node.
 func OrderEntriesForNavigation(entries []PlanEntry, navigationStage any) []PlanEntry {
-	stage := strings.ToUpper(strings.TrimSpace(jsStringTruthyOrEmpty(navigationStage)))
+	stage := strings.ToUpper(strings.TrimSpace(jsval.StringOrEmpty(navigationStage)))
 	if stage == "" {
 		return entries
 	}
@@ -284,8 +285,8 @@ func OrderEntriesForNavigation(entries []PlanEntry, navigationStage any) []PlanE
 // keeps existing installed/user BattleStart settings.
 func MergePresetFormationTasks(installedTasks, userTasks map[string]any) map[string]any {
 	merged := copyRecord(userTasks)
-	installedBattleStart := asRecord(installedTasks["BattleStart"])
-	userBattleStart := asRecord(userTasks["BattleStart"])
+	installedBattleStart := jsval.Record(installedTasks["BattleStart"])
+	userBattleStart := jsval.Record(userTasks["BattleStart"])
 	battleStart := copyRecord(installedBattleStart)
 	for key, value := range userBattleStart {
 		battleStart[key] = value
@@ -317,7 +318,7 @@ type CurrentMapResource struct {
 // EnsureCurrentMapActivityResource writes a MAA Stages resource that lets the
 // activity runner recognize stages without home navigation.
 func EnsureCurrentMapActivityResource(configDir string, activityCode any, stages []any) (*CurrentMapResource, error) {
-	code := strings.ToUpper(strings.TrimSpace(jsStringTruthyOrEmpty(activityCode)))
+	code := strings.ToUpper(strings.TrimSpace(jsval.StringOrEmpty(activityCode)))
 	if !activityCodePattern.MatchString(code) {
 		return nil, apperrors.WithStatus("COPILOT_ACTIVITY_CODE_INVALID", "活动代号格式不合法", http.StatusBadRequest, false, map[string]any{"code": code})
 	}
@@ -354,7 +355,7 @@ func EnsurePresetFormationResource(installedResourceDir, configDir string) error
 	if err != nil {
 		return apperrors.WithStatus("COPILOT_PRESET_RESOURCE_FAILED", "读取 MAA 任务资源失败", http.StatusInternalServerError, false, map[string]any{"path": installedTasksPath, "error": err.Error()})
 	}
-	installedTasks := asRecord(installedValue)
+	installedTasks := jsval.Record(installedValue)
 	if installedTasks == nil {
 		installedTasks = map[string]any{}
 	}
@@ -363,7 +364,7 @@ func EnsurePresetFormationResource(installedResourceDir, configDir string) error
 	userValue, err := jsonstore.Read(userTasksPath, map[string]any{})
 	userTasks := map[string]any{}
 	if err == nil {
-		if record := asRecord(userValue); record != nil {
+		if record := jsval.Record(userValue); record != nil {
 			userTasks = record
 		}
 	}
@@ -401,7 +402,7 @@ func CanUseNativeCopilotSet(options NativeSetOptions) bool {
 	if len(options.SelectedIndexes) > 0 {
 		seen := map[int]struct{}{}
 		for _, raw := range options.SelectedIndexes {
-			index, ok := integerValue(raw)
+			index, ok := jsval.Integer(raw)
 			if !ok || index < 0 || index >= totalItems {
 				return false
 			}
@@ -478,16 +479,16 @@ func BuildNativeCopilotCommand(setId any, raid string, options CopilotOptions) [
 	if raid == "" {
 		raid = "normal"
 	}
-	args := []string{"prts://s" + jsString(setId), "--batch"}
+	args := []string{"prts://s" + jsval.String(setId), "--batch"}
 	if raid == "raid" || raid == "both" {
 		args = append(args, "--raid", raid)
 	}
 	if options.FormationMode == "on" {
 		args = append(args, "--formation")
 	}
-	formationIndex := numberOrZero(options.FormationIndex)
+	formationIndex := jsval.NumberOrZero(options.FormationIndex)
 	if !math.IsNaN(formationIndex) && !math.IsInf(formationIndex, 0) && formationIndex > 0 {
-		args = append(args, "--formation-index", jsString(formationIndex))
+		args = append(args, "--formation-index", jsval.String(formationIndex))
 	}
 	if options.AddTrust {
 		args = append(args, "--add-trust")
@@ -498,9 +499,9 @@ func BuildNativeCopilotCommand(setId any, raid string, options CopilotOptions) [
 	if options.UseSanityPotion {
 		args = append(args, "--use-sanity-potion")
 	}
-	supportUsage := numberOrZero(options.SupportUsage)
+	supportUsage := jsval.NumberOrZero(options.SupportUsage)
 	if !math.IsNaN(supportUsage) && !math.IsInf(supportUsage, 0) && supportUsage > 0 {
-		args = append(args, "--support-unit-usage", jsString(supportUsage))
+		args = append(args, "--support-unit-usage", jsval.String(supportUsage))
 	}
 	if supportName, ok := options.SupportName.(string); ok && strings.TrimSpace(supportName) != "" {
 		args = append(args, "--support-unit-name", strings.TrimSpace(supportName))
@@ -509,14 +510,14 @@ func BuildNativeCopilotCommand(setId any, raid string, options CopilotOptions) [
 		args = append(args, "--user-resource")
 	}
 	profile := options.Profile
-	if !truthy(profile) {
+	if !jsval.Truthy(profile) {
 		profile = options.ProfileID
 	}
-	if truthy(profile) {
-		args = append(args, "-p", jsString(profile))
+	if jsval.Truthy(profile) {
+		args = append(args, "-p", jsval.String(profile))
 	}
-	if truthy(options.Address) {
-		args = append(args, "-a", jsString(options.Address))
+	if jsval.Truthy(options.Address) {
+		args = append(args, "-a", jsval.String(options.Address))
 	}
 	return args
 }
@@ -525,7 +526,7 @@ func normalizedStageList(stages []any) []string {
 	seen := map[string]struct{}{}
 	result := make([]string, 0, len(stages))
 	for _, raw := range stages {
-		stage := strings.ToUpper(strings.TrimSpace(jsStringTruthyOrEmpty(raw)))
+		stage := strings.ToUpper(strings.TrimSpace(jsval.StringOrEmpty(raw)))
 		if stage == "" {
 			continue
 		}

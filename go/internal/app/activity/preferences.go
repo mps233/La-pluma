@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"encoding/json"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"strings"
 )
 
@@ -22,19 +23,19 @@ func NormalizeRaid(value any) string {
 
 // GetCombatCopilotPreferences mirrors getCombatCopilotPreferences.
 func GetCombatCopilotPreferences(combatTasks any) CombatCopilotPreferences {
-	tasks := asRecord(combatTasks)
+	tasks := jsval.Record(combatTasks)
 	if tasks == nil {
 		tasks = map[string]any{}
 	}
-	advancedParams := asRecord(tasks["advancedParams"])
+	advancedParams := jsval.Record(tasks["advancedParams"])
 	if advancedParams == nil {
 		advancedParams = map[string]any{}
 	}
-	preferences := asRecord(advancedParams["copilot"])
+	preferences := jsval.Record(advancedParams["copilot"])
 	if preferences == nil {
 		preferences = map[string]any{}
 	}
-	autoFormation := asRecord(tasks["autoFormation"])
+	autoFormation := jsval.Record(tasks["autoFormation"])
 	if autoFormation == nil {
 		autoFormation = map[string]any{}
 	}
@@ -106,14 +107,14 @@ func (s *Service) LoadActivitySelectionContext(ctx context.Context) SelectionCon
 }
 
 func ownedOperatorNames(box any) map[string]struct{} {
-	boxRecord := asRecord(box)
+	boxRecord := jsval.Record(box)
 	if boxRecord == nil {
 		boxRecord = map[string]any{}
 	}
-	allOpers := asArray(boxRecord["allOpers"])
+	allOpers := jsval.Array(boxRecord["allOpers"])
 	hasOwnFlags := false
 	for _, oper := range allOpers {
-		if record := asRecord(oper); record != nil {
+		if record := jsval.Record(oper); record != nil {
 			if _, exists := record["own"]; exists {
 				hasOwnFlags = true
 				break
@@ -124,12 +125,12 @@ func ownedOperatorNames(box any) map[string]struct{} {
 	if hasOwnFlags {
 		source = allOpers
 	} else {
-		source = asArray(boxRecord["data"])
+		source = jsval.Array(boxRecord["data"])
 	}
 
 	names := make(map[string]struct{})
 	for _, oper := range source {
-		record := asRecord(oper)
+		record := jsval.Record(oper)
 		if record != nil {
 			if own, ok := record["own"].(bool); ok && !own {
 				continue
@@ -137,7 +138,7 @@ func ownedOperatorNames(box any) map[string]struct{} {
 		}
 		name := ""
 		if record != nil {
-			name = strings.TrimSpace(jsStringOrEmpty(record["name"]))
+			name = strings.TrimSpace(jsval.StringOrEmpty(record["name"]))
 		}
 		if name != "" {
 			names[name] = struct{}{}
@@ -154,25 +155,25 @@ func ownedOperatorNames(box any) map[string]struct{} {
 // field those reliably, so substitution prefers candidates that do not need
 // them.
 func usableOperatorNames(box any) map[string]struct{} {
-	boxRecord := asRecord(box)
+	boxRecord := jsval.Record(box)
 	if boxRecord == nil {
 		return nil
 	}
 	names := map[string]struct{}{}
-	for _, raw := range asArray(boxRecord["data"]) {
-		record := asRecord(raw)
+	for _, raw := range jsval.Array(boxRecord["data"]) {
+		record := jsval.Record(raw)
 		if record == nil {
 			continue
 		}
 		if own, ok := record["own"].(bool); ok && !own {
 			continue
 		}
-		name := strings.TrimSpace(jsStringOrEmpty(record["name"]))
+		name := strings.TrimSpace(jsval.StringOrEmpty(record["name"]))
 		if name == "" {
 			continue
 		}
-		elite := jsNumber(record["elite"])
-		level := jsNumber(record["level"])
+		elite := jsval.NumberOrZero(record["elite"])
+		level := jsval.NumberOrZero(record["level"])
 		if elite <= 0 && level <= 1 {
 			continue
 		}

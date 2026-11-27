@@ -8,6 +8,7 @@ import (
 	"time"
 
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const activityCacheTTL = 24 * 60 * 60 * 1000
@@ -55,7 +56,7 @@ func (s *Service) CurrentActivity(ctx context.Context, clientType string) (*Info
 		persistedData = map[string]any{}
 	}
 	rawPersisted, hasPersisted := persistedData[clientType]
-	persistedEntry := asRecord(rawPersisted)
+	persistedEntry := jsval.Record(rawPersisted)
 	if !hasPersisted {
 		persistedEntry = nil
 	}
@@ -254,11 +255,11 @@ func infoFromPenguinActivity(activity *PenguinActivity) Info {
 
 func infoFromPersisted(entry map[string]any) (Info, int64, int64) {
 	ttl := int64(activityCacheTTL)
-	if parsed, ok := numberValue(entry["ttl"]); ok && parsed != 0 {
+	if parsed, ok := jsval.Number(entry["ttl"]); ok && parsed != 0 {
 		ttl = int64(parsed)
 	}
 	timestamp := int64(0)
-	if parsed, ok := numberValue(entry["timestamp"]); ok {
+	if parsed, ok := jsval.Number(entry["timestamp"]); ok {
 		timestamp = int64(parsed)
 	}
 	return infoFromPersistedEntry(entry), timestamp, ttl
@@ -306,11 +307,11 @@ func parseMAAActivityOutput(output string) (*string, string) {
 }
 
 func commandStdout(run domainrun.DTO) string {
-	record := asRecord(run.Result)
+	record := jsval.Record(run.Result)
 	if record == nil {
 		return ""
 	}
-	return asString(record["stdout"])
+	return jsval.Text(record["stdout"])
 }
 
 func timeValueMillis(value any) (int64, bool) {
@@ -339,7 +340,7 @@ func timeValueMillis(value any) (int64, bool) {
 		}
 		return 0, false
 	default:
-		if parsed, ok := numberValue(value); ok {
+		if parsed, ok := jsval.Number(value); ok {
 			return int64(parsed), true
 		}
 		return 0, false

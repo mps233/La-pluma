@@ -14,6 +14,7 @@ import (
 	"time"
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -113,7 +114,7 @@ func (c *PRTSClient) GetSet(ctx context.Context, setId string) (map[string]any, 
 	if err != nil {
 		return nil, err
 	}
-	return asRecord(value), nil
+	return jsval.Record(value), nil
 }
 
 // GetSetRaw returns the raw /set/get envelope, matching the Node proxy.
@@ -122,7 +123,7 @@ func (c *PRTSClient) GetSetRaw(ctx context.Context, setId string) (map[string]an
 	if err != nil {
 		return nil, err
 	}
-	return asRecord(value), nil
+	return jsval.Record(value), nil
 }
 
 // GetCopilotRaw returns the raw /copilot/get/{id} envelope, matching the Node
@@ -132,7 +133,7 @@ func (c *PRTSClient) GetCopilotRaw(ctx context.Context, id string) (map[string]a
 	if err != nil {
 		return nil, err
 	}
-	return asRecord(value), nil
+	return jsval.Record(value), nil
 }
 
 // GetCopilot reads /copilot/get/{id} and returns the unwrapped data object.
@@ -141,7 +142,7 @@ func (c *PRTSClient) GetCopilot(ctx context.Context, id string) (map[string]any,
 	if err != nil {
 		return nil, err
 	}
-	return asRecord(value), nil
+	return jsval.Record(value), nil
 }
 
 // QueryCopilots reads /copilot/query and returns the data.data array. A
@@ -154,15 +155,15 @@ func (c *PRTSClient) QueryCopilots(ctx context.Context, keyword string, page, li
 	if err != nil {
 		return nil, err
 	}
-	record := asRecord(payload)
+	record := jsval.Record(payload)
 	if record == nil {
 		return []any{}, nil
 	}
-	if code, ok := numberValue(record["status_code"]); !ok || code != 200 {
+	if code, ok := jsval.Number(record["status_code"]); !ok || code != 200 {
 		return []any{}, nil
 	}
-	data := asRecord(record["data"])
-	return append([]any{}, asArray(dataArray(data))...), nil
+	data := jsval.Record(record["data"])
+	return append([]any{}, jsval.Array(dataArray(data))...), nil
 }
 
 // QuerySets posts /set/query and returns the data.data array.
@@ -172,15 +173,15 @@ func (c *PRTSClient) QuerySets(ctx context.Context, keyword string, page, limit 
 	if err != nil {
 		return nil, err
 	}
-	record := asRecord(payload)
+	record := jsval.Record(payload)
 	if record == nil {
 		return []any{}, nil
 	}
-	if code, ok := numberValue(record["status_code"]); !ok || code != 200 {
+	if code, ok := jsval.Number(record["status_code"]); !ok || code != 200 {
 		return []any{}, nil
 	}
-	data := asRecord(record["data"])
-	return append([]any{}, asArray(dataArray(data))...), nil
+	data := jsval.Record(record["data"])
+	return append([]any{}, jsval.Array(dataArray(data))...), nil
 }
 
 // ResolveStageIDs maps a display stage code (for example TL-EX-8) or an exact,
@@ -236,14 +237,14 @@ func (c *PRTSClient) fetchLevelCatalog(ctx context.Context) (*levelCatalogCache,
 	if err != nil {
 		return nil, err
 	}
-	record := asRecord(payload)
+	record := jsval.Record(payload)
 	if record == nil {
 		return nil, fmt.Errorf("关卡列表格式无效")
 	}
-	if code, ok := numberValue(record["status_code"]); !ok || code != 200 {
+	if code, ok := jsval.Number(record["status_code"]); !ok || code != 200 {
 		return nil, fmt.Errorf("关卡列表返回失败")
 	}
-	items := asArray(record["data"])
+	items := jsval.Array(record["data"])
 	if len(items) == 0 {
 		return nil, fmt.Errorf("关卡列表为空")
 	}
@@ -261,22 +262,22 @@ func (c *PRTSClient) fetchLevelCatalog(ctx context.Context) (*levelCatalogCache,
 	}
 	nameIDs := map[string]map[string]struct{}{}
 	for _, raw := range items {
-		level := asRecord(raw)
+		level := jsval.Record(raw)
 		if level == nil {
 			continue
 		}
-		stageID := cleanStageSearchID(asString(level["stage_id"]))
+		stageID := cleanStageSearchID(jsval.Text(level["stage_id"]))
 		if stageID == "" {
 			continue
 		}
-		display := strings.ToUpper(strings.TrimSpace(asString(level["cat_three"])))
+		display := strings.ToUpper(strings.TrimSpace(jsval.Text(level["cat_three"])))
 		if display != "" {
 			addCandidate(display, stageID, 0)
 			if base, rank := splitStageVariant(display); base != display {
 				addCandidate(base, stageID, rank)
 			}
 		}
-		if name := strings.TrimSpace(asString(level["name"])); name != "" {
+		if name := strings.TrimSpace(jsval.Text(level["name"])); name != "" {
 			ids := nameIDs[name]
 			if ids == nil {
 				ids = map[string]struct{}{}
@@ -351,7 +352,7 @@ func (c *PRTSClient) StageStats(ctx context.Context) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return asArray(value), nil
+	return jsval.Array(value), nil
 }
 
 func dataArray(data map[string]any) any {
@@ -386,18 +387,18 @@ func (c *PRTSClient) fetchJSON(ctx context.Context, method, endpoint string, bod
 }
 
 func unwrapPayload(payload any) (any, error) {
-	record := asRecord(payload)
+	record := jsval.Record(payload)
 	if record == nil {
 		return payload, nil
 	}
-	if code, ok := numberValue(record["status_code"]); ok && code != 0 && code != 200 {
+	if code, ok := jsval.Number(record["status_code"]); ok && code != 0 && code != 200 {
 		message := "作业站返回失败"
-		if text := asString(record["message"]); text != "" {
+		if text := jsval.Text(record["message"]); text != "" {
 			message = text
 		}
 		return nil, fmt.Errorf("%s", message)
 	}
-	if data := record["data"]; truthy(data) {
+	if data := record["data"]; jsval.Truthy(data) {
 		return data, nil
 	}
 	return payload, nil
@@ -454,7 +455,7 @@ func (c *PRTSClient) doJSONOnce(ctx context.Context, method, endpoint string, bo
 		return nil, err
 	}
 	var payload any
-	if err := decodeJSON(data, &payload); err != nil {
+	if err := jsval.DecodeJSON(data, &payload); err != nil {
 		return nil, err
 	}
 	return payload, nil

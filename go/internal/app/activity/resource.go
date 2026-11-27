@@ -12,6 +12,7 @@ import (
 
 	"github.com/mps233/la-pluma/go/internal/config"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const resourceCacheTTL = 5 * time.Minute
@@ -65,7 +66,7 @@ func (r *ResourceIndex) load() ([]map[string]any, map[string]map[string]any, err
 	stages := stageRecords(value)
 	byCode := make(map[string]map[string]any, len(stages))
 	for _, record := range stages {
-		code := asString(record["code"])
+		code := jsval.Text(record["code"])
 		if code == "" {
 			continue
 		}
@@ -117,7 +118,7 @@ func collectActivityStageCodes(stages []map[string]any, activityCode string) []s
 	byCode := map[string]int{}
 	order := make([]string, 0)
 	for _, stage := range stages {
-		code := strings.ToUpper(strings.TrimSpace(asString(stage["code"])))
+		code := strings.ToUpper(strings.TrimSpace(jsval.Text(stage["code"])))
 		if !strings.HasPrefix(code, prefix) {
 			continue
 		}
@@ -160,7 +161,7 @@ func stageRecords(value any) []map[string]any {
 	case []any:
 		records := make([]map[string]any, 0, len(typed))
 		for _, raw := range typed {
-			if record := asRecord(raw); record != nil {
+			if record := jsval.Record(raw); record != nil {
 				records = append(records, record)
 			}
 		}
@@ -173,7 +174,7 @@ func stageRecords(value any) []map[string]any {
 		sort.Strings(keys)
 		records := make([]map[string]any, 0, len(keys))
 		for _, key := range keys {
-			if record := asRecord(typed[key]); record != nil {
+			if record := jsval.Record(typed[key]); record != nil {
 				records = append(records, record)
 			}
 		}

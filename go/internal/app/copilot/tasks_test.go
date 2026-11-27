@@ -8,13 +8,14 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func boolPointer(value bool) *bool { return &value }
 
 func asMap(t *testing.T, value any) map[string]any {
 	t.Helper()
-	record := asRecord(value)
+	record := jsval.Record(value)
 	if record == nil {
 		t.Fatalf("expected record, got %#v", value)
 	}
@@ -338,7 +339,7 @@ func TestEnsurePresetFormationResource(t *testing.T) {
 	}
 	merged := asMap(t, value)
 	battleStart := asMap(t, merged["BattleStart"])
-	if numberOrZero(battleStart["postDelay"]) != 999 {
+	if jsval.NumberOrZero(battleStart["postDelay"]) != 999 {
 		t.Fatalf("user postDelay lost: %#v", battleStart["postDelay"])
 	}
 	// mergePresetFormationTasks only merges BattleStart from the installed
@@ -358,7 +359,7 @@ func TestBuildCopilotDynamicTaskConfig(t *testing.T) {
 		},
 		map[string]any{"name": "活动作业", "type": "Copilot"},
 	)
-	tasks := asArray(config["tasks"])
+	tasks := jsval.Array(config["tasks"])
 	if len(tasks) != 3 {
 		t.Fatalf("tasks = %#v", tasks)
 	}
@@ -367,7 +368,7 @@ func TestBuildCopilotDynamicTaskConfig(t *testing.T) {
 		t.Fatalf("last task = %#v", last)
 	}
 	empty := BuildCopilotDynamicTaskConfig(nil, map[string]any{"name": "only"})
-	if len(asArray(empty["tasks"])) != 1 {
+	if len(jsval.Array(empty["tasks"])) != 1 {
 		t.Fatalf("empty pre tasks = %#v", empty)
 	}
 }
@@ -401,7 +402,7 @@ func TestBuildCopilotStartUpTask(t *testing.T) {
 	if task["type"] != "StartUp" || task["client_type"] != "Bilibili" {
 		t.Fatalf("startup task = %#v", task)
 	}
-	params := asRecord(task["params"])
+	params := jsval.Record(task["params"])
 	if params == nil || params["start_game_enabled"] != true {
 		t.Fatalf("startup params = %#v", task["params"])
 	}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // Manual session states. The Node service projects these from AgentRun.
@@ -367,7 +368,7 @@ func normalizeSelectedIndexes(value []any) []int {
 	seen := map[int]struct{}{}
 	result := make([]int, 0, len(value))
 	for _, raw := range value {
-		index, ok := integerValue(raw)
+		index, ok := jsval.Integer(raw)
 		if !ok {
 			continue
 		}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/mps233/la-pluma/go/internal/config"
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 type fakeExecutor struct {
@@ -384,14 +385,14 @@ func TestRunCurrentActivitySetUsesZoneChapterForEXStage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	userTasks := asRecord(value)
-	page := asRecord(userTasks["LaPlumaActivityPage"])
-	chapter := asRecord(userTasks["LaPlumaActivityChapter"])
-	if asString(page["baseTask"]) != "EA-OpenOcr" {
+	userTasks := jsval.Record(value)
+	page := jsval.Record(userTasks["LaPlumaActivityPage"])
+	chapter := jsval.Record(userTasks["LaPlumaActivityChapter"])
+	if jsval.Text(page["baseTask"]) != "EA-OpenOcr" {
 		t.Fatalf("page task = %#v", page)
 	}
 	text, _ := chapter["text"].([]any)
-	if len(text) != 1 || asString(text[0]) != "测试章节" {
+	if len(text) != 1 || jsval.Text(text[0]) != "测试章节" {
 		t.Fatalf("chapter task = %#v", chapter)
 	}
 	if len(planExecutor.planRequests) != 1 {

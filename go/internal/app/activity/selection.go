@@ -1,6 +1,7 @@
 package activity
 
 import (
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"strings"
 )
 
@@ -9,7 +10,7 @@ func FindMissingOperators(content any, ownedOperators map[string]struct{}) Missi
 	if len(ownedOperators) == 0 {
 		return MissingOperatorInfo{Names: []string{}, Unknown: true}
 	}
-	source := asRecord(content)
+	source := jsval.Record(content)
 	if source == nil {
 		source = map[string]any{}
 	}
@@ -21,8 +22,8 @@ func FindMissingOperators(content any, ownedOperators map[string]struct{}) Missi
 		}
 	}
 	missingGroups := 0
-	for _, rawGroup := range asArray(source["groups"]) {
-		group := asRecord(rawGroup)
+	for _, rawGroup := range jsval.Array(source["groups"]) {
+		group := jsval.Record(rawGroup)
 		if group == nil {
 			continue
 		}
@@ -51,12 +52,12 @@ func FindMissingOperators(content any, ownedOperators map[string]struct{}) Missi
 func readOperatorNames(value any) []string {
 	seen := map[string]struct{}{}
 	result := make([]string, 0)
-	for _, raw := range asArray(value) {
-		record := asRecord(raw)
+	for _, raw := range jsval.Array(value) {
+		record := jsval.Record(raw)
 		if record == nil {
 			continue
 		}
-		name := strings.TrimSpace(jsStringOrEmpty(record["name"]))
+		name := strings.TrimSpace(jsval.StringOrEmpty(record["name"]))
 		if name == "" {
 			continue
 		}
@@ -78,7 +79,7 @@ func CanRunWithOperators(missing *MissingOperatorInfo, preferences any) bool {
 	if missing.Count != 1 {
 		return false
 	}
-	source := asRecord(preferences)
+	source := jsval.Record(preferences)
 	if source == nil {
 		source = map[string]any{}
 	}
@@ -86,14 +87,14 @@ func CanRunWithOperators(missing *MissingOperatorInfo, preferences any) bool {
 		return false
 	}
 	supportUsage := 0.0
-	if truthy(source["supportUsage"]) {
-		supportUsage = jsNumber(source["supportUsage"])
+	if jsval.Truthy(source["supportUsage"]) {
+		supportUsage = jsval.NumberOrZero(source["supportUsage"])
 	}
 	if supportUsage == 1 {
 		return true
 	}
 	if supportUsage == 2 {
-		supportName := strings.TrimSpace(jsStringOrEmpty(source["supportName"]))
+		supportName := strings.TrimSpace(jsval.StringOrEmpty(source["supportName"]))
 		if supportName == "" {
 			return false
 		}

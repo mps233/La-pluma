@@ -138,5 +138,20 @@ deleted, verification, and follow-ups.
 - Deleted: `stores/index.ts` and the two old directories.
 - Verified: type-check, 74 test files / 514 tests, lint at the ratchet, build.
 
+### Round 14 — canonical JS value coercion (2026-11-28)
+
+- Added `internal/util/jsval` with explicit contracts for the idioms the
+  backend actually needs: `Text` (type assertion), `String` (JS `String`),
+  `StringOrNullish` (`?? ""`), `StringOrEmpty` (`|| ""`), plus record/array,
+  truthiness, number/integer, float formatting, and JSON parsing.
+- Migrated `app/activity` and `app/copilot`, the two largest copies, and
+  deleted their local helpers (~450 lines). `asString` call sites map to
+  `jsval.Text`, not `jsval.String`; the stage-ID regression test caught the
+  difference.
+- Tests cover every coercion contract, including large-number JSON parsing.
+- Verified: full Go test suite, vet, gofmt.
+- Follow-up: thirteen packages still carry local copies (tracked in G1).
+
+
 
 

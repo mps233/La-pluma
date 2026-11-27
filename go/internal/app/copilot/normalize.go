@@ -1,5 +1,7 @@
 package copilot
 
+import "github.com/mps233/la-pluma/go/internal/util/jsval"
+
 // NormalizeCopilotContentForMAA repairs operator requirement blocks that
 // MaaCore rejects even though its own inference already implies the higher
 // elite level. A PRTS plan that equips a module (or asks for skill mastery)
@@ -15,26 +17,26 @@ func NormalizeCopilotContentForMAA(content Content) Content {
 	}
 	normalizeOperList(ContentOpers(content))
 	for _, rawGroup := range ContentGroups(content) {
-		group := asRecord(rawGroup)
+		group := jsval.Record(rawGroup)
 		if group == nil {
 			continue
 		}
-		normalizeOperList(asArray(group["opers"]))
+		normalizeOperList(jsval.Array(group["opers"]))
 	}
 	return content
 }
 
 func normalizeOperList(entries []any) {
 	for _, raw := range entries {
-		oper := asRecord(raw)
+		oper := jsval.Record(raw)
 		if oper == nil {
 			continue
 		}
-		requirements := asRecord(oper["requirements"])
+		requirements := jsval.Record(oper["requirements"])
 		if requirements == nil {
 			continue
 		}
-		declared, ok := integerValue(requirements["elite"])
+		declared, ok := jsval.Integer(requirements["elite"])
 		if !ok {
 			continue
 		}
@@ -48,7 +50,7 @@ func normalizeOperList(entries []any) {
 // a skill index implies elite (skill 2 -> E1, skill 3 -> E2), skill mastery
 // raises the floor, and any module requires E2.
 func derivedEliteRequirement(oper, requirements map[string]any) int {
-	skill, ok := integerValue(oper["skill"])
+	skill, ok := jsval.Integer(oper["skill"])
 	if !ok || skill < 1 {
 		skill = 1
 	}
@@ -56,14 +58,14 @@ func derivedEliteRequirement(oper, requirements map[string]any) int {
 	if required < 0 {
 		required = 0
 	}
-	if skillLevel, ok := integerValue(requirements["skill_level"]); ok {
+	if skillLevel, ok := jsval.Integer(requirements["skill_level"]); ok {
 		if skillLevel > 7 {
 			required = max(required, 2)
 		} else if skillLevel > 4 {
 			required = max(required, 1)
 		}
 	}
-	if module, ok := integerValue(requirements["module"]); ok && module > 0 {
+	if module, ok := jsval.Integer(requirements["module"]); ok && module > 0 {
 		required = max(required, 2)
 	}
 	return required

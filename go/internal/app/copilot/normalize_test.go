@@ -2,6 +2,7 @@ package copilot
 
 import (
 	"encoding/json"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"testing"
 )
 
@@ -28,16 +29,16 @@ func TestNormalizeCopilotContentForMAARaisesContradictoryElite(t *testing.T) {
 	if len(groups) != 1 {
 		t.Fatalf("groups = %d", len(groups))
 	}
-	opers := asArray(asRecord(groups[0])["opers"])
-	if elite, _ := integerValue(asRecord(opers[0])["requirements"].(map[string]any)["elite"]); elite != 2 {
+	opers := jsval.Array(jsval.Record(groups[0])["opers"])
+	if elite, _ := jsval.Integer(jsval.Record(opers[0])["requirements"].(map[string]any)["elite"]); elite != 2 {
 		t.Fatalf("狮蝎 elite = %v, want 2", elite)
 	}
 	// Already consistent entries stay untouched.
-	if elite, _ := integerValue(asRecord(opers[1])["requirements"].(map[string]any)["elite"]); elite != 1 {
+	if elite, _ := jsval.Integer(jsval.Record(opers[1])["requirements"].(map[string]any)["elite"]); elite != 1 {
 		t.Fatalf("伊桑 elite = %v, want 1", elite)
 	}
-	top := asRecord(ContentOpers(content)[0])
-	if elite, _ := integerValue(asRecord(top["requirements"])["elite"]); elite != 0 {
+	top := jsval.Record(ContentOpers(content)[0])
+	if elite, _ := jsval.Integer(jsval.Record(top["requirements"])["elite"]); elite != 0 {
 		t.Fatalf("桃金娘 elite = %v, want 0", elite)
 	}
 }
@@ -59,9 +60,9 @@ func TestNormalizeCopilotContentForMAASatisfiesMaaCoreRule(t *testing.T) {
 	content := Content(parsed)
 	NormalizeCopilotContentForMAA(content)
 
-	oper := asRecord(asArray(asRecord(ContentGroups(content)[0])["opers"])[0])
-	requirements := asRecord(oper["requirements"])
-	declared, _ := integerValue(requirements["elite"])
+	oper := jsval.Record(jsval.Array(jsval.Record(ContentGroups(content)[0])["opers"])[0])
+	requirements := jsval.Record(oper["requirements"])
+	declared, _ := jsval.Integer(requirements["elite"])
 	if required := derivedEliteRequirement(oper, requirements); required > declared {
 		t.Fatalf("content still rejected: requires %d, declares %d", required, declared)
 	}
@@ -70,7 +71,7 @@ func TestNormalizeCopilotContentForMAASatisfiesMaaCoreRule(t *testing.T) {
 func TestNormalizeCopilotContentForMAASkipsMissingRequirements(t *testing.T) {
 	content := Content{"opers": []any{map[string]any{"name": "桃金娘"}}}
 	NormalizeCopilotContentForMAA(content)
-	if _, exists := asRecord(ContentOpers(content)[0])["requirements"]; exists {
+	if _, exists := jsval.Record(ContentOpers(content)[0])["requirements"]; exists {
 		t.Fatal("missing requirements must not be invented")
 	}
 }

@@ -2,6 +2,7 @@ package activity
 
 import (
 	"context"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"regexp"
 	"sort"
 	"strings"
@@ -53,7 +54,7 @@ func ParseStageActivityTime(value any, timeZone any) (int64, bool) {
 		return 0, false
 	}
 	offsetHours := 8.0
-	if parsed, ok := numberValue(timeZone); ok {
+	if parsed, ok := jsval.Number(timeZone); ok {
 		offsetHours = parsed
 	}
 	year := mustAtoi(match[1])
@@ -75,7 +76,7 @@ func mustAtoi(value string) int {
 }
 
 func getActivityWindow(activity any) activityWindow {
-	record := asRecord(activity)
+	record := jsval.Record(activity)
 	if record == nil {
 		record = map[string]any{}
 	}
@@ -94,11 +95,11 @@ func getStagePrefix(stages []any) string {
 	counts := map[string]int{}
 	order := make([]string, 0)
 	for _, rawStage := range stages {
-		stage := asRecord(rawStage)
+		stage := jsval.Record(rawStage)
 		if stage == nil {
 			continue
 		}
-		value := strings.TrimSpace(jsStringOrEmpty(stage["Value"]))
+		value := strings.TrimSpace(jsval.StringOrEmpty(stage["Value"]))
 		if value == "" || sideStoryReopenPattern.MatchString(value) {
 			continue
 		}
@@ -123,20 +124,20 @@ func getStagePrefix(stages []any) string {
 
 // SelectCurrentStageActivity mirrors selectCurrentStageActivity.
 func SelectCurrentStageActivity(data any, clientType string, now time.Time) *StageActivity {
-	root := asRecord(data)
+	root := jsval.Record(data)
 	if root == nil {
 		root = map[string]any{}
 	}
 	clientKey := NormalizeClientType(clientType)
 	rawClientData := root[clientKey]
-	if !truthy(rawClientData) {
+	if !jsval.Truthy(rawClientData) {
 		rawClientData = root["Official"]
 	}
-	clientData := asRecord(rawClientData)
+	clientData := jsval.Record(rawClientData)
 	if clientData == nil {
 		clientData = map[string]any{}
 	}
-	sideStoryStage := asRecord(clientData["sideStoryStage"])
+	sideStoryStage := jsval.Record(clientData["sideStoryStage"])
 	if sideStoryStage == nil {
 		return nil
 	}
@@ -148,12 +149,12 @@ func SelectCurrentStageActivity(data any, clientType string, now time.Time) *Sta
 	}
 	active := make([]candidate, 0)
 	for key, rawValue := range sideStoryStage {
-		raw := asRecord(rawValue)
+		raw := jsval.Record(rawValue)
 		if raw == nil {
 			raw = map[string]any{}
 		}
-		activity := asRecord(raw["Activity"])
-		stages := asArray(raw["Stages"])
+		activity := jsval.Record(raw["Activity"])
+		stages := jsval.Array(raw["Stages"])
 		if activity == nil || len(stages) == 0 {
 			continue
 		}
@@ -171,10 +172,10 @@ func SelectCurrentStageActivity(data any, clientType string, now time.Time) *Sta
 
 		stageValues := make([]string, 0, len(stages))
 		for _, rawStage := range stages {
-			stage := asRecord(rawStage)
+			stage := jsval.Record(rawStage)
 			value := ""
 			if stage != nil {
-				value = strings.TrimSpace(jsStringOrEmpty(stage["Value"]))
+				value = strings.TrimSpace(jsval.StringOrEmpty(stage["Value"]))
 			}
 			if value == "" {
 				continue
@@ -195,7 +196,7 @@ func SelectCurrentStageActivity(data any, clientType string, now time.Time) *Sta
 		}
 
 		minimumRequired := raw["MinimumRequired"]
-		if !truthy(minimumRequired) {
+		if !jsval.Truthy(minimumRequired) {
 			minimumRequired = nil
 		}
 		active = append(active, candidate{
@@ -243,20 +244,20 @@ type resourceCollectionCacheEntry struct {
 // IsResourceCollectionOpen reports whether the resource collection window
 // covers now, mirroring isResourceCollectionOpen.
 func IsResourceCollectionOpen(data any, clientType string, now time.Time) bool {
-	root := asRecord(data)
+	root := jsval.Record(data)
 	if root == nil {
 		root = map[string]any{}
 	}
 	clientKey := NormalizeClientType(clientType)
 	rawClientData := root[clientKey]
-	if !truthy(rawClientData) {
+	if !jsval.Truthy(rawClientData) {
 		rawClientData = root["Official"]
 	}
-	clientData := asRecord(rawClientData)
+	clientData := jsval.Record(rawClientData)
 	if clientData == nil {
 		clientData = map[string]any{}
 	}
-	resource := asRecord(clientData["resourceCollection"])
+	resource := jsval.Record(clientData["resourceCollection"])
 	if resource == nil || resource["IsResourceCollection"] != true {
 		return false
 	}
