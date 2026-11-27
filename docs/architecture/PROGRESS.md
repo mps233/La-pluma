@@ -326,6 +326,15 @@ deleted, verification, and follow-ups.
 - Follow-up: ADB address fallbacks, TURN settings, Docker detection, and
   `MAA_CLIENT_TYPE` still read the env in services (G11 remainder).
 
+### Round 26 — enforce the app/HTTP boundary (2026-11-28)
+
+- After the quotes move, no `internal/app` production file owns an HTTP
+  handler. Added an archguard test that fails if `ServeHTTP` or `http.Handler`
+  appears anywhere in the application layer.
+- `infra/assets` remains the one known routing exception, recorded in G6.
+- Verified: archguard and full Go suite.
+
+
 
 
 

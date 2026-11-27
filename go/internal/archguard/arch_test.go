@@ -162,6 +162,35 @@ func TestAgentAPIFilesStaySmall(t *testing.T) {
 	}
 }
 
+// TestAppLayerHasNoHTTPHandlers keeps HTTP routing in transport. Application
+// services may build HTTP clients or use status codes, but they must not own
+// routers or implement http.Handler.
+func TestAppLayerHasNoHTTPHandlers(t *testing.T) {
+	root := moduleRoot(t)
+	base := filepath.Join(root, "internal", "app")
+	err := filepath.WalkDir(base, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		if strings.Contains(text, "ServeHTTP") || strings.Contains(text, "http.Handler") {
+			rel, _ := filepath.Rel(root, path)
+			t.Errorf("%s owns an HTTP handler; move the routing to transport", rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk app: %v", err)
+	}
+}
+
 func TestLayersAreKnown(t *testing.T) {
 	root := moduleRoot(t)
 	entries, err := os.ReadDir(filepath.Join(root, "internal"))
