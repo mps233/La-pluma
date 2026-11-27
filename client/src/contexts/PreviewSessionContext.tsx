@@ -25,22 +25,25 @@ export function PreviewSessionProvider({ children }: { children: ReactNode }) {
   })
   const previousOptionsRef = useRef(scrcpyOptions)
   const restartingRef = useRef(false)
+  const sessionStatus = session.status
+  const sessionConnect = session.connect
+  const sessionDisconnect = session.disconnect
   useEffect(() => {
     if (previousOptionsRef.current === scrcpyOptions) return
     previousOptionsRef.current = scrcpyOptions
-    if (restartingRef.current || session.status !== 'connected') return
+    if (restartingRef.current || sessionStatus !== 'connected') return
     restartingRef.current = true
     void (async () => {
       try {
-        session.disconnect()
+        sessionDisconnect()
         await maaApi.stopWebrtc().catch(() => undefined)
         const result = await maaApi.startWebrtc('default', 'mumu-la-pluma', undefined, scrcpyOptions)
-        if (result.success) session.connect()
+        if (result.success) sessionConnect()
       } finally {
         restartingRef.current = false
       }
     })()
-  }, [scrcpyOptions, session.status, session.connect, session.disconnect])
+  }, [scrcpyOptions, sessionStatus, sessionConnect, sessionDisconnect])
 
   const value = useMemo(() => ({ session, activeVideoRef }), [session])
 

@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run type-check && vite build",
-    "lint": "eslint . --max-warnings 12",
+    "lint": "eslint . --max-warnings 1",
     "preview": "vite preview",
     "type-check": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "verify": "npm run lint && npm run type-check && npm run test && npm run build"
+    "verify": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

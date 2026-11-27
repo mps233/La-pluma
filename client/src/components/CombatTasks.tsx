@@ -1720,7 +1720,7 @@ export default function CombatTasks() {
     setActivityFallback(false)
     setActivityPrefillSetId(combatCopilotPrefill.setId)
     void applyCopilotUri(`prts://s${combatCopilotPrefill.setId}`, { ignorePreviewGuard: true })
-  }, [activeTab, applyCopilotUri, combatCopilotPrefill, configLoaded, setCombatCopilotPrefill])
+  }, [activeTab, applyCopilotUri, combatCopilotPrefill, configLoaded, setCombatCopilotPrefill, setStatusMessage])
 
   const handleSearchParadox = async () => {
     if (isSearchingParadox) return
