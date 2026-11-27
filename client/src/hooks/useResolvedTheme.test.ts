@@ -3,7 +3,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useResolvedTheme } from './useResolvedTheme'
-import { useUIStore } from '@/stores'
+import { useUIStore } from '@/state'
 
 type Listener = (event: { matches: boolean }) => void
 

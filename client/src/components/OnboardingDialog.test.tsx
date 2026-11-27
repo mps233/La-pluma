@@ -19,7 +19,8 @@ vi.mock('@/desktop/bridge', () => ({
   isDesktopRuntime: () => desktopMock.desktop,
 }))
 
-vi.mock('@/stores', () => ({
+vi.mock('@/state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/state')>()),
   useUIStore: (selector: (state: { setActiveTab: typeof uiMocks.setActiveTab }) => unknown) =>
     selector({ setActiveTab: uiMocks.setActiveTab }),
 }))

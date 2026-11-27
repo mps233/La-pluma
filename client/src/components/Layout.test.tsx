@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useUIStore } from '@/stores'
+import { useUIStore } from '@/state'
 import Layout from './Layout'
 
 const mocks = vi.hoisted(() => ({

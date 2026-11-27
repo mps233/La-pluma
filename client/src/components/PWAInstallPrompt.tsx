@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
-import { useStatusStore } from '@/store/statusStore'
+import { useStatusStore } from '@/state'
 import { GlassCard } from '@/components/glass'
 import { Button, CjkText, IconButton } from '@/components/common'
 import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'

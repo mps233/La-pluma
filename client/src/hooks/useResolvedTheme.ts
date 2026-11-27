@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { useUIStore } from '@/stores'
+import { useUIStore } from '@/state'
 
 export type ResolvedTheme = 'light' | 'dark'
 

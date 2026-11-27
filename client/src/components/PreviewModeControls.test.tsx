@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PreviewModeControls from './PreviewModeControls'
-import { usePreviewStore } from '../stores'
+import { usePreviewStore } from '@/state'
 
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class {

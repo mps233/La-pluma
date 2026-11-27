@@ -24,8 +24,8 @@ import { IconRing } from '@/components/islandcn/progress-ring'
 import { islandAccent } from '@/components/islandcn/theme'
 import { useThemeAccent } from '@/hooks/useThemeAccent'
 import { useIslandActions } from '@/lib/island'
-import { useRunStore } from '@/store/runStore'
-import { useStatusStore } from '@/store/statusStore'
+import { useRunStore } from '@/state'
+import { useStatusStore } from '@/state'
 import { isActiveRunState, type AgentRun, type AgentRunState } from '@/types/run'
 import {
   formatRunDuration,

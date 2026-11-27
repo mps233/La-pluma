@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { maaApi } from '../services/api'
-import { useStatusStore } from '../store/statusStore'
+import { useStatusStore } from '@/state'
 import { useOnlineStatus } from './useOnlineStatus'
 
 const BACKEND_PROBE_INTERVAL_MS = 30_000

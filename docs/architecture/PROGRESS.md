@@ -129,5 +129,14 @@ deleted, verification, and follow-ups.
 - Deleted: one embedded API module (~70 lines), one duplicate type.
 - Verified: type-check, 74 test files / 514 tests, lint at the ratchet.
 
+### Round 13 — one state module (2026-11-28)
+
+- Moved all seven Zustand stores and their tests from `store/` and `stores/`
+  into `state/`, with one barrel exporting the public hooks and types.
+- Migrated ~50 imports to `@/state`, including test mocks; mocks now spread
+  the real module and override only the hook under test.
+- Deleted: `stores/index.ts` and the two old directories.
+- Verified: type-check, 74 test files / 514 tests, lint at the ratchet, build.
+
 
 

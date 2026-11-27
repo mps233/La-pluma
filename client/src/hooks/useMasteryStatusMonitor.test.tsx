@@ -3,7 +3,7 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMasteryStatusMonitor } from './useMasteryStatusMonitor'
-import { useMasteryStore } from '@/store/masteryStore'
+import { useMasteryStore } from '@/state'
 import type { MasteryQueueStatus } from '@/types/components'
 
 const mocks = vi.hoisted(() => ({ getMasteryStatus: vi.fn() }))

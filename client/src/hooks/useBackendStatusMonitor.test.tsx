@@ -3,7 +3,7 @@
 import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
-import { useStatusStore } from '../store/statusStore'
+import { useStatusStore } from '@/state'
 import {
   invalidateBackendStatusProbe,
   probeBackendAvailability,
@@ -38,7 +38,7 @@ vi.mock('../components/common', () => ({
 }))
 vi.mock('./useRunStatusMonitor', () => ({ useRunStatusMonitor: () => undefined }))
 vi.mock('../components/AutomationTasks', async () => {
-  const { useStatusStore: useMockStatusStore } = await import('../store/statusStore')
+  const { useStatusStore: useMockStatusStore } = await import('@/state')
 
   return {
     default: function MockAutomationTasks() {

@@ -5,7 +5,7 @@ import { useActivity } from '@/components/islandcn/use-activity'
 import { islandMetrics, useIsland, useIslandActions } from '@/lib/island'
 import { useMaaSanity } from '@/hooks/useMaaSanity'
 import { useThemeAccent } from '@/hooks/useThemeAccent'
-import { useStatusStore } from '@/store/statusStore'
+import { useStatusStore } from '@/state'
 import type { SanityProjection } from '@/utils/maaSanity'
 
 const ACTIVITY_ID = 'la-pluma-sanity'

@@ -1,7 +1,7 @@
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import { GlassButtonGroup, GlassButtonGroupItem } from '@/components/glass'
 import { GlassMenu } from './LayoutGlassChrome'
-import { useUIStore } from '@/stores'
+import { useUIStore } from '@/state'
 
 type ThemeMode = 'light' | 'dark' | 'system'
 

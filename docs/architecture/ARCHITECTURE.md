@@ -64,7 +64,7 @@ transport → app → infra / domain
 | Agent route registration | `internal/transport/agentapi` | Every advertised operation must resolve (tested) |
 | Scheduler state and flows | `internal/app/scheduler` | Startup resume + tracked runs |
 | Client HTTP access | `client/src/services/api.ts` | `fetchWithAuth`; known bypasses in `TASKS.md` |
-| Client global state | `client/src/store/` + `client/src/stores/` | Split is arbitrary; target is one `state/` module |
+| Client global state | `client/src/state` | One Zustand file per concern + barrel |
 | Client design system | `DESIGN.md`, `components/common`, `components/glass` | Tokens in `index.css` + `ios-theme.css` |
 | Vendored glass kit | `components/liquid-glass` | Verbatim; app imports go through `components/glass` |
 
@@ -78,8 +78,8 @@ transport → app → infra / domain
 - `components/glass/` is the only application-facing Liquid Glass surface.
 - `services/api.ts` is the single HTTP client; page components should not
   call `fetch` directly.
-- `store/` (dashboard/run/status/mastery/maaUpdate) and `stores/`
-  (ui/preview) are both Zustand; the directory split has no semantic basis.
+- `state/` is the single Zustand module: one file per concern and one barrel.
+  Pages and hooks import `@/state`; tests mock `@/state` only.
 
 ## Known deviations
 
@@ -96,7 +96,8 @@ depends on them.
 4. JS-coercion helpers and PRTS clients exist in more than one package.
 5. The client keeps local run flags alongside the global run projection, and
    configuration-sync drafts are implemented per page.
-6. `client/src/store/` and `client/src/stores/` both exist.
+6. `client/src/components/common` exports only part of its usable primitives,
+   so some consumers still deep-import; page skeletons live in `Loading.tsx`.
 7. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
    aspirational; page CSS and some JS colors still use literals.
 8. `internal/app/logs` has no tests; `agentapi` exercises ~17% of its routes.

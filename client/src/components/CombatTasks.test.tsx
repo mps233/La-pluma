@@ -4,8 +4,8 @@ import { Activity, type ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CombatTasks from './CombatTasks'
-import { useRunStore } from '../store/runStore'
-import { useUIStore } from '../stores/uiStore'
+import { useRunStore } from '@/state'
+import { useUIStore } from '@/state'
 
 const mocks = vi.hoisted(() => ({
   getTaskStatus: vi.fn(),
@@ -82,9 +82,11 @@ vi.mock('../services/api', () => ({
   searchParadoxCopilot: mocks.searchParadoxCopilot,
 }))
 
-vi.mock('../store/statusStore', () => {
+vi.mock('@/state', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/state')>()
   const state = { setMessage: mocks.setMessage, clearMessage: mocks.clearMessage, setActive: mocks.setActive }
   return {
+    ...actual,
     useStatusStore: (selector?: (value: typeof state) => unknown) =>
       selector ? selector(state) : state,
   }

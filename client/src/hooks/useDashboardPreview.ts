@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { maaApi, type WebrtcStatusData } from '../services/api'
-import { buildPreviewScrcpyOptions, usePreviewStore } from '../stores'
+import { buildPreviewScrcpyOptions, usePreviewStore } from '@/state'
 import { usePreviewConnection } from '../contexts/previewSession'
 
 const DEFAULT_SIGNALING_URL = '/webrtc-signaling'

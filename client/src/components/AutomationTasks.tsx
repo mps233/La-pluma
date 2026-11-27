@@ -12,8 +12,8 @@ import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch, CjkTex
 import { CheckboxField, GlassSelectWithFill } from '@/components/common/fields'
 import { formatClockDuration } from '../utils/format'
 import { keepNumberWithUnit } from '../utils/typography'
-import { useStatusStore } from '../store/statusStore'
-import { useRunStore } from '../store/runStore'
+import { useStatusStore } from '@/state'
+import { useRunStore } from '@/state'
 import type { RunTaskResult } from '../types/run'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {

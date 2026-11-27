@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { maaApi } from '../services/api'
-import { useRunStore } from '../store/runStore'
-import { useStatusStore } from '../store/statusStore'
+import { useRunStore } from '@/state'
+import { useStatusStore } from '@/state'
 import {
   IDLE_RUN_STATUS,
   isActiveRunState,

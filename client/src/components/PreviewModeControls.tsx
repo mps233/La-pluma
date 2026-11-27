@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { Camera, EyeOff, Radio } from 'lucide-react'
-import { usePreviewStore, type PreviewMode } from '../stores'
+import { usePreviewStore, type PreviewMode } from '@/state'
 import { Switch } from './common'
 import GlassTabs from '@/components/liquid-glass/glass-tabs'
 

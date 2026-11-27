@@ -5,7 +5,7 @@ import { GlassButton } from '@/components/glass'
 import PreviewModeControls, { PreviewAutoStartToggle } from './PreviewModeControls'
 import { useDashboardPreview } from '../hooks/useDashboardPreview'
 import { useScrcpyInput } from '../hooks/useScrcpyInput'
-import { usePreviewStore } from '../stores'
+import { usePreviewStore } from '@/state'
 
 const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
   const {

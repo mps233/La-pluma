@@ -1,4 +1,4 @@
-import type { ActivitySummary } from '../store/dashboardStore'
+import type { ActivitySummary } from '@/state'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

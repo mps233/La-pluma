@@ -3,8 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useDashboardStore } from '../store/dashboardStore'
-import { useStatusStore } from '../store/statusStore'
+import { useDashboardStore } from '@/state'
+import { useStatusStore } from '@/state'
 import Dashboard, { DASHBOARD_REFRESH_INTERVAL_MS } from './Dashboard'
 
 const apiMocks = vi.hoisted(() => ({
@@ -44,7 +44,8 @@ vi.mock('../services/api', () => ({
   getOpenTodayStages: apiMocks.getOpenTodayStages,
 }))
 
-vi.mock('@/stores', () => ({
+vi.mock('@/state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/state')>()),
   useUIStore: (selector: (state: {
     setActiveTab: () => void
     setStatisticsTab: () => void

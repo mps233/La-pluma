@@ -3,8 +3,8 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { IDLE_RUN_STATUS } from '../types/run'
-import { useRunStore } from '../store/runStore'
-import { useStatusStore } from '../store/statusStore'
+import { useRunStore } from '@/state'
+import { useStatusStore } from '@/state'
 import { useRunStatusMonitor } from './useRunStatusMonitor'
 
 const mocks = vi.hoisted(() => ({

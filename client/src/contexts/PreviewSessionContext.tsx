@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
-import { buildPreviewScrcpyOptions, usePreviewStore } from '../stores'
+import { buildPreviewScrcpyOptions, usePreviewStore } from '@/state'
 import { maaApi } from '../services/api'
 import { PreviewSessionContext } from './previewSession'
 

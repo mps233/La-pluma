@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { maaApi } from '@/services/api'
-import { useMaaUpdateStore, type MaaUpdateKind, type MaaUpdateOperation } from '@/store/maaUpdateStore'
+import { useMaaUpdateStore, type MaaUpdateKind, type MaaUpdateOperation } from '@/state'
 import type { ApiResponse } from '@/types/api'
 
 const SUCCESS_HOLD_MS = 5_000

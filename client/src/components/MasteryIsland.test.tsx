@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import MasteryIsland from './MasteryIsland'
-import { useMasteryStore } from '@/store/masteryStore'
+import { useMasteryStore } from '@/state'
 import type { MasteryQueueItem, MasteryQueueStatus } from '@/types/components'
 
 const mocks = vi.hoisted(() => ({

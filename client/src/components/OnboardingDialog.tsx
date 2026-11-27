@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { ArrowRight, Bot, Download, KeyRound, Monitor } from 'lucide-react'
 import { Button, CjkText, Modal } from './common'
 import { isDesktopRuntime } from '@/desktop/bridge'
-import { useUIStore } from '@/stores'
+import { useUIStore } from '@/state'
 import { notifyAuthRequired } from '@/utils/accessToken'
 import { requestPwaInstall } from '@/utils/pwaInstallPrompt'
 

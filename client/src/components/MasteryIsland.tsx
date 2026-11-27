@@ -24,7 +24,7 @@ import { IconRing } from '@/components/islandcn/progress-ring'
 import { islandAccent } from '@/components/islandcn/theme'
 import { useThemeAccent } from '@/hooks/useThemeAccent'
 import { useIslandActions } from '@/lib/island'
-import { useMasteryStore, type MasteryOutcome } from '@/store/masteryStore'
+import { useMasteryStore, type MasteryOutcome } from '@/state'
 import type { MasteryQueueStatus } from '@/types/components'
 import {
   MASTERY_ACTIVITY_ID,

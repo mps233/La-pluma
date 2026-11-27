@@ -4,7 +4,7 @@ import { ArrowLeft, Clipboard, ClipboardPaste, Gauge, Home, Maximize2, Minimize2
 import { maaApi } from '../services/api'
 import { Button, IconButton, TruncatedText } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
-import { previewQualityPresets, usePreviewStore, type PreviewQuality } from '../stores'
+import { previewQualityPresets, usePreviewStore, type PreviewQuality } from '@/state'
 import { usePreviewConnection } from '../contexts/previewSession'
 import { useScrcpyInput } from '../hooks/useScrcpyInput'
 

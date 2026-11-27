@@ -27,7 +27,7 @@ import {
   MAA_UPDATE_LABELS,
   type MaaUpdateKind,
   type MaaUpdateOperation,
-} from '@/store/maaUpdateStore'
+} from '@/state'
 import { formatDurationMs } from '@/utils/format'
 
 const ACTIVITY_ID = 'la-pluma-maa-update'

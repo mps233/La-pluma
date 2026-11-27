@@ -4,7 +4,7 @@ import { Activity } from 'react'
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDashboardPreview } from './useDashboardPreview'
-import { usePreviewStore } from '../stores'
+import { usePreviewStore } from '@/state'
 
 const mocks = vi.hoisted(() => ({
   getWebrtcStatus: vi.fn(),

@@ -44,7 +44,8 @@ vi.mock('../services/api', () => ({
   parseJsonResponse: mocks.parseJsonResponse,
 }))
 
-vi.mock('../store/statusStore', () => ({
+vi.mock('@/state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/state')>()),
   useStatusStore: (selector?: (value: typeof mocks.status) => unknown) =>
     selector ? selector(mocks.status) : mocks.status,
 }))

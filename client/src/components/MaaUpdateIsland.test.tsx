@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import MaaUpdateIsland from './MaaUpdateIsland'
-import { useMaaUpdateStore } from '@/store/maaUpdateStore'
+import { useMaaUpdateStore } from '@/state'
 
 const mocks = vi.hoisted(() => ({
   start: vi.fn(),

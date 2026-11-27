@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { maaApi } from '../services/api'
-import { useRunStore } from '../store/runStore'
+import { useRunStore } from '@/state'
 import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import {
   PageHeader,

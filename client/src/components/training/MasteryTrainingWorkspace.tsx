@@ -34,7 +34,7 @@ import {
 } from '../common'
 import { formatDateTimeCompact, formatRemainingDuration } from '../../utils/format'
 import { getApiErrorMessage } from '../../utils/errorMessage'
-import { useMasteryStore } from '../../store/masteryStore'
+import { useMasteryStore } from '@/state'
 import { getOperatorAvatarUrl } from '../../services/operatorQuotes'
 import {
   addMasteryTargets,

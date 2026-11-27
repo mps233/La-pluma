@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { getMasteryStatus } from '../services/api'
-import { useMasteryStore } from '../store/masteryStore'
+import { useMasteryStore } from '@/state'
 import type { MasteryCampaignStatus, MasteryQueueStatus } from '../types/components'
 
 const RUNNING_POLL_MS = 5_000

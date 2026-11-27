@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox, Switch, CjkText, TruncatedText, SwipeModePager } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
-import { useStatusStore } from '../store/statusStore'
+import { useStatusStore } from '@/state'
 import { startMaaUpdate } from '../hooks/useMaaUpdateIsland'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import DesktopSettings from './DesktopSettings'

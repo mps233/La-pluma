@@ -48,9 +48,11 @@ vi.mock('../services/api', () => ({
   },
 }))
 
-vi.mock('../store/statusStore', () => {
+vi.mock('@/state', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/state')>()
   const state = { setMessage: mocks.setMessage, setActive: mocks.setActive }
   return {
+    ...actual,
     useStatusStore: (selector?: (value: typeof state) => unknown) =>
       selector ? selector(state) : state,
   }

@@ -9,7 +9,6 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
-| C4 | P1 | client | Consolidate `store/` + `stores/` into one `src/state/` module with one barrel; migrate all imports | 46 imports to `store/`, 20 to `stores/`; 25 relative deep imports |
 | G1 | P1 | go | Canonical JS-coercion helpers in `internal/util/jsval`; migrate one package per commit | `truthy`×8, `asRecord`×8, `numberValue`×8 across 12 packages |
 | G4 | P1 | go | One timestamp format constant and one timezone helper | literal `"2006-01-02T15:04:05.000Z"` in 10 files; 3 zone strategies |
 | G3 | P1 | go | Typed owners for `operbox.json`, `depot.json`, and the `user-configs` path | written in `recognition/service.go:188,267`; read in `mastery/data.go:107,112`, `training/data.go:211,292`, `handler.go:1849,1858`; path composed in 7 packages |
@@ -62,3 +61,4 @@ without re-investigation.
 - Duplicated run-restore/poll effect extracted to `useTaskRestoreMonitor` with hook tests.
 - Shared duration/timestamp/error formatters in `utils/format.ts` and `utils/errorMessage.ts`; local copies deleted.
 - Notification config API, cache, and types moved into `services/api.ts`; `AutoUpdateConfig` duplication removed.
+- All Zustand stores consolidated under `src/state/` with one barrel; ~50 imports migrated.

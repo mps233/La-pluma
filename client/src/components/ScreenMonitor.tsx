@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { maaApi, type WebrtcStatusData } from '../services/api'
 import type { ApiResponse } from '../types/api'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
-import { buildPreviewScrcpyOptions, usePreviewStore } from '../stores'
+import { buildPreviewScrcpyOptions, usePreviewStore } from '@/state'
 import ScrcpyDeviceView from './ScrcpyDeviceView'
 
 interface ScreenMonitorProps {

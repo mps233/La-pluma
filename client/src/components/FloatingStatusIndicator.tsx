@@ -4,7 +4,7 @@ import {
   type OperatorQuote,
 } from '../services/operatorQuotes'
 import { useShallow } from 'zustand/react/shallow'
-import { useStatusStore } from '../store/statusStore'
+import { useStatusStore } from '@/state'
 import { detectStatusMessageType, getStatusVisualConfig } from '../utils/statusMessage'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { useUIStore } from '@/stores'
+import { useUIStore } from '@/state'
 
 const subscribeSystemDark = (onChange: () => void) => {
   const media = window.matchMedia?.('(prefers-color-scheme: dark)')
