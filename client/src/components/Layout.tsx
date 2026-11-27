@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench } from 'lucide-react'
 import { GlassButton, GlassCard } from '@/components/glass'
-import { GlassLiveCardButton } from '@/components/common/GlassLiveCardButton'
+import { GlassLiveCardButton } from '@/components/common'
 import { GlassInput, GlassMenu, GlassNav } from './LayoutGlassChrome'
 import ThemeToggle from './ThemeToggle'
 import RunIsland from './RunIsland'

@@ -25,7 +25,7 @@ without re-investigation.
 | G10 | P2 | go | One bootstrap for desktop and headless mounts | `go/main.go:277-289` vs `cmd/server/main.go:40-50` |
 | C5 | P1 | client | Derive page `isRunning` from the global run projection; keep local state only for submit-in-flight | four local flags; `statusStore.runStatus` + `runStore` already project runs; behavior-sensitive |
 | C7 | P2 | client | Split `services/api.ts` into `api/client.ts` + endpoint modules; unify `maaApi` and standalone exports | 1,305 lines, 89 calls, 37 standalone functions |
-| C10 | P2 | client | Complete the common barrel; move page skeletons next to pages; remove env-specific DOM branches | `Loading.tsx` 967 lines; 11 deep imports; `fields.tsx:64,172` test-only branches |
+| C10 | P2 | client | Move page skeletons out of `common/Loading.tsx` next to their pages; remove the test-only DOM branches in `fields.tsx` | Barrel now exports the used primitives; `Loading.tsx` still holds 20 skeletons and `fields.tsx:64,172` branches on `import.meta.env.MODE` |
 | C11 | P2 | client | Extract pure helpers from giant pages | `AutomationTasks.tsx:29-150,283,1745-1785`; `Dashboard.tsx:146-300,348-378` |
 | C8 | P2 | client | Token/color migration for the remaining literals; fix `statusMessage` pulse RGB against the effective iOS theme | `utils/statusMessage.ts:11-33`; ~8 production hex sites; visual verification required |
 | C9 | P3 | client | Move page-prefixed CSS out of `index.css` into route CSS | 13 class names defined twice; visual verification required |
@@ -68,3 +68,4 @@ without re-investigation.
 - Quotes HTTP handler moved from `app/quotes` to `transport/quotesapi`; raw JSON contract preserved.
 - `MAA_CLI_PATH` resolved once by `config.Config.MAAExecutable`; services no longer read it.
 - Task tuning (battle OCR, mastery tick, drop TTL/TZ, WebP, scrcpy, device id) resolved by `config.Tuning`; services receive options.
+- Common component barrel completed; all primitive deep imports migrated.

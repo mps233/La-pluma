@@ -80,6 +80,8 @@ vi.mock('./common/Loading', () => ({
 }))
 vi.mock('./common', () => ({
   PageHeader: ({ title, actions }: { title: string; actions?: React.ReactNode }) => <header><h1>{title}</h1>{actions}</header>,
+  ActivityIndicator: () => null,
+  GlassLiveCardButton: ({ children, icon: _icon, ...props }: { children?: React.ReactNode; icon?: React.ReactNode } & React.ComponentProps<'button'>) => <button type="button" {...props}>{children}</button>,
   CjkText: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TruncatedText: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   Card: ({ children }: { children: React.ReactNode }) => <section>{children}</section>,

@@ -334,6 +334,17 @@ deleted, verification, and follow-ups.
 - `infra/assets` remains the one known routing exception, recorded in G6.
 - Verified: archguard and full Go suite.
 
+### Round 27 — complete the common component barrel (2026-11-28)
+
+- `components/common/index.ts` exported 13 entries but five used primitives
+  were only reachable by deep import (`ActivityIndicator`, `Tooltip`,
+  `GlassLiveCardButton`, `CheckboxField`, `GlassSelectWithFill`, `SelectField`).
+- Added them to the barrel and migrated all six deep imports across pages.
+- Updated the Dashboard test's module mock for the now-barrel imports.
+- Verified: type-check, 76 test files / 518 tests, lint at the ratchet.
+- Follow-up: page skeletons still live in `Loading.tsx` (C10 remainder).
+
+
 
 
 
