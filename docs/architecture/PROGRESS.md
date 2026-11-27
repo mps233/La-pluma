@@ -201,6 +201,16 @@ deleted, verification, and follow-ups.
 - Deleted: three token/queue implementations and one promise ref.
 - Verified: type-check, 75 test files / 517 tests, lint at the ratchet.
 
+### Round 19 — cover the log buffer and composition root (2026-11-28)
+
+- Added `internal/app/logs` tests: eviction, recent limits, sequence
+  filtering, stream-to-level mapping, clear monotonicity, UTC timestamps.
+- Added a composition-root test that asserts every service is wired after
+  `app.New`, alongside the existing instance-lock test.
+- Verified: full Go test suite.
+- Follow-up: agentapi still exercises a minority of its routes (G9 remainder).
+
+
 
 
 
