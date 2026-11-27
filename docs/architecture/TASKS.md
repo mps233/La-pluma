@@ -20,8 +20,7 @@ without re-investigation.
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
 | G6 | P1 | go | Move `quotes`/`assets` HTTP handlers into `transport/` and use `httpx` for every response | 4 envelope implementations; `app/quotes/handler.go:38`, `infra/assets/handler.go:84` |
-| G7 | P1 | go | Give `app/agentrun` a run scope so transport only decodes/validates/delegates | `handler.go:715-768`, `2955-3005`; 5 lifecycle writers; high risk |
-| G8 | P2 | go | Split `agentapi/handler.go` by domain into files within the package | 3,450 lines, 158 funcs, 107 routes; do after G7 so ownership is real |
+| G7 | P1 | go | Give `app/agentrun` a run scope so transport only decodes/validates/delegates | `handlers_runs.go`, `handlers_copilot.go`, `handlers_schedule.go` still call begin/start/fail/stop; 5 lifecycle writers; high risk |
 | G5 | P2 | go | Shared HTTP client/retry factory | 10 `&http.Client{...}` sites; retries only in PRTS |
 | G10 | P2 | go | One bootstrap for desktop and headless mounts | `go/main.go:277-289` vs `cmd/server/main.go:40-50` |
 | C5 | P1 | client | Derive page `isRunning` from the global run projection; keep local state only for submit-in-flight | four local flags; `statusStore.runStatus` + `runStore` already project runs; behavior-sensitive |
@@ -65,3 +64,4 @@ without re-investigation.
 - Config sync token/queue/pending-key protocol centralized in `utils/configSync.ts`; three task pages migrated.
 - `internal/app/logs` and the composition root now have direct tests.
 - Notifications and WebRTC use the shared platform-aware connection defaults; every environment variable is documented.
+- `agentapi/handler.go` split into 15 domain files (3,450 → 775 lines); file-size guard added.

@@ -14,6 +14,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | Run status strings, classification, DTO links, and optional fields stay stable | `internal/domain/agentrun/status_test.go` | `cd go && go test ./internal/domain/agentrun` |
 | Atomic file replacement has one implementation (0600 temp file, fsync, rename) | `internal/util/jsonstore/store_test.go` | `cd go && go test ./internal/util/jsonstore` |
 | Application code imports Liquid Glass only through `@/components/glass` (documented preview exception) | ESLint `no-restricted-imports` | `npm run lint --prefix client` |
+| Agent API endpoint files stay split by domain (≤ 800 production lines per file) | `TestAgentAPIFilesStaySmall` | `cd go && go test ./internal/archguard` |
 | Client lint does not exceed the current warning count | `--max-warnings 1` in `client/package.json` | `npm run lint --prefix client` |
 | Strict TypeScript, including `noUnusedLocals` and `noUnusedParameters` | `tsc --noEmit` | `npm run type-check --prefix client` |
 | Pages are code-split and PWA/page caching configuration is covered | `vite.config.test.ts` | `npm run test --prefix client` |

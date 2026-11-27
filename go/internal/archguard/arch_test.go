@@ -133,6 +133,35 @@ func TestInternalDependenciesPointDownward(t *testing.T) {
 	}
 }
 
+// TestAgentAPIFilesStaySmall keeps the transport endpoint package split by
+// domain. handler.go was a 3,450-line file that every API change touched; the
+// split is only useful if a new god file cannot grow back.
+func TestAgentAPIFilesStaySmall(t *testing.T) {
+	root := moduleRoot(t)
+	limit := 800
+	base := filepath.Join(root, "internal", "transport", "agentapi")
+	err := filepath.WalkDir(base, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if lines := strings.Count(string(data), "\n") + 1; lines > limit {
+			rel, _ := filepath.Rel(root, path)
+			t.Errorf("%s has %d lines, limit is %d; split it by domain", rel, lines, limit)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk agentapi: %v", err)
+	}
+}
+
 func TestLayersAreKnown(t *testing.T) {
 	root := moduleRoot(t)
 	entries, err := os.ReadDir(filepath.Join(root, "internal"))

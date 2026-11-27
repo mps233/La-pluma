@@ -88,9 +88,10 @@ transport → app → infra / domain
 These are real today and tracked in `TASKS.md`; do not add new code that
 depends on them.
 
-1. `agentapi/handler.go` is 3,450 lines and can begin/stop runs directly, so
-   run lifecycle has more than one writer. Target: handlers delegate to an
-   `app` run scope.
+1. `agentapi` handlers can begin/stop runs directly, so run lifecycle has more
+   than one writer. The endpoint package is now split by domain (no file over
+   800 lines); the remaining fix is to delegate lifecycle to an `app` run
+   scope.
 2. Several `app`/`infra` packages expose `http.Handler` and write their own
    envelopes (`quotes`, `assets`). Target: handlers in transport using `httpx`.
 3. `operbox.json` / `depot.json` and the `user-configs` path are composed in

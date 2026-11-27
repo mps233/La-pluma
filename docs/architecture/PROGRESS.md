@@ -257,6 +257,20 @@ deleted, verification, and follow-ups.
   and dev-proxy variables.
 - Verified: full Go test suite, vet, gofmt.
 
+### Round 21 — split the agent API god file (2026-11-28)
+
+- `agentapi/handler.go` was 3,450 lines and every API change touched it.
+- Split the 158 declarations into 15 domain files in the same package:
+  runs/actions, logs, config, drops, screen, training, notifications,
+  schedule, copilot, activity, recognition, mastery, skland, webrtc; shared
+  decoding/envelope/lifecycle helpers remain in `handler.go` (775 lines).
+- No behavior change: all agentapi tests pass; the move was verified by the
+  compiler and existing tests.
+- Added `TestAgentAPIFilesStaySmall` (800-line limit) so a god file cannot
+  grow back unnoticed.
+- Verified: full Go test suite, vet, gofmt.
+- Follow-up: the run lifecycle is still called from handlers (G7).
+
 
 
 
