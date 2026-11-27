@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { GlassCard } from '@/components/liquid-glass'
+import { GlassCard } from '@/components/glass'
 import { AlertCircle, X } from 'lucide-react'
 import {
   useEffect,

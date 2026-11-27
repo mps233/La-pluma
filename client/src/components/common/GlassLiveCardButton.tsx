@@ -1,6 +1,6 @@
 import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ReactNode } from 'react'
 
-import { GlassCard } from '@/components/liquid-glass'
+import { GlassCard } from '@/components/glass'
 import { useCoarsePointer } from '@/hooks/useCoarsePointer'
 
 export interface GlassLiveCardButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type'> {

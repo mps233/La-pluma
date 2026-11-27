@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes } from 'react'
 
-import { Switch as OfficialSwitch } from '@/components/liquid-glass/controls/Switch'
+import { GlassSwitch as OfficialSwitch } from '@/components/glass'
 
 interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onChange' | 'type' | 'value'> {
   checked: boolean

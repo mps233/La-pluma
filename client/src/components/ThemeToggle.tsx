@@ -1,5 +1,5 @@
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
-import { GlassButtonGroup, GlassButtonGroupItem } from '@/components/liquid-glass'
+import { GlassButtonGroup, GlassButtonGroupItem } from '@/components/glass'
 import { GlassMenu } from './LayoutGlassChrome'
 import { useUIStore } from '@/stores'
 

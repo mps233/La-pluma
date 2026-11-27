@@ -3,7 +3,7 @@ import '../styles/pages/training.css'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { GlassSegmented } from '@/components/common/Segmented'
+import { GlassSegmented } from '@/components/glass'
 import {
   AlertCircle,
   Check,

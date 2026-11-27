@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import '../styles/pages/roguelike.css'
-import { GlassSegmented } from '@/components/common/Segmented'
+import { GlassSegmented } from '@/components/glass'
 import { Check, Play, Square } from 'lucide-react'
 import { maaApi } from '../services/api'
 import { PageHeader, Input, Select, Button, SmoothPanel, Switch, CjkText, TruncatedText, SwipeModePager } from './common'

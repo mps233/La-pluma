@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent, type InputHTMLAttributes, type KeyboardEventHandler, type ReactNode } from 'react'
 
-import { GlassCard, GlassButtonGroup, GlassButtonGroupItem } from '@/components/liquid-glass'
+import { GlassCard, GlassButtonGroup, GlassButtonGroupItem } from '@/components/glass'
 import {
   GlassDropdownMenu,
   GlassDropdownMenuContent,
   GlassDropdownMenuItem,
   GlassDropdownMenuTrigger,
-} from '@/components/liquid-glass/glass-dropdown-menu'
+} from '@/components/glass'
 
 const HOST = 'lg-host'
 

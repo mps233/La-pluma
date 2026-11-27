@@ -40,4 +40,23 @@ export default defineConfig([
       }],
     },
   },
+  {
+    // The vendored kit is copied verbatim; application code goes through the
+    // adapter so a kit upgrade has one integration point.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      'src/components/glass/**',
+      'src/components/liquid-glass/**',
+      // DESIGN.md allows the preview card to use the registry GlassTabs directly.
+      'src/components/PreviewModeControls.tsx',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['@/components/liquid-glass', '@/components/liquid-glass/*'],
+          message: 'Import glass primitives from @/components/glass (see components/glass/README.md).',
+        }],
+      }],
+    },
+  },
 ])

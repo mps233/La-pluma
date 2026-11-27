@@ -8,8 +8,7 @@ import type { GridComponents, GridItemProps, GridListProps } from 'react-virtuos
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { motion, useReducedMotion } from 'framer-motion'
-import { GlassCard } from '@/components/liquid-glass'
-import { GlassSegmented } from '@/components/common/Segmented'
+import { GlassCard, GlassSegmented } from '@/components/glass'
 import {
   ChevronDown,
   Download,

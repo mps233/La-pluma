@@ -1,8 +1,7 @@
 import { useEffect, useRef, type ComponentProps } from 'react'
 import { ChevronDown } from 'lucide-react'
 
-import { GlassSelect as KitSelect, type GlassSelectOption } from '@/components/liquid-glass/glass-select'
-import { Checkbox as KitCheckbox } from '@/components/liquid-glass/controls/Checkbox'
+import { GlassCheckbox as KitCheckbox, GlassSelect as KitSelect, type GlassSelectOption } from '@/components/glass'
 
 export interface SelectFieldOption {
   value: string | number

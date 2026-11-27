@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { Play, Radio, RotateCw, Smartphone } from 'lucide-react'
 import { SmoothPanel } from './common'
-import { GlassButton } from '@/components/liquid-glass'
+import { GlassButton } from '@/components/glass'
 import PreviewModeControls, { PreviewAutoStartToggle } from './PreviewModeControls'
 import { useDashboardPreview } from '../hooks/useDashboardPreview'
 import { useScrcpyInput } from '../hooks/useScrcpyInput'

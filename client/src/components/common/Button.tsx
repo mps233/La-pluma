@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { GlassButton } from '@/components/liquid-glass'
+import { GlassButton } from '@/components/glass'
 import ActivityIndicator from './ActivityIndicator'
 import Tooltip from './Tooltip'
 

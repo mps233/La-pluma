@@ -28,7 +28,8 @@ const mocks = vi.hoisted(() => ({
 // The kit's Select opens a top-layer popover that jsdom cannot present. The
 // browser verification covers the real component; here a native select keeps
 // the page's option mapping and add-task wiring under test.
-vi.mock('@/components/liquid-glass/glass-select', async () => {
+vi.mock('@/components/glass', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/glass')>()
   const React = await import('react')
   type Option = { value: string; label: ReactNode }
   const MockGlassSelect = ({ label, options, onValueChange, placeholder, disabled }: {
@@ -53,7 +54,7 @@ vi.mock('@/components/liquid-glass/glass-select', async () => {
       (options ?? []).map(option => React.createElement('option', { key: option.value, value: option.value }, option.label)),
     ),
   )
-  return { GlassSelect: MockGlassSelect }
+  return { ...actual, GlassSelect: MockGlassSelect }
 })
 
 vi.mock('framer-motion', async () => {

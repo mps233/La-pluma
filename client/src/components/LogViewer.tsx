@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import '../styles/pages/logs.css'
-import { GlassSegmented } from '@/components/common/Segmented'
+import { GlassSegmented } from '@/components/glass'
 import {
   AlertCircle,
   ArrowDown,
