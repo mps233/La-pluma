@@ -789,7 +789,7 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C8 (color tokens) is the last P2 item.
 
-### Round 55 — migrate JS color literals to theme tokens (2026-11-28)
+### Round 55 — migrate JS color literals to theme tokens (2026-11-28, `d1b8061`)
 
 - C8: eight files still carried hex/RGB literals even though the themes expose
   semantic tokens, and the status pulse used fixed light-theme RGB values in
