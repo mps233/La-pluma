@@ -5,6 +5,13 @@ Glass registry. The registry in `components/liquid-glass/` is vendored from
 upstream. Kit upgrades replace it wholesale, so local changes stay limited to
 documented patches and must be preserved when upgrading.
 
+## Upstream baseline
+
+Vendored from `bilalgursen/liquid-glass` at `5d7da84` (Engine 2.0.2, Card
+2.0.3). Upstream 2.1.x adds `GlassSearch` and supporting engine/layer
+features; this app does not use them. Recheck the local patches below when
+upgrading, because they change load timing and two pointer behaviors.
+
 ## Local patches
 
 - `glass-layer-lazy.tsx` / `glass-lens-lazy.tsx` defer the glass engine until

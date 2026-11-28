@@ -1534,7 +1534,8 @@ export function GlassPopupSurface({ popup: morph }: { popup: GlassPopup }) {
   )
 }
 
-/** The anchor's share of the glass: the first child of the control that  moment the surface is back in,
+/**
+ * The label of a morphing control, coming back letter by letter the moment the surface is back in,
  * with the control's swell. `delay` (seconds) starts it that much later. Read aloud as one string.
  */
 export function GlassPopupText({ children, delay = 0, className }: { children: string; delay?: number; className?: string }) {
