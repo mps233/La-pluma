@@ -721,7 +721,7 @@ deleted, verification, and follow-ups.
 - Follow-up: C7c moves the `maaApi` object, training/notification endpoints,
   and shared local types.
 
-### Round 49 — split the notification API (2026-11-28)
+### Round 49 — split the notification API (2026-11-28, `1540d5e`)
 
 - C7c: notification config types, the clone helper, the shared cache, and
   `notificationsApi` lived inside `services/api.ts` next to every other
