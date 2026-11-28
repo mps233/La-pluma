@@ -708,7 +708,7 @@ deleted, verification, and follow-ups.
   (535 tests / 80 files), and production build.
 - Follow-up: C7b splits the endpoint methods into domain modules.
 
-### Round 48 — split the endpoint tail into domain modules (2026-11-28)
+### Round 48 — split the endpoint tail into domain modules (2026-11-28, `47e3511`)
 
 - C7b: the mastery, Skland, copilot-search, and drops endpoints were the last
   standalone block in `services/api.ts`, each repeating URL construction and
