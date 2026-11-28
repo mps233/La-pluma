@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PageSkeleton } from './Loading'
+import { PageSkeleton } from './PageSkeleton'
 
 afterEach(cleanup)
 

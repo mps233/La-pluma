@@ -30,8 +30,8 @@ vi.mock('../components/Layout', () => ({
 }))
 
 vi.mock('../components/PWAInstallPrompt', () => ({ default: () => null }))
+vi.mock('../components/PageSkeleton', () => ({ PageSkeleton: () => null }))
 vi.mock('../components/common', () => ({
-  PageSkeleton: () => null,
   Modal: () => null,
   Button: () => null,
   Input: () => null,

@@ -650,6 +650,24 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C10b, then C7/C11/C8.
 
+### Round 44 — page skeletons next to their pages (2026-11-28)
+
+- C10b: the remaining seven page skeletons lived in `common/Loading.tsx`
+  together with the spinner.
+- Moved every page skeleton next to its page (`AutomationTasksSkeleton`,
+  `CombatTasksSkeleton`, `RoguelikeTasksSkeleton`, `OperatorTrainingSkeleton`,
+  `LogViewerSkeleton`, `DataStatisticsSkeleton`, `ConfigManagerSkeleton`);
+  shared panel/monitor/mode primitives live in `common/Skeleton.tsx`, and
+  `components/PageSkeleton.tsx` dispatches the variants. `Loading.tsx` is now
+  only the spinner; the common barrel no longer exports `PageSkeleton`.
+- Updated `App`, the dashboard skeleton test, and the page/backend test mocks
+  to the new module boundaries.
+- `fields.tsx` still has the jsdom-only native select/checkbox branches; they
+  need a dedicated test-harness change, recorded as C10c.
+- Verified: client type-check, lint at the ratchet, full suite (525 tests / 78
+  files), and production build.
+- Follow-up: C7/C11/C8 remain, then C9/C10c.
+
 
 
 

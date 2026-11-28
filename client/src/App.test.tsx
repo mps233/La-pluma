@@ -57,8 +57,10 @@ vi.mock('./components/Layout', () => ({
 vi.mock('./components/PWAInstallPrompt', () => ({ default: () => null }))
 vi.mock('./hooks/useBackendStatusMonitor', () => ({ useBackendStatusMonitor: () => undefined }))
 vi.mock('./hooks/useRunStatusMonitor', () => ({ useRunStatusMonitor: () => undefined }))
-vi.mock('./components/common', () => ({
+vi.mock('./components/PageSkeleton', () => ({
   PageSkeleton: ({ variant }: { variant: string }) => <div>{variant} skeleton</div>,
+}))
+vi.mock('./components/common', () => ({
   Modal: ({ isOpen, children }: { isOpen: boolean; children?: ReactNode }) => (isOpen ? <div>{children}</div> : null),
   Input: ({ value, onChange, placeholder }: { value?: string; onChange?: (value: string) => void; placeholder?: string }) => (
     <input value={value} placeholder={placeholder} onChange={event => onChange?.(event.target.value)} />

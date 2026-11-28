@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react'
 
+import SmoothPanel from './SmoothPanel'
+
 /**
  * 骨架屏组件 Props
  */
@@ -56,3 +58,74 @@ export function PageHeaderSkeleton({ dashboard = false }: { dashboard?: boolean 
     </div>
   )
 }
+export function PanelHeadingSkeleton({ className, showIcon = true }: { className: string; showIcon?: boolean }) {
+  return (
+    <div className={className}>
+      <div className="min-w-0 space-y-2">
+        <div className="flex items-center gap-2">
+          {showIcon && <Skeleton variant="rect" className="h-4 w-4 shrink-0 rounded" />}
+          <Skeleton variant="text" className="h-4 w-24" />
+        </div>
+        <Skeleton variant="text" className="h-2.5 w-36 max-w-full" />
+      </div>
+      <Skeleton variant="rect" className="h-7 w-12 shrink-0 rounded-full" />
+    </div>
+  )
+}
+
+export function CardHeaderSkeleton({ actionWidth = 'w-20' }: { actionWidth?: string | null }) {
+  return (
+    <div className="app-card-header" aria-hidden="true">
+      <Skeleton variant="text" className="h-4 w-28" />
+      {actionWidth && <Skeleton variant="rect" className={`h-9 ${actionWidth} rounded-xl`} />}
+    </div>
+  )
+}
+
+export function MonitorSkeleton({ variant }: { variant: 'automation' | 'combat' | 'roguelike' }) {
+  return (
+    <SmoothPanel
+      className={`${variant}-monitor-panel automation-monitor-skeleton`}
+      surfaceClassName={`automation-monitor-surface ${variant}-monitor-surface automation-monitor-skeleton-surface`}
+      aria-hidden="true"
+    >
+      <div className="automation-monitor-skeleton-header">
+        <Skeleton variant="circle" className="h-1.5 w-1.5 shrink-0" />
+        <Skeleton variant="text" className="h-4 w-24" />
+        <Skeleton variant="text" className="ml-auto h-3 w-12" />
+      </div>
+      <div className="automation-monitor-skeleton-frame aspect-video">
+        <Skeleton variant="rect" className="h-full w-full rounded-[inherit]" />
+      </div>
+      <div className="automation-monitor-skeleton-toolbar">
+        {[1, 2, 3, 4, 5].map(item => <Skeleton key={item} variant="circle" className="h-11 w-11" />)}
+      </div>
+    </SmoothPanel>
+  )
+}
+
+
+export function GlassModeSkeleton({ count, className = '' }: { count: number; className?: string }) {
+  return (
+    <div className={`${className} glass-mode-skeleton`.trim()} aria-hidden="true">
+      <div className="glass-mode-skeleton-track">
+        {Array.from({ length: count }, (_, index) => (
+          <div key={index} className={`glass-mode-skeleton-item${index === 0 ? ' is-selected' : ''}`}>
+            <Skeleton variant="circle" className="h-4 w-4" />
+            <Skeleton variant="text" className="h-3 w-16 max-w-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export function ModeControlSkeleton({ variant }: { variant: 'combat' | 'roguelike' }) {
+  return (
+    <GlassModeSkeleton
+      count={variant === 'roguelike' ? 2 : 3}
+      className={`${variant}-mode-shell`}
+    />
+  )
+}
+

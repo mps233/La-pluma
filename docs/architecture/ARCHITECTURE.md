@@ -100,8 +100,8 @@ depends on them.
    their own workflow flags, and `useTaskRestoreMonitor` still writes the
    running flag alongside the projection (PD3).
 3. `client/src/components/common` exports only part of its usable primitives,
-   so some consumers still deep-import; most page skeletons live in
-   `Loading.tsx` (the dashboard skeleton moved next to Dashboard).
+   so some consumers still deep-import; `fields.tsx` keeps jsdom-only native
+   control branches (C10c). Page skeletons live next to their pages.
 4. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
    aspirational; page CSS and some JS colors still use literals.
 5. `agentapi` exercises ~45 of 107 routes; the remaining mutation/side-effect

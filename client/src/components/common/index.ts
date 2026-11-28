@@ -19,7 +19,7 @@ export { CheckboxField, GlassSelectWithFill, SelectField } from './fields.tsx'
 
 // 反馈组件
 export { Modal, ConfirmDialog } from './Modal.tsx'
-export { default as Loading, PageSkeleton } from './Loading.tsx'
+export { default as Loading } from './Loading.tsx'
 export { default as EmptyState } from './EmptyState.tsx'
 export { default as StatusMark } from './StatusMark.tsx'
 export { default as ActivityIndicator } from './ActivityIndicator.tsx'
