@@ -17,9 +17,10 @@ export function useDashboardFlowLayout(enabled = true) {
 
     const grid = flowGridRef.current
     const flowCard = flowCardRef.current
+    const flowSurface = flowCard?.querySelector<HTMLElement>('.dashboard-flow-card') ?? flowCard
     const previewShell = flowPreviewRef.current
 
-    if (!grid || !flowCard || !previewShell) return
+    if (!grid || !flowCard || !flowSurface || !previewShell) return
 
     const mediaQuery = window.matchMedia('(min-width: 1280px)')
     let frameId = 0
@@ -45,10 +46,10 @@ export function useDashboardFlowLayout(enabled = true) {
         }
 
         const gridRect = grid.getBoundingClientRect()
-        const flowRect = flowCard.getBoundingClientRect()
+        const flowRect = flowSurface.getBoundingClientRect()
         const previewCardRect = previewCard.getBoundingClientRect()
         const previewFrameRect = previewFrame.getBoundingClientRect()
-        const feedbackRow = flowCard.querySelector<HTMLElement>('[data-dashboard-flow-feedback]')
+        const feedbackRow = flowSurface.querySelector<HTMLElement>('[data-dashboard-flow-feedback]')
         const feedbackRowHeight = feedbackRow?.getBoundingClientRect().height ?? 0
 
         if (
@@ -62,7 +63,14 @@ export function useDashboardFlowLayout(enabled = true) {
 
         const gridStyle = window.getComputedStyle(grid)
         const columnGap = Number.parseFloat(gridStyle.columnGap) || 20
-        const previewChromeHeight = Math.max(0, previewCardRect.height - previewFrameRect.height)
+        // The frame is the flex child that absorbs the card's stretched height.
+        // `card.height - frame.height` would therefore include that extra and make
+        // the target frame height self-referential; the frame's top/bottom offsets
+        // are the real chrome (header, settings, padding, gaps) and stay stable.
+        const previewChromeHeight = Math.max(
+          0,
+          (previewFrameRect.top - previewCardRect.top) + (previewCardRect.bottom - previewFrameRect.bottom),
+        )
         const previewChromeWidth = Math.max(0, previewCardRect.width - previewFrameRect.width)
         // Feedback appears and disappears around async actions; it must not resize both columns.
         const stableFlowHeight = Math.max(0, flowRect.height - feedbackRowHeight)
@@ -81,6 +89,7 @@ export function useDashboardFlowLayout(enabled = true) {
     const resizeObserver = new ResizeObserver(syncColumns)
     resizeObserver.observe(grid)
     resizeObserver.observe(flowCard)
+    resizeObserver.observe(flowSurface)
     resizeObserver.observe(previewShell)
 
     const previewCard = previewShell.querySelector<HTMLElement>('[data-dashboard-preview-card]')

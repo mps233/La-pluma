@@ -283,6 +283,35 @@ func (h *Handler) executeTrackedOperation(ctx context.Context, operationID strin
 	return run, false, err
 }
 
+// executeTrackedOperationBackground is the non-blocking form used by endpoints
+// that accept waitForCompletion=false. It returns the accepted run immediately
+// and lets the action finish on a context that survives the HTTP request, so a
+// long flow can be followed through /runs/current instead of holding the POST
+// open for its whole duration.
+func (h *Handler) executeTrackedOperationBackground(operationID string, input, metadata any, idem *string, action func(context.Context) (any, error)) (agentrun.DTO, bool, error) {
+	scope, replayed, err := h.app.Runs.Open(runapp.Request{
+		OperationID:    operationID,
+		IdempotencyKey: idem,
+		Input:          input,
+		Metadata:       metadata,
+	})
+	if err != nil {
+		return agentrun.DTO{}, false, err
+	}
+	run, _ := scope.Run()
+	if replayed {
+		return run, true, nil
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
+		defer cancel()
+		if _, err := scope.Execute(ctx, action); err != nil {
+			h.logger.Warn("background agent run failed", "runId", scope.RunID(), "operationId", operationID, "error", err)
+		}
+	}()
+	return run, false, nil
+}
+
 type fightStage struct {
 	Stage string
 	Times string

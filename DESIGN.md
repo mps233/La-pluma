@@ -410,7 +410,7 @@ Tailwind 的映射不是按类名直觉对应的，必须按下表使用：
 
 - 统一使用中性投影；卡片、菜单和普通浮层保持向下、无水平偏移；移动 tabbar 使用向上（负 Y）阴影。需要强调主操作时，用词重、填充色和尺寸，不要靠发光。
 - 禁止用品牌色或状态色做模糊投影，也禁止零偏移的彩色光环（`0 0 0 3px` 配彩色）和彩色 `text-shadow`。
-- 普通状态指示点的语义光环限制在扩散 ≤3px、透明度 ≤20%；`status-border-beam`（4px / 46%）和 `FloatingStatusIndicator` 的运行脉冲（4px / 70%，2s）是命名例外。
+- 普通状态指示点的语义光环限制在扩散 ≤3px、透明度 ≤20%；`FloatingStatusIndicator` 的运行脉冲（4px / 70%，2s）是命名例外。`status-border-beam` 的旋转渐变不挂 drop-shadow（WebKit 每帧重绘滤镜会占满帧预算），改用透明度呼吸和 shell 静态辉光。
 - 命名例外：`surface-panel-hover` 的 accent 20% 描边 + 9% 投影、`icon-well` 的 accent 12% 投影、`focus-visible` 焦点环属于现有交互态；不要把它们复制到静态内容或普通容器。
 - 悬停和按下状态沿用同一套中性投影，只调整透明度；只有命名例外可以改变描边/光晕颜色。
 - 深色主题不要新增更重的黑色阴影；现有 `surface-panel` 的深色阴影保持不变，新的层级优先通过表面色阶、1px 边框和 `--app-glass-border` 表达。

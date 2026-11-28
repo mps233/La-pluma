@@ -1430,10 +1430,6 @@ html.la-pluma-standalone #app-root .page {
   box-shadow: none;
 }
 
-.la-pluma-app .config-editor-card .app-card-content > section.surface-soft {
-  border-top: 1px solid var(--app-border);
-}
-
 .la-pluma-app .config-update-card .app-card-content {
   gap: 0;
 }

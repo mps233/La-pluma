@@ -396,7 +396,7 @@ export default function Dashboard() {
         return false
       }
 
-      const result = await maaApi.executeScheduleNow('dashboard-quick-start', savedFlow)
+      const result = await maaApi.executeScheduleNow('dashboard-quick-start', savedFlow, false)
       if (result.success) {
         setQuickStartMessage(result.message || '今日流程已开始执行')
         setQuickStartMessageType('success')
@@ -502,20 +502,20 @@ export default function Dashboard() {
     ? connectionTitle
     : activityPreflightLoading
       ? (activityRunStatus || '正在准备当前活动')
-      : quickStartLoading
-        ? '正在启动今日流程'
-        : flowIsRunning
-          ? (scheduleSummary.currentTask || '流程执行中')
+      : flowIsRunning
+        ? (scheduleSummary.currentTask || '流程执行中')
+        : quickStartLoading
+          ? '正在启动今日流程'
           : '准备就绪'
   const flowCommandDescription = keepNumberWithUnit(
     !automationAvailable
       ? connectionDescription
       : activityPreflightLoading
         ? '正在获取当前活动作业集，随后跳到自动战斗页'
-        : quickStartLoading
-          ? '正在读取任务配置并提交执行'
-          : flowIsRunning
-            ? (scheduleSummary.message || '自动化任务正在按计划推进')
+        : flowIsRunning
+          ? (scheduleSummary.message || '自动化任务正在按计划推进')
+          : quickStartLoading
+            ? '正在读取任务配置并提交执行'
             : (scheduleSummary.message || '设备待命，可以开始今天的自动化任务'),
   )
   const flowStatusLabel = serviceStatus === 'offline'
@@ -526,9 +526,9 @@ export default function Dashboard() {
         ? '检查中'
         : activityPreflightLoading
           ? '准备中'
-          : quickStartLoading
-            ? '启动中'
-            : flowIsRunning ? '执行中' : '待命'
+          : flowIsRunning
+            ? '执行中'
+            : quickStartLoading ? '启动中' : '待命'
   const activityCompleted = activitySummary.completion?.complete === true
   const activityCompletion = activitySummary.completion
   const activityStageProgress = activityCompletion?.known === true
@@ -916,11 +916,6 @@ export default function Dashboard() {
 
         {deviceStats && (
           <div className="dashboard-device-section">
-            <div className="flex items-center gap-2">
-              <div className="h-0.5 flex-1 bg-[var(--app-border)] rounded-full" />
-              <span className={`text-xs font-medium ${labelClass} uppercase shrink-0`}>设备状态</span>
-              <div className="h-0.5 flex-1 bg-[var(--app-border)] rounded-full" />
-            </div>
             <div className="dashboard-device-grid">
               {([
                 { label: 'CPU', pct: deviceStats.cpuPct, sub: deviceStats.load1m != null ? `负载 ${deviceStats.load1m.toFixed(1)}` : '', Icon: Cpu, value: undefined as string | undefined },

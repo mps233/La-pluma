@@ -1811,7 +1811,10 @@ svg.w-5.h-5 {
 
   .status-border-beam.is-active::after {
     opacity: var(--app-status-beam-opacity);
-    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--app-accent) 46%, transparent));
+    /* The orbit repaints the conic gradient every frame. A drop-shadow (or any
+       filter) on this pseudo-element makes WebKit re-render the filter every
+       frame too, which dominates the frame budget on high-refresh displays.
+       The shell's static glow keeps the light without that per-frame cost. */
     animation:
       app-status-beam-orbit 2.8s linear infinite,
       app-status-beam-breathe 2.2s ease-in-out infinite;
@@ -1842,11 +1845,11 @@ svg.w-5.h-5 {
   @keyframes app-status-beam-breathe {
     0%,
     100% {
-      filter: drop-shadow(0 0 2px color-mix(in srgb, var(--app-accent) 28%, transparent)) brightness(0.88);
+      opacity: calc(var(--app-status-beam-opacity) * 0.82);
     }
 
     50% {
-      filter: drop-shadow(0 0 6px color-mix(in srgb, var(--app-accent) 52%, transparent)) brightness(1.08);
+      opacity: var(--app-status-beam-opacity);
     }
   }
 
@@ -5135,6 +5138,13 @@ html.is-standalone-pwa body {
 @media (min-width: 1280px) {
   .dashboard-flow-layout {
     align-items: stretch;
+  }
+
+  /* WebKit resolves the card's percentage height against this grid item; make
+     its height definite instead of relying on the stretched auto height. */
+  .dashboard-flow-layout > :last-child {
+    height: 100%;
+    min-height: 0;
   }
 
   .la-pluma-content .dashboard-preview-card,

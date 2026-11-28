@@ -132,24 +132,27 @@ func (h *Handler) resolveAutomationTaskFlow(requested any) (any, error) {
 }
 
 func (h *Handler) executeSchedule(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		TaskFlow any `json:"taskFlow"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	if _, ok := body.TaskFlow.([]any); !ok {
+	body := decodeBody(r)
+	taskFlow, ok := body["taskFlow"].([]any)
+	if !ok {
 		writeError(w, apperrors.Validation("AGENT_VALIDATION_TASK_FLOW_INVALID", "任务流程格式无效", nil))
 		return
 	}
+	wait, err := parseWaitForCompletion(body, true)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	scheduleID := r.PathValue("scheduleId")
-	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
-	defer cancel()
-	run, replayed, err := h.executeTrackedOperation(ctx, "execute_schedule", map[string]any{
+	input := map[string]any{
 		"scheduleId": scheduleID,
-		"taskFlow":   body.TaskFlow,
-	}, map[string]any{"taskName": "定时任务 " + scheduleID, "taskType": "schedule"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
+		"taskFlow":   taskFlow,
+	}
+	metadata := map[string]any{"taskName": "定时任务 " + scheduleID, "taskType": "schedule"}
+	action := func(actionCtx context.Context) (any, error) {
 		result := h.app.Scheduler.StartDailyFlow(actionCtx, scheduler.DailyFlowRequest{
 			ScheduleID: scheduleID,
-			TaskFlow:   body.TaskFlow,
+			TaskFlow:   taskFlow,
 		})
 		if !result.Success {
 			return nil, dailyFlowError(result, "AGENT_SCHEDULE_EXECUTE_FAILED")
@@ -158,7 +161,19 @@ func (h *Handler) executeSchedule(w http.ResponseWriter, r *http.Request) {
 			return nil, runapp.ErrActionStopped
 		}
 		return structMap(result), nil
-	})
+	}
+	if !wait {
+		run, replayed, err := h.executeTrackedOperationBackground("execute_schedule", input, metadata, idempotencyKey(r), action)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		sendRunResponse(w, run, replayed, true, nil)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
+	defer cancel()
+	run, replayed, err := h.executeTrackedOperation(ctx, "execute_schedule", input, metadata, idempotencyKey(r), action)
 	if err != nil {
 		if run.State == agentrun.StatusFailed || run.State == agentrun.StatusInterrupted {
 			sendRunFailureResponse(w, run)

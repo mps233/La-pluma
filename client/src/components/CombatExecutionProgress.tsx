@@ -48,7 +48,7 @@ export default function CombatExecutionProgress({ run, visible }: CombatExecutio
 
   return (
     <section
-      className="mb-3 border-y border-[var(--app-border)] py-2.5"
+      className="mb-3 py-2.5"
       aria-label="本次执行进度"
       aria-live="polite"
     >

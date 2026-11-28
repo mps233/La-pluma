@@ -45,14 +45,17 @@ export const scheduleApi = {
 
   /**
    * 立即执行定时任务
+   *
+   * waitForCompletion=false 会立即返回已接受的 run；调用方通过 run 状态或
+   * getScheduleExecutionStatus 跟踪进度，避免长流程把 POST 挂到结束。
    */
-  async executeScheduleNow(scheduleId: string = 'default', taskFlow: unknown[]): Promise<ApiResponse<ScheduleExecutionResultData>> {
+  async executeScheduleNow(scheduleId: string = 'default', taskFlow: unknown[], waitForCompletion = true): Promise<ApiResponse<ScheduleExecutionResultData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/${scheduleId}/execute`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ taskFlow }),
+      body: JSON.stringify({ taskFlow, waitForCompletion }),
     })
     return parseJsonResponse(response)
   },

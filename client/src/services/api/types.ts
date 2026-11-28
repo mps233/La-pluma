@@ -140,6 +140,9 @@ export interface ScheduleExecutionResultData {
   owner?: unknown
   summary?: unknown
   runId?: string
+  state?: string
+  pollUrl?: string
+  stopUrl?: string
   results?: unknown[]
   pending?: Array<{ itemIndex: number; [key: string]: unknown }>
   substitutions?: Array<{
