@@ -745,6 +745,17 @@ deleted, verification, and follow-ups.
   ratchet, full suite (535 tests / 80 files), and production build.
 - Follow-up: C7e composes `maaApi` from domain modules.
 
+### Round 51 — move maaApi behind the API facade (2026-11-28)
+
+- C7e: after the endpoint modules moved out, `services/api.ts` still carried
+  the 600-line `maaApi` object and all of its DTOs.
+- Moved the object and DTOs to `services/api/maa.ts`; `services/api.ts` is now
+  a 63-line facade that re-exports `maaApi`, the client core, and every domain
+  module. Existing `@/services/api` imports and test mocks are unchanged.
+- Verified: client type-check, lint at the ratchet, full suite (535 tests / 80
+  files), and production build.
+- Follow-up: C7f splits `maa.ts` by domain and composes the object.
+
 
 
 
