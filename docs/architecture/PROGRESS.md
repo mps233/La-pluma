@@ -914,7 +914,7 @@ deleted, verification, and follow-ups.
 - Follow-up: PD1 needs an explicit workflow request; PD2 needs a rendered
   design pass.
 
-### Round 61 — CI guards and token-layer start (2026-11-28)
+### Round 61 — CI guards and token-layer start (2026-11-28, `a4c38fa`)
 
 - PD1: `go-verify.yml` gained a `gofmt -l` guard, a run-lifecycle `go test -race` job, and a client-verify job (Node 22, `npm ci` + `npm run verify`). The publish workflow is untouched; every job keeps `contents: read` and no secrets.
 - PD2 phase 1: `ios-theme.css` now declares a `--la-*` primitive palette for
