@@ -622,6 +622,21 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite (718 tests / 53 packages), vet, gofmt.
 - Follow-up: G12 (route coverage) is the last Go P2 item.
 
+### Round 42 — raise Agent API route coverage (2026-11-28)
+
+- G12: handler tests exercised about 18 of the 107 registered routes, so a
+  broken registration or envelope on a read-only endpoint could ship.
+- Added table-driven coverage for 21 read-only routes (config/profile,
+  notification config, logs, drops, training, schedules, stages, custom tools,
+  WebRTC/Skland/mastery status) plus lifecycle tests for user config,
+  notification config, and log clearing. The mastery catalog's missing-data
+  path is asserted as a stable 503 instead of a success.
+- Route coverage is now ~45 of 107; remaining routes are mutation or
+  device-side-effect operations covered indirectly by their service tests.
+- Verified: full Go test suite (743 tests / 53 packages), vet, gofmt.
+- Follow-up: the remaining pool is client-heavy (C7/C10/C11/C8, C9) plus G13
+  and T5.
+
 
 
 

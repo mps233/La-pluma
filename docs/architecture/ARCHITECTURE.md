@@ -103,4 +103,5 @@ depends on them.
    so some consumers still deep-import; page skeletons live in `Loading.tsx`.
 4. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
    aspirational; page CSS and some JS colors still use literals.
-5. `internal/app/logs` has no tests; `agentapi` exercises ~17% of its routes.
+5. `agentapi` exercises ~45 of 107 routes; the remaining mutation/side-effect
+   routes are covered indirectly by their service tests.
