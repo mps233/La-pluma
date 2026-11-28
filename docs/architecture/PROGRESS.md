@@ -681,6 +681,19 @@ deleted, verification, and follow-ups.
   production build.
 - Follow-up: C11b (Dashboard helpers), then C7/C8.
 
+### Round 46 — extract Dashboard payload helpers (2026-11-28)
+
+- C11b: `Dashboard.tsx` inlined record guards, first-string selection,
+  timestamp validation, stage-array validation, activity-completion
+  validation/normalization, and the usage threshold classes.
+- Moved them to `utils/dashboardData.ts` with tests for malformed payloads,
+  the stage limit, completion normalization, and threshold classes. The page
+  keeps the store/API orchestration.
+- Verified: client type-check, lint at the ratchet, full suite (535 tests / 80
+  files), and production build.
+- Follow-up: C7 (API module split) and C8 (color tokens) are the remaining P2
+  client items.
+
 
 
 
