@@ -777,7 +777,7 @@ deleted, verification, and follow-ups.
 - Follow-up: move logs/config/connections/activity/schedule/updates/user
   config/data/copilot/custom-tools/WebRTC groups the same way.
 
-### Round 54 — finish the maaApi group split (2026-11-28)
+### Round 54 — finish the maaApi group split (2026-11-28, `13d0cc8`)
 
 - C7g: moved the remaining `maaApi` groups to `services/api/groups/`:
   `logs`, `config` (including user config), `connections` (device/WebRTC/
