@@ -138,3 +138,25 @@ tokens, and the `index.css` fallback layer remain follow-up phases.
 Consequences: accent/status tokens now have one literal owner. The rendered
 dashboard matched the pre-change screenshots pixel-for-pixel except dynamic
 timestamps and status text (light/dark, desktop/mobile).
+
+## ADR-0009: Primitive surfaces, spacing, and component tokens
+
+Status: accepted (2026-11-28), continues PD2
+
+Context: after the accent/status palette, the surface, neutral, spacing,
+radius, control, and tabbar values in `ios-theme.css` still wrote literals;
+cards and the primary action button had no component aliases.
+
+Decision: add neutral/surface (`--la-gray-*`, `--la-slate-*`), spacing
+(`--la-space-*`), radius (`--la-radius-*`), control (`--la-control-*`), and
+font-size primitives, and rewire the effective theme tokens to them. Add
+`--app-card-radius`, `--app-card-continuous-radius`,
+`--app-button-primary-bg`, and `--app-button-primary-text` as component
+tokens and use them in the shared card and `.brand-action` rules. Alpha
+colours use `color-mix` against the same primitive.
+
+Consequences: semantic tokens in the effective layer now reference primitives
+only; component tokens reference semantic tokens only. The `index.css`
+fallback palette and the remaining literals inside component rules still need
+the same pass.
+

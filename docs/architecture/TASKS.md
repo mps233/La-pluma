@@ -19,7 +19,7 @@ without re-investigation.
 
 | ID | Decision | Why blocked |
 | --- | --- | --- |
-| PD2 | Finish the primitive/semantic/component token layers from `DESIGN.md` | Accent/status primitives landed (ADR-0008); surfaces, neutrals, spacing/radius, component tokens, and the `index.css` fallback still need a rendered light/dark/mobile pass |
+| PD2 | Finish the primitive/semantic/component token layers from `DESIGN.md` | Effective theme tokens now use `--la-*` primitives for accent/status/surfaces/neutrals/spacing/radius and card/button component tokens (ADR-0008/0009); the `index.css` fallback palette and literals inside component rules remain |
 
 ## Completed
 

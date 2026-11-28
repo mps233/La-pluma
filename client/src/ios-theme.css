@@ -25,30 +25,70 @@
   --la-indigo-450: #5e5ce6;
   --la-indigo-500: #5856d6;
   --la-indigo-600: #3f3dc4;
+  --la-white: #ffffff;
+  --la-black: #000000;
+  --la-gray-50: #f2f2f7;
+  --la-gray-100: #e5e5ea;
+  --la-gray-200: #d1d1d6;
+  --la-gray-500: #767680;
+  --la-gray-600: #5e5e63;
+  --la-gray-650: #636368;
+  --la-gray-700: #48484a;
+  --la-gray-800: #3c3c43;
+  --la-gray-900: #1c1c1e;
+  --la-slate-25: #edf3f8;
+  --la-slate-100: #ebf5ff;
+  --la-slate-400: #9aa8b5;
+  --la-slate-500: #82909e;
+  --la-slate-900: #151a21;
+  --la-slate-950: #101318;
+  --la-space-8: 0.5rem;
+  --la-space-14: 0.875rem;
+  --la-space-16: 1rem;
+  --la-space-18: 1.125rem;
+  --la-space-20: 1.25rem;
+  --la-space-21: 1.3125rem;
+  --la-space-40: 2.5rem;
+  --la-space-44: 2.75rem;
+  --la-space-62: 3.875rem;
+  --la-space-68: 4.25rem;
+  --la-radius-6: 0.375rem;
+  --la-radius-10: 0.625rem;
+  --la-radius-13: 0.8125rem;
+  --la-radius-16: 1rem;
+  --la-radius-20: 1.25rem;
+  --la-control-36: 2.25rem;
+  --la-control-44: 2.75rem;
+  --la-control-48: 3rem;
+  --la-font-10: 10px;
+  --la-font-11: 11px;
+  --la-font-13: 13px;
+  --la-font-20: 20px;
+  --la-font-24: 24px;
 }
 
 :root {
-  --app-chrome-page-bg: #f2f2f7;
-  --app-chrome-bg: rgba(255, 255, 255, 0.72);
-  --app-glass-bg: rgba(255, 255, 255, 0.68);
-  --app-glass-border: rgba(60, 60, 67, 0.18);
-  --app-glass-shadow: 0 12px 32px rgba(60, 60, 67, 0.12);
+  --app-chrome-page-bg: var(--la-gray-50);
+  --app-chrome-bg: color-mix(in srgb, var(--la-white) 72%, transparent);
+  --app-glass-bg: color-mix(in srgb, var(--la-white) 68%, transparent);
+  --app-glass-border: color-mix(in srgb, var(--la-gray-800) 18%, transparent);
+  --app-glass-shadow: 0 12px 32px color-mix(in srgb, var(--la-gray-800) 12%, transparent);
   /* The simulator viewport's empty surface, shared with content cards. */
   --app-preview-frame-bg: color-mix(
     in srgb,
     var(--app-surface-muted) 86%,
     var(--app-surface-solid)
   );
-  --app-bg: #f2f2f7;
-  --app-bg-soft: #e5e5ea;
-  --app-surface: rgba(255, 255, 255, 0.72);
-  --app-surface-solid: #ffffff;
-  --app-surface-muted: rgba(118, 118, 128, 0.12);
-  --app-border: rgba(60, 60, 67, 0.18);
-  --app-border-strong: rgba(60, 60, 67, 0.28);
-  --app-text: #1c1c1e;
-  --app-text-muted: #5e5e63;
-  --app-text-soft: #636368;
+  --app-bg: var(--la-gray-50);
+  --app-bg-soft: var(--la-gray-100);
+  --app-surface: color-mix(in srgb, var(--la-white) 72%, transparent);
+  --app-surface-solid: var(--la-white);
+  --app-surface-muted: color-mix(in srgb, var(--la-gray-500) 12%, transparent);
+  --app-border: color-mix(in srgb, var(--la-gray-800) 18%, transparent);
+  --app-border-strong: color-mix(in srgb, var(--la-gray-800) 28%, transparent);
+  --app-text: var(--la-gray-900);
+  --app-text-muted: var(--la-gray-600);
+  --app-text-soft: var(--la-gray-650);
   --app-accent: var(--la-blue-500);
   --app-accent-strong: var(--la-blue-600);
   --app-accent-action: var(--la-blue-550);
@@ -68,21 +108,21 @@
   --app-info-text: var(--la-indigo-600);
   --app-info-rgb: 88, 86, 214;
   --app-text-soft-rgb: 99, 99, 104;
-  --app-on-accent: #ffffff;
-  --app-radius-xs: 0.375rem;
-  --app-radius-sm: 0.625rem;
-  --app-radius-md: 0.8125rem;
-  --app-radius-lg: 1rem;
-  --app-continuous-radius: 1.25rem;
-  --app-continuous-radius-compact: 1rem;
-  --app-space-card: 0.875rem;
-  --app-space-section: 1.125rem;
-  --app-space-page: 1.25rem;
-  --app-space-panel: 1rem;
-  --app-space-control-x: 1rem;
-  --app-control-height-sm: 2.25rem;
-  --app-control-height-md: 2.75rem;
-  --app-control-height-lg: 3rem;
+  --app-on-accent: var(--la-white);
+  --app-radius-xs: var(--la-radius-6);
+  --app-radius-sm: var(--la-radius-10);
+  --app-radius-md: var(--la-radius-13);
+  --app-radius-lg: var(--la-radius-16);
+  --app-continuous-radius: var(--la-radius-20);
+  --app-continuous-radius-compact: var(--la-radius-16);
+  --app-space-card: var(--la-space-14);
+  --app-space-section: var(--la-space-18);
+  --app-space-page: var(--la-space-20);
+  --app-space-panel: var(--la-space-16);
+  --app-space-control-x: var(--la-space-16);
+  --app-control-height-sm: var(--la-control-36);
+  --app-control-height-md: var(--la-control-44);
+  --app-control-height-lg: var(--la-control-48);
   --app-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF UI Text", system-ui, sans-serif;
   --app-navbar-height: 4.75rem;
   --app-toolbar-height: 4rem;
@@ -91,11 +131,11 @@
   --app-safe-area-right: env(safe-area-inset-right, 0px);
   --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --app-safe-area-left: env(safe-area-inset-left, 0px);
-  --app-page-gutter: 1.25rem;
+  --app-page-gutter: var(--la-space-20);
   --la-pluma-viewport-height: 100dvh;
   --la-pluma-tabbar-safe-bottom: max(var(--app-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
-  --la-pluma-tabbar-floating-height: 4.25rem;
-  --la-pluma-tabbar-floating-offset: 0.5rem;
+  --la-pluma-tabbar-floating-height: var(--la-space-68);
+  --la-pluma-tabbar-floating-offset: var(--la-space-8);
   --la-pluma-tabbar-bottom-clearance: clamp(
     var(--la-pluma-tabbar-floating-offset),
     var(--la-pluma-tabbar-safe-bottom),
@@ -104,15 +144,20 @@
   --la-pluma-tabbar-reserved-height: calc(
     var(--la-pluma-tabbar-floating-height) + var(--la-pluma-tabbar-bottom-clearance)
   );
-  --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.16);
-  --la-pluma-tabbar-side-inset: 1.25rem;
-  --la-pluma-tabbar-label-size: 11px;
+  --la-pluma-tabbar-active-bg: color-mix(in srgb, var(--la-gray-500) 16%, transparent);
+  --la-pluma-tabbar-side-inset: var(--la-space-20);
+  --la-pluma-tabbar-label-size: var(--la-font-11);
   --la-pluma-tabbar-label-line: 1;
-  --la-pluma-tabbar-icon-size: 20px;
-  --la-pluma-tabbar-fold-height: 2.5rem;
-  --la-pluma-navbar-fade-color: #ffffff;
+  --la-pluma-tabbar-icon-size: var(--la-font-20);
+  --la-pluma-tabbar-fold-height: var(--la-space-40);
+  --la-pluma-navbar-fade-color: var(--la-white);
   --la-pluma-sidebar-width: 17rem;
   --la-pluma-sidebar-selection: var(--app-accent-action);
+  /* Component tokens reference semantic tokens only. */
+  --app-card-radius: var(--app-radius-lg);
+  --app-card-continuous-radius: var(--app-continuous-radius);
+  --app-button-primary-bg: var(--app-accent-action);
+  --app-button-primary-text: var(--app-on-accent);
 }
 
 /* Safari's dynamic viewport is intentionally used in a normal browser so
@@ -146,45 +191,45 @@ html.la-pluma-standalone {
    clears the home indicator through the max() with the safe-area inset. */
 @media (display-mode: standalone), (display-mode: fullscreen) {
   :root {
-    --la-pluma-tabbar-floating-height: 3.875rem;
-    --la-pluma-tabbar-side-inset: 1.3125rem;
+    --la-pluma-tabbar-floating-height: var(--la-space-62);
+    --la-pluma-tabbar-side-inset: var(--la-space-21);
     --la-pluma-tabbar-bottom-clearance: max(1.3125rem, env(safe-area-inset-bottom, 0px));
-    --la-pluma-tabbar-label-size: 10px;
-    --la-pluma-tabbar-label-line: 13px;
-    --la-pluma-tabbar-icon-size: 24px;
-    --la-pluma-tabbar-fold-height: 2.75rem;
+    --la-pluma-tabbar-label-size: var(--la-font-10);
+    --la-pluma-tabbar-label-line: var(--la-font-13);
+    --la-pluma-tabbar-icon-size: var(--la-font-24);
+    --la-pluma-tabbar-fold-height: var(--la-space-44);
   }
 }
 
 html.la-pluma-standalone {
-  --la-pluma-tabbar-floating-height: 3.875rem;
-  --la-pluma-tabbar-side-inset: 1.3125rem;
+  --la-pluma-tabbar-floating-height: var(--la-space-62);
+  --la-pluma-tabbar-side-inset: var(--la-space-21);
   --la-pluma-tabbar-bottom-clearance: max(1.3125rem, env(safe-area-inset-bottom, 0px));
-  --la-pluma-tabbar-label-size: 10px;
-  --la-pluma-tabbar-label-line: 13px;
-  --la-pluma-tabbar-icon-size: 24px;
-  --la-pluma-tabbar-fold-height: 2.75rem;
+  --la-pluma-tabbar-label-size: var(--la-font-10);
+  --la-pluma-tabbar-label-line: var(--la-font-13);
+  --la-pluma-tabbar-icon-size: var(--la-font-24);
+  --la-pluma-tabbar-fold-height: var(--la-space-44);
 }
 
 html.dark,
 #app-root.dark {
   /* Keep this canvas color in sync with --boot-bg in client/index.html and the
      dark theme-color writers in index.html, uiStore.ts, and vite.config.ts. */
-  --app-chrome-page-bg: #101318;
-  --app-chrome-bg: rgba(21, 26, 33, 0.74);
-  --app-glass-bg: rgba(21, 26, 33, 0.72);
-  --app-glass-border: rgba(235, 245, 255, 0.12);
-  --app-glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
-  --app-bg: #101318;
-  --app-bg-soft: #151a21;
-  --app-surface: rgba(21, 26, 33, 0.78);
-  --app-surface-solid: #151a21;
-  --app-surface-muted: rgba(148, 163, 184, 0.1);
-  --app-border: rgba(235, 245, 255, 0.09);
-  --app-border-strong: rgba(235, 245, 255, 0.16);
-  --app-text: #edf3f8;
-  --app-text-muted: #9aa8b5;
-  --app-text-soft: #82909e;
+  --app-chrome-page-bg: var(--la-slate-950);
+  --app-chrome-bg: color-mix(in srgb, var(--la-slate-900) 74%, transparent);
+  --app-glass-bg: color-mix(in srgb, var(--la-slate-900) 72%, transparent);
+  --app-glass-border: color-mix(in srgb, var(--la-slate-100) 12%, transparent);
+  --app-glass-shadow: 0 14px 34px color-mix(in srgb, var(--la-black) 34%, transparent);
+  --app-bg: var(--la-slate-950);
+  --app-bg-soft: var(--la-slate-900);
+  --app-surface: color-mix(in srgb, var(--la-slate-900) 78%, transparent);
+  --app-surface-solid: var(--la-slate-900);
+  --app-surface-muted: color-mix(in srgb, var(--la-slate-400) 10%, transparent);
+  --app-border: color-mix(in srgb, var(--la-slate-100) 9%, transparent);
+  --app-border-strong: color-mix(in srgb, var(--la-slate-100) 16%, transparent);
+  --app-text: var(--la-slate-25);
+  --app-text-muted: var(--la-slate-400);
+  --app-text-soft: var(--la-slate-500);
   --app-accent: var(--la-blue-450);
   --app-accent-strong: var(--la-blue-400);
   --app-accent-action: var(--la-blue-550);
@@ -204,26 +249,26 @@ html.dark,
   --app-info-text: var(--la-indigo-300);
   --app-info-rgb: 94, 92, 230;
   --app-text-soft-rgb: 130, 144, 158;
-  --app-on-accent: #ffffff;
-  --la-pluma-tabbar-active-bg: rgba(148, 163, 184, 0.26);
-  --la-pluma-navbar-fade-color: #101318;
+  --app-on-accent: var(--la-white);
+  --la-pluma-tabbar-active-bg: color-mix(in srgb, var(--la-slate-400) 26%, transparent);
+  --la-pluma-navbar-fade-color: var(--la-slate-950);
   --la-pluma-sidebar-selection: var(--app-accent-action);
 }
 
 @media (prefers-contrast: more) {
   :root {
-    --app-border: rgba(60, 60, 67, 0.32);
-    --app-border-strong: rgba(60, 60, 67, 0.46);
-    --app-text-muted: #48484a;
-    --app-text-soft: #48484a;
+    --app-border: color-mix(in srgb, var(--la-gray-800) 32%, transparent);
+    --app-border-strong: color-mix(in srgb, var(--la-gray-800) 46%, transparent);
+    --app-text-muted: var(--la-gray-700);
+    --app-text-soft: var(--la-gray-700);
   }
 
   html.dark,
   #app-root.dark {
-    --app-border: rgba(235, 235, 245, 0.3);
-    --app-border-strong: rgba(235, 235, 245, 0.46);
-    --app-text-muted: #d1d1d6;
-    --app-text-soft: #d1d1d6;
+    --app-border: color-mix(in srgb, var(--la-slate-100) 30%, transparent);
+    --app-border-strong: color-mix(in srgb, var(--la-slate-100) 46%, transparent);
+    --app-text-muted: var(--la-gray-200);
+    --app-text-soft: var(--la-gray-200);
   }
 }
 
@@ -1273,7 +1318,7 @@ html.la-pluma-standalone #app-root .page {
 .la-pluma-app .surface-panel {
   margin: 0;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-lg);
+  border-radius: var(--app-card-radius);
   background: var(--app-surface-solid);
   box-shadow:
     0 1px 3px rgba(60, 60, 67, 0.05),
@@ -1294,7 +1339,7 @@ html.la-pluma-standalone #app-root .page {
 .la-pluma-app .app-card[data-smooth-corners='true'] {
   display: flex;
   border: 0;
-  border-radius: var(--app-continuous-radius);
+  border-radius: var(--app-card-continuous-radius);
   background: transparent;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -1321,7 +1366,7 @@ html.la-pluma-standalone #app-root .page {
   display: flex;
   min-width: 0;
   border: 0;
-  border-radius: var(--app-continuous-radius);
+  border-radius: var(--app-card-continuous-radius);
   background: transparent;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;

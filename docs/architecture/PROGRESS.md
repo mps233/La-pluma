@@ -930,3 +930,23 @@ deleted, verification, and follow-ups.
   `index.css` fallback layer.
 - Verified: client production build (type-check included); CSS-only change.
 - Follow-up: PD2 remainder and PD1 CI rollout observation.
+
+### Round 62 — primitive surfaces, spacing, and component tokens (2026-11-28)
+
+- PD2 phase 2/3: added neutral/surface (`--la-gray-*`, `--la-slate-*`),
+  spacing (`--la-space-*`), radius (`--la-radius-*`), control
+  (`--la-control-*`), and font-size primitives to the effective theme; the
+  surface, border, text, radius, spacing, control, and tabbar semantic tokens
+  now reference them. Alpha surfaces use `color-mix` against the same
+  primitives.
+- Added `--app-card-radius`, `--app-card-continuous-radius`,
+  `--app-button-primary-bg`, and `--app-button-primary-text`; the shared card
+  and `.brand-action` rules now use them.
+- Visual verification: captured dashboard and automation pages at 1440×900
+  and 390×844 in light/dark before and after the change. Static pixel samples
+  (card surfaces, page background, button fill, sidebar) were identical; the
+  remaining differences were the animated ASCII field, island progress, PWA
+  prompt, clock, and rotating status quote.
+- Remaining PD2 work: migrate the `index.css` fallback palette to primitives
+  and replace the literals still inside component rules.
+- Verified: client production build (type-check included).
