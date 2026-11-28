@@ -969,3 +969,29 @@ deleted, verification, and follow-ups.
 - PD2 is complete; the blocked task pool is empty.
 - Verified: client type-check, lint at the ratchet, full suite (536 tests / 81
   files), and production build.
+
+### Round 64 — keep framer-motion out of the entry (2026-11-28, `760501c`)
+
+- PF0 (implemented): the first-visit guide and the access-token dialog are
+  lazy-loaded, so their modal animation dependency no longer ships with the
+  dashboard. `AccessTokenGate` is now a tiny event listener; the dialog lives
+  in `AccessTokenModal` and mounts after a 401. `OnboardingDialog` loads on
+  first open and stays mounted for its close animation.
+- `Modal`/`ConfirmDialog` and `StatusMark` left the `components/common`
+  barrel and are imported from their files by their lazy consumers. The
+  framer-motion manual chunk was removed: naming it pulled the vendor into
+  the entry preload even though every consumer is a lazy page.
+- Added an entry-chunk policy test to `vite.config.test.ts` so a future
+  framer-motion manual chunk is caught before it reaches the entry.
+- Bundle: entry 776.4 → 760.6 KB raw (255.3 → 250.5 KB gzip); initial JS is
+  ~49 KB gzip smaller (44.6 KB motion-vendor + 4.8 KB entry). The PWA
+  precache drops from 17 entries / 1,376.7 KiB to 16 / 1,237.1 KiB.
+  Framer-motion now lives in an async shared chunk (114.7 KB raw / 37.1 KB
+  gzip) loaded only when a page that animates is opened.
+- Visual verification: the onboarding dialog rendered in light/dark at
+  1440×900 and 390×844; the access-token dialog rendered in light/dark at
+  1440×900. Both keep their existing layout, focus, and close behavior.
+- Verified: client lint (0 errors, 1 existing warning), type-check, full
+  suite (537 tests / 81 files), production build, and the new config test.
+- Follow-up: PF1–PF6 in `TASKS.md` (three.js glass runtime, island,
+  WebRTC preview, glass popups, unused run logs, CSS pruning).
