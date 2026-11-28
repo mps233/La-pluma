@@ -15,7 +15,7 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
-| C7f | P2 | client | Split `services/api/maa.ts` into domain modules and compose `maaApi` from them | The facade `services/api.ts` is 63 lines; `maa.ts` still holds the maaApi object and its local DTOs (829 lines) |
+| C7g | P2 | client | Split the `maaApi` method groups in `services/api/maa.ts` and compose the object from domain modules | Shared DTOs moved to `services/api/types.ts` (C7f); `maa.ts` still holds one 600-line object literal |
 | C10c | P3 | client | Remove the jsdom-only DOM branches in `fields.tsx` | `SelectField`/`CheckboxField` render native controls when `import.meta.env.MODE === 'test'`; tests must drive the glass controls or a shared a11y harness instead. The page skeletons are already page-adjacent (C10b) |
 | C8 | P2 | client | Token/color migration for the remaining literals; shift `statusMessage` pulse RGB to the effective iOS theme | Nine files remain in the `themeColorBoundary` allowlist; ~8 production hex sites; visual verification required |
 | C9 | P3 | client | Move page-prefixed CSS out of `index.css` into route CSS | 13 class names defined twice; visual verification required |
@@ -81,3 +81,4 @@ without re-investigation.
 - C7c: notification config types, cache, and `notificationsApi` moved to `services/api/notifications.ts` and re-exported (Round 49).
 - C7d: training endpoints and their types moved to `services/api/training.ts` and re-exported (Round 50).
 - C7e: `maaApi` and its DTOs moved to `services/api/maa.ts`; `services/api.ts` is a 63-line facade (Round 51).
+- C7f: shared API DTOs moved to `services/api/types.ts`; `maa.ts` imports them and the facade re-exports them (Round 52).

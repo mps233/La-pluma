@@ -4,6 +4,7 @@
  */
 
 export * from './api/maa'
+export * from './api/types'
 export { API_BASE_URL, fetchWithAuth, getItemIconUrl } from './api/client'
 export { parseJsonResponse } from '@/utils/apiResponse'
 
