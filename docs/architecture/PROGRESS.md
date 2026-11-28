@@ -622,7 +622,7 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite (718 tests / 53 packages), vet, gofmt.
 - Follow-up: G12 (route coverage) is the last Go P2 item.
 
-### Round 42 — raise Agent API route coverage (2026-11-28)
+### Round 42 — raise Agent API route coverage (2026-11-28, `899643a`)
 
 - G12: handler tests exercised about 18 of the 107 registered routes, so a
   broken registration or envelope on a read-only endpoint could ship.
