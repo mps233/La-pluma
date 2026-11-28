@@ -1,16 +1,11 @@
-import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench } from 'lucide-react'
 import { GlassButton, GlassCard } from '@/components/glass'
 import { GlassLiveCardButton } from '@/components/common'
 import { GlassInput, GlassMenu, GlassNav } from './LayoutGlassChrome'
 import ThemeToggle from './ThemeToggle'
-import RunIsland from './RunIsland'
-import SanityBatteryIsland from './SanityBatteryIsland'
-import MaaUpdateIsland from './MaaUpdateIsland'
-import MasteryIsland from './MasteryIsland'
+import IslandHost from './IslandHost'
 import AsciiFieldBackdrop from './backgrounds/AsciiFieldBackdrop'
-import { Island } from '@/lib/island'
-import { IslandContext } from '@/lib/island/context'
 import { useUIStore } from '@/state'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/state'
 import { useResolvedTheme } from '@/hooks/useResolvedTheme'
@@ -137,7 +132,6 @@ export default function Layout({ children }: LayoutProps) {
   const theme = useUIStore(state => state.theme)
   const resolvedTheme = useResolvedTheme()
   const brandMark = brandMarkUrl(resolvedTheme)
-  const hasIslandProvider = useContext(IslandContext) !== null
   const activeTab: AppTab = isAppTab(storedActiveTab) ? storedActiveTab : 'dashboard'
   const [sidebarQuery, setSidebarQuery] = useState('')
   const [sidebarIdentity, setSidebarIdentity] = useState(DEFAULT_OPERATOR_QUOTE)
@@ -418,15 +412,7 @@ export default function Layout({ children }: LayoutProps) {
                 />
               </div>
             </div>
-            {hasIslandProvider && (
-              <div className="la-pluma-island-layer">
-                <Island placement="container" label="La Pluma 活动" />
-                <RunIsland />
-                <MaaUpdateIsland />
-                <MasteryIsland />
-                <SanityBatteryIsland />
-              </div>
-            )}
+            <IslandHost />
           </div>
         </header>
 

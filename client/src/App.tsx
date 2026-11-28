@@ -10,7 +10,6 @@ import { useRunStatusMonitor } from './hooks/useRunStatusMonitor'
 import { useMasteryStatusMonitor } from './hooks/useMasteryStatusMonitor'
 import { useUIStore } from '@/state'
 import { PreviewSessionProvider } from './contexts/PreviewSessionContext'
-import { IslandProvider } from '@/lib/island'
 import { pageLoaders } from './utils/pagePreload'
 
 const AutomationTasks = lazy(pageLoaders.automation)
@@ -119,11 +118,9 @@ function App() {
     <div id="app-root" className={`la-pluma-app${desktopShell ? ' is-desktop-shell' : ''}`}>
       <div className="desktop-titlebar" aria-hidden="true" />
       <PreviewSessionProvider>
-        <IslandProvider>
-          <Layout>
-            {({ activeTab }) => <VisitedWorkspaces activeTab={activeTab} />}
-          </Layout>
-        </IslandProvider>
+        <Layout>
+          {({ activeTab }) => <VisitedWorkspaces activeTab={activeTab} />}
+        </Layout>
       </PreviewSessionProvider>
       <PWAInstallPrompt />
       <AccessTokenGate />

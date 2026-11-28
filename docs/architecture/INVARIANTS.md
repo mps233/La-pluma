@@ -29,6 +29,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | The entry preload excludes the animation vendor: framer-motion is never a named manual chunk | `vite.config.test.ts` (entry chunk policy) | `npm run test --prefix client` |
 | Glass controls stay readable before the shared renderer loads: Switch and CheckboxField render solid fallbacks | `common/Switch.test.tsx` + `common/fields.test.tsx` | `npm run test --prefix client` |
 | The glass renderer is only created after the first interaction, and one load upgrades every mounted canvas | `controls/glass/useGlassCanvas.test.tsx` | `npm run test --prefix client` |
+| The island provider, surface, activity adapters, and icon package stay behind the lazy `IslandLayer` boundary | `components/islandBoundary.test.ts` + `IslandHost.test.tsx` | `npm run test --prefix client` |
 
 ## Not yet enforceable
 

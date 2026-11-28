@@ -14,7 +14,6 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
-| PF2 | P1 | Client bundle | Mount the Dynamic Island (and its hugeicons dependency) after first paint or when a run becomes active. | `src/lib/island` contributes ~97 KB of generated entry code; `@hugeicons/core-free-icons` (~35 KB generated) is used only by `islandcn/glyphs`. |
 | PF3 | P2 | Client bundle | Load the WebRTC preview entry on demand instead of importing it from the dashboard. | `useScrcpyWebRTC` (18.8 KB generated) and `DashboardPreviewEntry` (5.3 KB) are in the entry; preview is closed by default. |
 | PF4 | P2 | Client bundle | Split glass popups, menus, and selects out of the entry; they render only after interaction. | `glass-popup.tsx` (26.5 KB generated), menu/select `@ui-sdk` modules, and the related popup foundation are in the entry. |
 | PF5 | P3 | Agent API | Drop the unused `recentLogs` field from `/runs/current` and `/status`, or make it opt-in. | The client requests `?lines=1` and never reads the field; other callers can receive up to 80 lines of up to 4000 chars. |
@@ -94,3 +93,4 @@ without re-investigation.
 - PF0: framer-motion left the entry preload. The onboarding guide and access-token dialog are lazy, Modal/StatusMark are direct imports instead of barrel exports, and framer-motion is no longer a named manual chunk. Initial JS fell by ~49 KB gzip and the PWA precache by ~140 KiB (Round 64).
 - PF1a: the preview auto-start glass switch mounts only after preview is enabled; the default dashboard no longer requests the three.js `runtime` chunk (Round 65).
 - PF1b: the glass renderer is interaction-gated. Switch and CheckboxField paint solid fallbacks; the first interaction loads three.js once and upgrades every mounted canvas. Automation, Config, Combat, and the other control pages no longer request the runtime on load (Round 66).
+- PF2: the Dynamic Island provider, surface, four activity adapters, islandcn visuals, and hugeicons now live behind one lazy `IslandLayer` chunk mounted after the first frame. The entry fell by ~196 KB raw / ~70 KB gzip; the PWA precache fell from 1,240 KiB to 1,048 KiB (Round 67).

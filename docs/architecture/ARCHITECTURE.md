@@ -89,6 +89,10 @@ transport → app → infra / domain
   three.js renderer is triggered by the first interaction; one load upgrades
   every mounted canvas. The 857 KB renderer chunk therefore stays off the
   initial page load on Automation, Config, and the other control pages.
+- The Dynamic Island subsystem (provider, surface, activity adapters,
+  islandcn visuals, and hugeicons) mounts behind one lazy `IslandLayer` chunk
+  after the first frame. `App`/`Layout` keep no island imports; the layer is
+  absolutely positioned, so deferring it does not shift the page.
 - `components/glass/` is the only application-facing Liquid Glass surface.
 - `services/api/client.ts` owns the base URL, auth headers, and raw `fetch`;
   `services/api.ts` is a facade over `services/api/maa.ts` (which composes the
