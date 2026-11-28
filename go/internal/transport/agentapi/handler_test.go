@@ -527,6 +527,72 @@ func TestStopActionResponseShape(t *testing.T) {
 	}
 }
 
+func TestSnapshotDataEndpointsUseTypedShape(t *testing.T) {
+	root := t.TempDir()
+	paths := config.Paths{DataDir: filepath.Join(root, "data"), MaaConfigDir: filepath.Join(root, "maa-config")}
+	if err := os.MkdirAll(paths.DataDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(paths.DataDir, "operbox.json"),
+		`{"timestamp":"2026-11-28T02:00:00.000Z","operCount":1,"totalOperCount":1,"data":[{"id":"char_1"}],"allOpers":[{"id":"char_1","name":"A","rarity":5,"own":true}]}`)
+	writeTestFile(t, filepath.Join(paths.DataDir, "depot.json"),
+		`{"timestamp":"2026-11-28T02:00:00.000Z","itemCount":1,"items":[{"id":"30012","count":3}],"complete":true}`)
+	_, handler := newActionApp(t, paths, filepath.Join(root, "missing-maa"))
+
+	operbox := doRequest(t, handler, http.MethodGet, "/data/operbox")
+	if operbox.Code != http.StatusOK {
+		t.Fatalf("operbox = %d, body = %s", operbox.Code, operbox.Body.String())
+	}
+	operboxData := envelopeData(t, operbox)
+	if operboxData["operCount"] != float64(1) || operboxData["timestamp"] != "2026-11-28T02:00:00.000Z" {
+		t.Fatalf("operbox data = %#v", operboxData)
+	}
+	allOpers, _ := operboxData["allOpers"].([]any)
+	if len(allOpers) != 1 {
+		t.Fatalf("allOpers = %#v", operboxData["allOpers"])
+	}
+	entry, _ := allOpers[0].(map[string]any)
+	if entry["id"] != "char_1" || entry["rarity"] != float64(5) || entry["own"] != true {
+		t.Fatalf("catalog entry = %#v", entry)
+	}
+
+	depot := doRequest(t, handler, http.MethodGet, "/data/depot")
+	if depot.Code != http.StatusOK {
+		t.Fatalf("depot = %d, body = %s", depot.Code, depot.Body.String())
+	}
+	depotData := envelopeData(t, depot)
+	if depotData["itemCount"] != float64(1) || depotData["complete"] != true {
+		t.Fatalf("depot data = %#v", depotData)
+	}
+	items, _ := depotData["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %#v", depotData["items"])
+	}
+	item, _ := items[0].(map[string]any)
+	if item["id"] != "30012" || item["count"] != float64(3) {
+		t.Fatalf("depot item = %#v", item)
+	}
+}
+
+func TestSnapshotDataFallsBackForLegacyDocuments(t *testing.T) {
+	root := t.TempDir()
+	paths := config.Paths{DataDir: filepath.Join(root, "data"), MaaConfigDir: filepath.Join(root, "maa-config")}
+	if err := os.MkdirAll(paths.DataDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(paths.DataDir, "operbox.json"), `{"allOpers":"legacy","extra":true}`)
+	_, handler := newActionApp(t, paths, filepath.Join(root, "missing-maa"))
+
+	rec := doRequest(t, handler, http.MethodGet, "/data/operbox")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	data := envelopeData(t, rec)
+	if data["allOpers"] != "legacy" || data["extra"] != true {
+		t.Fatalf("legacy document was not preserved: %#v", data)
+	}
+}
+
 func TestRecognitionParsesExistingLogWithoutMAA(t *testing.T) {
 	root := t.TempDir()
 	marker := filepath.Join(root, "maa-called")

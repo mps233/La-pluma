@@ -10,7 +10,6 @@ without re-investigation.
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
 | G1c | P2 | go | Finish the `internal/util/jsval` migration in mixed domain/coercion files: `mastery`, `scheduler`, `updates`, `app/run_resume`, `agentapi` | These files mix JS coercion with domain field accessors; move only the coercion bodies and keep the accessors documented |
-| G3 | P1 | go | Wire the operbox/depot readers to `internal/domain/snapshot` so field definitions are shared | The document shapes now live in `domain/snapshot` (recognition aliases them); `training/data.go:212,293`, `mastery/data.go:107,112`, `handler.go:1849,1858` still read untyped maps |
 | G2 | P1 | go | One PRTS client in `internal/infra/prts`; unify retry/timeout semantics | `activity/prts.go:50-223` vs `copilot/prts.go:73-473` |
 | G12 | P2 | go | Raise `agentapi` route coverage beyond the current ~18 of 107 paths | `handler_test.go` exercises ~18 distinct routes; contract tests cover the registry, not handler behavior |
 | G13 | P3 | go | Surface persistence errors discarded by stop/settle paths | `agentrun.Scope.Stop` ignores `releaseIdempotency` errors and `Settle` ignores `fail` errors, matching the pre-scope transport; decide whether a failed terminal write must fail the request |
@@ -73,3 +72,4 @@ without re-investigation.
 - G1a: `jsval` owns the JSON-null/finite contracts; `drops`, `notifications`, and `infra/maa/results` local coercion copies deleted (Round 32).
 - G1b: `gamedata`, `recognition`, and `customtools` local coercion copies deleted; `jsval` gained `Numeric`, `TextOK`, and `FiniteNumberOrNull` (Round 33).
 - G1b: `training` migrated to `jsval.FiniteNumber`/`Numeric`/`Truthy`/`StringOrNullish`; only the settings-map adapters remain (Round 34).
+- G3: operbox/depot readers decode through `domain/snapshot` (`DecodeOperBox`/`DecodeDepot`); training, mastery, and the `/data` endpoints share the schema. Activity's legacy own-flag heuristic still reads the raw document (Round 35).

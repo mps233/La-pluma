@@ -53,7 +53,7 @@ transport → app → infra / domain
 | Concept | Owner | Notes |
 | --- | --- | --- |
 | Run status strings, record, DTO, links | `internal/domain/agentrun` | Public API contract; tested |
-| Persisted recognition schema | `internal/domain/snapshot` | operbox/depot document shapes; recognition aliases them |
+| Persisted recognition schema | `internal/domain/snapshot` | operbox/depot document shapes + `DecodeOperBox`/`DecodeDepot`; recognition aliases them, training/mastery/API decode through them |
 | Run lifecycle, persistence, idempotency, restore | `internal/app/agentrun` (`Service` + single-writer `Scope`) | Transition methods are unexported; transport and services delegate through `Scope` and only read via `Get`/`Current`/`List` |
 | MAA process lifecycle | `internal/infra/maa` + `internal/app/maa` | CLI spawn/stop/line capture |
 | MAA execution lease | `internal/app/execution` | Cross-process admission |

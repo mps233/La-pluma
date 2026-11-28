@@ -10,6 +10,7 @@ import (
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
 
+	"github.com/mps233/la-pluma/go/internal/domain/snapshot"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"github.com/mps233/la-pluma/go/internal/util/timefmt"
@@ -210,45 +211,38 @@ func normalizeID(value any) string {
 }
 
 func (s *Service) loadOperBox() operBoxData {
+	empty := operBoxData{Operators: []operBoxOperator{}, AllOpers: []operBoxCatalogOperator{}}
 	value, err := jsonstore.Read(s.paths.OperBoxPath(), map[string]any{"operators": []any{}})
 	if err != nil {
 		s.logger.Error("加载 OperBox 数据失败", "error", err)
-		return operBoxData{Operators: []operBoxOperator{}, AllOpers: []operBoxCatalogOperator{}}
+		return empty
 	}
-	record, ok := asRecord(value)
-	if !ok {
-		return operBoxData{Operators: []operBoxOperator{}, AllOpers: []operBoxCatalogOperator{}}
+	document, err := snapshot.DecodeOperBox(value)
+	if err != nil {
+		s.logger.Error("加载 OperBox 数据失败", "error", err)
+		return empty
 	}
 
 	result := operBoxData{AllOpers: []operBoxCatalogOperator{}}
-	if array, ok := asArray(record["data"]); ok {
+	if document.Data != nil {
 		result.HasData = true
-		result.Data = normalizeOperBoxOperators(array)
+		result.Data = normalizeOperBoxOperators(document.Data)
 	}
-	if array, ok := asArray(record["operators"]); ok {
+	if document.Operators != nil {
 		result.HasOperators = true
-		result.Operators = normalizeOperBoxOperators(array)
+		result.Operators = normalizeOperBoxOperators(document.Operators)
 	}
-	if array, ok := asArray(record["allOpers"]); ok {
-		for _, raw := range array {
-			entry, ok := asRecord(raw)
-			if !ok {
-				continue
-			}
-			id := normalizeID(entry["id"])
-			if id == "" {
-				continue
-			}
-			catalog := operBoxCatalogOperator{ID: id}
-			if name, ok := entry["name"].(string); ok {
-				catalog.Name = name
-			}
-			if rarity, ok := jsval.FiniteNumber(entry["rarity"]); ok {
-				catalog.Rarity = &rarity
-			}
-			catalog.Own = entry["own"] == true
-			result.AllOpers = append(result.AllOpers, catalog)
+	for _, entry := range document.AllOpers {
+		if entry.ID == "" {
+			continue
 		}
+		rarity := entry.Rarity
+		result.AllOpers = append(result.AllOpers, operBoxCatalogOperator{
+			ID:     entry.ID,
+			Name:   entry.Name,
+			Rarity: &rarity,
+			Own:    entry.Own,
+		})
 	}
 	return result
 }
@@ -296,26 +290,19 @@ func (s *Service) loadDepot() depotData {
 		s.logger.Error("加载仓库数据失败", "error", err)
 		return result
 	}
-	record, ok := asRecord(value)
-	if !ok {
+	document, err := snapshot.DecodeDepot(value)
+	if err != nil {
+		s.logger.Error("加载仓库数据失败", "error", err)
 		return result
 	}
-	if array, ok := asArray(record["items"]); ok {
-		for _, raw := range array {
-			entry, ok := asRecord(raw)
-			if !ok {
-				continue
-			}
-			id := normalizeID(entry["id"])
-			if id == "" {
-				continue
-			}
-			count, _ := jsval.FiniteNumber(entry["count"])
-			result.Items[id] = count
+	for _, item := range document.Items {
+		if item.ID == "" {
+			continue
 		}
+		result.Items[item.ID] = jsval.FiniteNumberOrZero(item.Count)
 	}
-	if timestamp, ok := record["timestamp"].(string); ok {
-		result.Timestamp = &timestamp
+	if document.Timestamp != "" {
+		result.Timestamp = &document.Timestamp
 	}
 	return result
 }

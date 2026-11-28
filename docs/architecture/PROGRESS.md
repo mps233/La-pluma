@@ -485,6 +485,28 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite (705 tests / 49 packages), vet, gofmt.
 - Follow-up: G1c holds the last mixed domain/coercion files.
 
+### Round 35 — typed operbox/depot readers (2026-11-28)
+
+- G3: training and mastery each decoded `operbox.json`/`depot.json` into
+  untyped maps and re-derived the same field names; the `/data/operbox` and
+  `/data/depot` endpoints returned the file verbatim.
+- Added `snapshot.DecodeOperBox`/`DecodeDepot`: typed decoding that keeps
+  `json.Number` values (depot counts, raw operator payloads) and documents the
+  legacy `operators` list as an optional compatibility field.
+- Migrated the training and mastery loaders to the typed documents; deleted
+  training's per-field map lookups, mastery's dead `allFields=false` branch,
+  and the untyped `allOpers` decode. The `/data` endpoints return the typed
+  shape and fall back to the stored value only when an older document does not
+  decode.
+- Activity keeps its raw-document own-flag heuristic: it intentionally
+  distinguishes an absent `own` key from `false`, which the typed
+  `OperBoxRecord` cannot express; recorded as an exception, not a migration
+  target.
+- Added decode tests (including `json.Number` preservation) and endpoint tests
+  for the typed shape plus the legacy fallback.
+- Verified: full Go test suite (709 tests / 49 packages), vet, gofmt.
+- Follow-up: G2 (one PRTS client) is the next P1.
+
 
 
 

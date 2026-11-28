@@ -13,6 +13,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/domain/snapshot"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 )
@@ -315,28 +316,43 @@ func (s *DataService) loadOperBox() (*operBoxFile, error) {
 			map[string]any{"path": path},
 		)
 	}
-	record, _ := asRecord(value)
-	result := &operBoxFile{}
-	if record == nil {
-		return result, nil
+	document, err := snapshot.DecodeOperBox(value)
+	if err != nil {
+		return nil, apperrors.WithStatus(
+			"AGENT_MASTERY_DATA_UNAVAILABLE",
+			"专精数据读取失败："+err.Error(),
+			http.StatusServiceUnavailable,
+			true,
+			map[string]any{"path": path},
+		)
 	}
-	for _, raw := range arrayItems(record["data"]) {
-		if operator, ok := normalizeOperBoxOperator(raw, true); ok {
+	result := &operBoxFile{}
+	for _, raw := range document.Data {
+		if operator, ok := normalizeOperBoxOperator(raw); ok {
 			result.Data = append(result.Data, operator)
 		}
 	}
-	for _, raw := range arrayItems(record["allOpers"]) {
-		if operator, ok := normalizeOperBoxOperator(raw, false); ok {
-			result.AllOpers = append(result.AllOpers, operator)
+	for _, entry := range document.AllOpers {
+		if entry.ID == "" {
+			continue
 		}
+		rarity := entry.Rarity
+		result.AllOpers = append(result.AllOpers, operBoxOperator{
+			ID:          entry.ID,
+			Name:        entry.Name,
+			Rarity:      &rarity,
+			OwnTrue:     entry.Own,
+			OwnNotFalse: entry.Own,
+		})
 	}
-	if timestamp, ok := record["timestamp"].(string); ok && timestamp != "" {
+	if document.Timestamp != "" {
+		timestamp := document.Timestamp
 		result.Timestamp = &timestamp
 	}
 	return result, nil
 }
 
-func normalizeOperBoxOperator(value any, allFields bool) (operBoxOperator, bool) {
+func normalizeOperBoxOperator(value any) (operBoxOperator, bool) {
 	record, ok := asRecord(value)
 	if !ok {
 		return operBoxOperator{}, false
@@ -358,9 +374,6 @@ func normalizeOperBoxOperator(value any, allFields bool) (operBoxOperator, bool)
 	ownFalse := hasOwn && ownRaw == false
 	operator.OwnTrue = hasOwn && ownRaw == true
 	operator.OwnNotFalse = !ownFalse
-	if !allFields {
-		return operator, true
-	}
 	if elite, ok := numberValue(record["elite"]); ok {
 		if _, present := record["elite"]; present {
 			operator.Elite = &elite
@@ -386,19 +399,25 @@ func (s *DataService) loadDepot() (*depotFile, error) {
 			map[string]any{"path": path},
 		)
 	}
-	record, _ := asRecord(value)
-	result := &depotFile{Items: map[string]float64{}}
-	if record == nil {
-		return result, nil
+	document, err := snapshot.DecodeDepot(value)
+	if err != nil {
+		return nil, apperrors.WithStatus(
+			"AGENT_MASTERY_DATA_UNAVAILABLE",
+			"专精数据读取失败："+err.Error(),
+			http.StatusServiceUnavailable,
+			true,
+			map[string]any{"path": path},
+		)
 	}
-	for _, raw := range arrayItems(record["items"]) {
-		item, ok := asRecord(raw)
-		if !ok || item["id"] == nil {
+	result := &depotFile{Items: map[string]float64{}}
+	for _, item := range document.Items {
+		if item.ID == "" {
 			continue
 		}
-		result.Items[stringify(item["id"])] = numberOr(item["count"], 0)
+		result.Items[item.ID] = numberOr(item.Count, 0)
 	}
-	if timestamp, ok := record["timestamp"].(string); ok && timestamp != "" {
+	if document.Timestamp != "" {
+		timestamp := document.Timestamp
 		result.Timestamp = &timestamp
 	}
 	return result, nil

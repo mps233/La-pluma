@@ -4,6 +4,11 @@
 // readers.
 package snapshot
 
+import (
+	"bytes"
+	"encoding/json"
+)
+
 // DepotItem is one enriched depot entry. Count keeps the raw JSON value so a
 // numeric callback count is not re-encoded through float64.
 type DepotItem struct {
@@ -33,11 +38,38 @@ type OperBoxRecord struct {
 }
 
 // OperBoxOutput is the exact operbox.json document shape. Data keeps the raw
-// MAA operator payload; AllOpers is the normalized catalog.
+// MAA operator payload; AllOpers is the normalized catalog. Operators is the
+// legacy pre-Data list that training still falls back to when Data is absent.
 type OperBoxOutput struct {
 	Timestamp      string          `json:"timestamp"`
 	OperCount      int             `json:"operCount"`
 	TotalOperCount int             `json:"totalOperCount"`
 	Data           []any           `json:"data"`
 	AllOpers       []OperBoxRecord `json:"allOpers"`
+	Operators      []any           `json:"operators,omitempty"`
+}
+
+// DecodeOperBox converts a decoded operbox.json document into the typed shape.
+// JSON numbers stay json.Number so raw operator payloads keep their precision.
+func DecodeOperBox(raw any) (OperBoxOutput, error) {
+	return decodeDocument[OperBoxOutput](raw)
+}
+
+// DecodeDepot converts a decoded depot.json document into the typed shape.
+func DecodeDepot(raw any) (DepotOutput, error) {
+	return decodeDocument[DepotOutput](raw)
+}
+
+func decodeDocument[T any](raw any) (T, error) {
+	var document T
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return document, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&document); err != nil {
+		return document, err
+	}
+	return document, nil
 }

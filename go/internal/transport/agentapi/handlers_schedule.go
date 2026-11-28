@@ -10,6 +10,7 @@ import (
 	runapp "github.com/mps233/la-pluma/go/internal/app/agentrun"
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	"github.com/mps233/la-pluma/go/internal/domain/agentrun"
+	"github.com/mps233/la-pluma/go/internal/domain/snapshot"
 	"github.com/mps233/la-pluma/go/internal/transport/httpx"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
@@ -22,21 +23,41 @@ func (h *Handler) openStages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) operboxData(w http.ResponseWriter, r *http.Request) {
-	value, err := jsonstore.Read(h.app.Config().Paths.OperBoxPath(), map[string]any{})
+	value, err := jsonstore.Read(h.app.Config().Paths.OperBoxPath(), nil)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, value, "", nil)
+	if value == nil {
+		httpx.Success(w, http.StatusOK, map[string]any{}, "", nil)
+		return
+	}
+	document, err := snapshot.DecodeOperBox(value)
+	if err != nil {
+		// Keep the stored shape for documents that predate the typed schema
+		// instead of failing a read-only endpoint.
+		httpx.Success(w, http.StatusOK, value, "", nil)
+		return
+	}
+	httpx.Success(w, http.StatusOK, document, "", nil)
 }
 
 func (h *Handler) depotData(w http.ResponseWriter, r *http.Request) {
-	value, err := jsonstore.Read(h.app.Config().Paths.DepotPath(), map[string]any{})
+	value, err := jsonstore.Read(h.app.Config().Paths.DepotPath(), nil)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, value, "", nil)
+	if value == nil {
+		httpx.Success(w, http.StatusOK, map[string]any{}, "", nil)
+		return
+	}
+	document, err := snapshot.DecodeDepot(value)
+	if err != nil {
+		httpx.Success(w, http.StatusOK, value, "", nil)
+		return
+	}
+	httpx.Success(w, http.StatusOK, document, "", nil)
 }
 
 func (h *Handler) scheduleStatus(w http.ResponseWriter, r *http.Request) {
