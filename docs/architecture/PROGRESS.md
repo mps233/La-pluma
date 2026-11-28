@@ -756,7 +756,7 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C7f splits `maa.ts` by domain and composes the object.
 
-### Round 52 — extract the API DTOs (2026-11-28)
+### Round 52 — extract the API DTOs (2026-11-28, `69fe741`)
 
 - C7f: `services/api/maa.ts` mixed the maaApi object with every local DTO.
 - Moved the DTO block to `services/api/types.ts`; `maa.ts` imports the types
