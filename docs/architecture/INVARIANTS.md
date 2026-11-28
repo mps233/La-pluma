@@ -22,6 +22,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | The desktop and headless entries mount the same handler surface through `transport/bootstrap` | `TestEntriesShareTheHTTPBootstrap` | `cd go && go test ./internal/archguard` |
 | Raw `fetch(` appears only in `services/api.ts`; everything else uses `fetchWithAuth`/`maaApi` | `services/apiBoundary.test.ts` | `npm run test --prefix client` |
 | New TS/TSX files contain no hex/rgb/hsl color literals outside the documented migration allowlist and vendored kits | `styles/themeColorBoundary.test.ts` | `npm run test --prefix client` |
+| CSS colour literals exist only in `--la-*` / `--la-base-*` primitive definitions; semantic and component tokens reference them | `styles/tokenLayerBoundary.test.ts` | `npm run test --prefix client` |
 | Client lint does not exceed the current warning count | `--max-warnings 1` in `client/package.json` | `npm run lint --prefix client` |
 | Strict TypeScript, including `noUnusedLocals` and `noUnusedParameters` | `tsc --noEmit` | `npm run type-check --prefix client` |
 | Pages are code-split and PWA/page caching configuration is covered | `vite.config.test.ts` | `npm run test --prefix client` |

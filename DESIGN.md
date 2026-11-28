@@ -41,7 +41,7 @@ token 权威表：
 
 ### token 分层（目标架构）
 
-当前生效主题已建立 accent / 状态 / 表面 / 中性色 / 间距 / 圆角 / 控件的 primitive 层（`--la-*`，ADR-0008/0009），并新增卡片与主按钮的 component token。`index.css` 回退层和组件规则内的剩余字面量仍在迁移。标注为「目标」的 token / 模式在落地前不要在新页面直接引用；新增或重构 token 时按下表收口：
+三层 token 已落地：`ios-theme.css` 的生效色调色板与 `index.css` 的回退调色板各自有 `--la-*` / `--la-base-*` primitive 层，语义 token 与 component token 只引用 primitive（ADR-0008/0009/0010）。颜色字面量只允许出现在 primitive 定义中，`styles/tokenLayerBoundary.test.ts` 会强制这条规则；`rgb(var(--status-pulse-rgb))` 是唯一的动态例外。新增或重构 token 时按下表收口：
 
 | 层 | 例子 | 规则 |
 | --- | --- | --- |

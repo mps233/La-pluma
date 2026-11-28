@@ -36,7 +36,7 @@
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: #e5e7eb;
+    border-color: var(--la-base-slate-200);
   }
 
   /* iOS draws a translucent box over the whole tap area, which is larger than
@@ -47,37 +47,76 @@
   }
 
   :root {
-    --app-bg: #f6f8fb;
-    --app-bg-soft: #edf3f7;
-    --app-surface: rgba(255, 255, 255, 0.78);
-    --app-surface-solid: #ffffff;
-    --app-surface-muted: rgba(241, 245, 249, 0.76);
-    --app-border: rgba(15, 23, 42, 0.075);
-    --app-border-strong: rgba(15, 23, 42, 0.12);
-    --app-text: #0f172a;
-    --app-text-muted: #64748b;
-    --app-text-soft: #5f6f80;
-    --app-accent: #0e7490;
-    --app-accent-strong: #155e75;
-    --app-accent-action: #155e75;
-    --app-accent-soft: rgba(14, 116, 144, 0.1);
+    /* Base/fallback palette (index.css). The effective iOS palette in
+       ios-theme.css overrides the semantic tokens at runtime; these names are
+       prefixed to avoid clashing with the --la-* primitives there. */
+    --la-base-white: #ffffff;
+    --la-base-black: #000000;
+    --la-base-slate-50: #f6f8fb;
+    --la-base-slate-100: #edf3f7;
+    --la-base-slate-150: #f1f5f9;
+    --la-base-slate-200: #e5e7eb;
+    --la-base-slate-300: #c3ced7;
+    --la-base-slate-600: #475569;
+    --la-base-gray-150: #ebebf5;
+    --la-base-gray-500: #767680;
+    --la-base-night-850: #111b21;
+    --la-base-night-975: #020617;
+    --la-base-slate-500: #64748b;
+    --la-base-slate-550: #5f6f80;
+    --la-base-slate-800: #0f172a;
+    --la-base-night-950: #05090c;
+    --la-base-night-900: #081116;
+    --la-base-night-50: #eef6fb;
+    --la-base-night-300: #9aa8b5;
+    --la-base-night-350: #7f8d99;
+    --la-base-teal-600: #0e7490;
+    --la-base-teal-700: #155e75;
+    --la-base-cyan-300: #67e8f9;
+    --la-base-emerald-600: #059669;
+    --la-base-emerald-700: #047857;
+    --la-base-emerald-400: #34d399;
+    --la-base-amber-600: #d97706;
+    --la-base-amber-500: #fbbf24;
+    --la-base-amber-800: #92400e;
+    --la-base-rose-600: #e11d48;
+    --la-base-rose-700: #be123c;
+    --la-base-rose-400: #fb7185;
+    --la-base-azure-600: #2563eb;
+    --la-base-azure-700: #1d4ed8;
+    --la-base-azure-400: #60a5fa;
+    --la-base-azure-300: #93c5fd;
+    --app-bg: var(--la-base-slate-50);
+    --app-bg-soft: var(--la-base-slate-100);
+    --app-surface: color-mix(in srgb, var(--la-base-white) 78%, transparent);
+    --app-surface-solid: var(--la-base-white);
+    --app-surface-muted: color-mix(in srgb, var(--la-base-slate-150) 76%, transparent);
+    --app-border: color-mix(in srgb, var(--la-base-slate-800) 7.5%, transparent);
+    --app-border-strong: color-mix(in srgb, var(--la-base-slate-800) 12%, transparent);
+    --app-text: var(--la-base-slate-800);
+    --app-text-muted: var(--la-base-slate-500);
+    --app-text-soft: var(--la-base-slate-550);
+    --app-accent: var(--la-base-teal-600);
+    --app-accent-strong: var(--la-base-teal-700);
+    --app-accent-action: var(--la-base-teal-700);
+    --app-accent-soft: color-mix(in srgb, var(--la-base-teal-600) 10%, transparent);
     --app-preview-empty-bg: color-mix(in srgb, var(--app-border) 52%, transparent);
-    --app-success: #059669;
-    --app-success-text: #047857;
-    --app-success-action: #047857;
+    --app-success: var(--la-base-emerald-600);
+    --app-success-text: var(--la-base-emerald-700);
+    --app-success-action: var(--la-base-emerald-700);
     --app-success-rgb: 5, 150, 105;
-    --app-warning: #d97706;
-    --app-warning-text: #92400e;
+    --app-warning: var(--la-base-amber-600);
+    --app-warning-text: var(--la-base-amber-800);
     --app-warning-rgb: 217, 119, 6;
-    --app-danger: #e11d48;
-    --app-danger-text: #be123c;
-    --app-danger-action: #be123c;
+    --app-danger: var(--la-base-rose-600);
+    --app-danger-text: var(--la-base-rose-700);
+    --app-danger-action: var(--la-base-rose-700);
     --app-danger-rgb: 225, 29, 72;
-    --app-info: #2563eb;
-    --app-info-text: #1d4ed8;
+    --app-info: var(--la-base-azure-600);
+    --app-info-text: var(--la-base-azure-700);
     --app-info-rgb: 37, 99, 235;
     --app-text-soft-rgb: 95, 111, 128;
-    --app-on-accent: #ffffff;
+    --app-on-accent: var(--la-base-white);
     --app-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%235f6f80' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
     --app-radius-xs: 0.25rem;
     --app-radius-sm: 0.375rem;
@@ -112,37 +151,37 @@
   }
 
   html.dark {
-    --app-bg: #05090c;
-    --app-bg-soft: #081116;
-    --app-surface: rgba(8, 14, 18, 0.74);
-    --app-surface-solid: #081116;
-    --app-surface-muted: rgba(255, 255, 255, 0.045);
-    --app-border: rgba(255, 255, 255, 0.075);
-    --app-border-strong: rgba(255, 255, 255, 0.12);
-    --app-text: #eef6fb;
-    --app-text-muted: #9aa8b5;
-    --app-text-soft: #7f8d99;
-    --app-accent: #0e7490;
-    --app-accent-strong: #67e8f9;
-    --app-accent-action: #0e7490;
-    --app-accent-soft: rgba(14, 116, 144, 0.2);
+    --app-bg: var(--la-base-night-950);
+    --app-bg-soft: var(--la-base-night-900);
+    --app-surface: color-mix(in srgb, var(--la-base-night-900) 74%, transparent);
+    --app-surface-solid: var(--la-base-night-900);
+    --app-surface-muted: color-mix(in srgb, var(--la-base-white) 4.5%, transparent);
+    --app-border: color-mix(in srgb, var(--la-base-white) 7.5%, transparent);
+    --app-border-strong: color-mix(in srgb, var(--la-base-white) 12%, transparent);
+    --app-text: var(--la-base-night-50);
+    --app-text-muted: var(--la-base-night-300);
+    --app-text-soft: var(--la-base-night-350);
+    --app-accent: var(--la-base-teal-600);
+    --app-accent-strong: var(--la-base-cyan-300);
+    --app-accent-action: var(--la-base-teal-600);
+    --app-accent-soft: color-mix(in srgb, var(--la-base-teal-600) 20%, transparent);
     --app-preview-empty-bg: color-mix(in srgb, var(--app-bg) 94%, var(--app-accent) 6%);
-    --app-success: #34d399;
-    --app-success-text: #34d399;
-    --app-success-action: #047857;
+    --app-success: var(--la-base-emerald-400);
+    --app-success-text: var(--la-base-emerald-400);
+    --app-success-action: var(--la-base-emerald-700);
     --app-success-rgb: 52, 211, 153;
-    --app-warning: #fbbf24;
-    --app-warning-text: #fbbf24;
+    --app-warning: var(--la-base-amber-500);
+    --app-warning-text: var(--la-base-amber-500);
     --app-warning-rgb: 251, 191, 36;
-    --app-danger: #fb7185;
-    --app-danger-text: #fb7185;
-    --app-danger-action: #be123c;
+    --app-danger: var(--la-base-rose-400);
+    --app-danger-text: var(--la-base-rose-400);
+    --app-danger-action: var(--la-base-rose-700);
     --app-danger-rgb: 251, 113, 133;
-    --app-info: #60a5fa;
-    --app-info-text: #93c5fd;
+    --app-info: var(--la-base-azure-400);
+    --app-info-text: var(--la-base-azure-300);
     --app-info-rgb: 96, 165, 250;
     --app-text-soft-rgb: 127, 141, 153;
-    --app-on-accent: #ffffff;
+    --app-on-accent: var(--la-base-white);
     --app-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239aa8b5' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
   }
 
@@ -488,7 +527,7 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.72) 50%,
+    color-mix(in srgb, var(--la-base-white) 72%, transparent) 50%,
     transparent 100%
   );
   transform: translate3d(-120%, 0, 0);
@@ -499,7 +538,7 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.1) 50%,
+    color-mix(in srgb, var(--la-base-white) 10%, transparent) 50%,
     transparent 100%
   );
 }
@@ -521,13 +560,13 @@
 }
 @media (prefers-reduced-transparency: reduce) {
   :root {
-    --app-surface: #ffffff;
-    --app-surface-muted: #f1f5f9;
+    --app-surface: var(--la-base-white);
+    --app-surface-muted: var(--la-base-slate-150);
   }
 
   html.dark {
-    --app-surface: #081116;
-    --app-surface-muted: #111b21;
+    --app-surface: var(--la-base-night-900);
+    --app-surface-muted: var(--la-base-night-850);
   }
 
   .surface-panel,
@@ -555,22 +594,22 @@
   }
 
   .app-modal-backdrop {
-    background: rgba(2, 6, 23, 0.72) !important;
+    background: color-mix(in srgb, var(--la-base-night-975) 72%, transparent) !important;
   }
 }
 @media (prefers-contrast: more) {
   :root {
-    --app-border: rgba(15, 23, 42, 0.2);
-    --app-border-strong: rgba(15, 23, 42, 0.34);
-    --app-text-muted: #475569;
-    --app-text-soft: #475569;
+    --app-border: color-mix(in srgb, var(--la-base-slate-800) 20%, transparent);
+    --app-border-strong: color-mix(in srgb, var(--la-base-slate-800) 34%, transparent);
+    --app-text-muted: var(--la-base-slate-600);
+    --app-text-soft: var(--la-base-slate-600);
   }
 
   html.dark {
-    --app-border: rgba(255, 255, 255, 0.22);
-    --app-border-strong: rgba(255, 255, 255, 0.38);
-    --app-text-muted: #c3ced7;
-    --app-text-soft: #c3ced7;
+    --app-border: color-mix(in srgb, var(--la-base-white) 22%, transparent);
+    --app-border-strong: color-mix(in srgb, var(--la-base-white) 38%, transparent);
+    --app-text-muted: var(--la-base-slate-300);
+    --app-text-soft: var(--la-base-slate-300);
   }
 }
 @media (pointer: coarse), (max-width: 768px) {
@@ -737,7 +776,7 @@
   background: color-mix(in srgb, var(--app-surface-solid) 90%, var(--app-accent-soft));
   box-shadow:
     inset 0 0 0 0.5px color-mix(in srgb, var(--app-border) 65%, transparent),
-    0 2px 7px rgba(60, 60, 67, 0.08);
+    0 2px 7px color-mix(in srgb, var(--la-base-slate-800) 8%, transparent);
 }
 .automation-monitor-surface .scrcpy-empty-description {
   color: var(--app-text-soft);
@@ -949,7 +988,7 @@
   inset: 0.125rem 0;
   border-radius: var(--app-continuous-radius-compact);
   background: color-mix(in srgb, var(--app-accent) 7%, transparent);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--la-base-black) 8%, transparent);
 }
 .automation-sequence-item.is-completed {
   color: var(--app-text);
@@ -1002,7 +1041,7 @@ body.automation-sorting {
 .automation-sequence-item.is-completed .automation-sequence-node {
   background: var(--app-success);
   color: white;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--la-base-white) 18%, transparent);
 }
 .automation-sequence-item.is-completed .automation-sequence-node::after {
   background: color-mix(in srgb, var(--app-success) 68%, var(--app-border));
@@ -1162,8 +1201,8 @@ body.automation-sorting {
 }
 .dark .automation-schedule-list-heading small,
 html.dark .automation-schedule-list-heading small {
-  background: rgba(118, 118, 128, 0.28);
-  color: rgba(235, 235, 245, 0.66);
+  background: color-mix(in srgb, var(--la-base-gray-500) 28%, transparent);
+  color: color-mix(in srgb, var(--la-base-gray-150) 66%, transparent);
 }
 .automation-schedule-time-row.is-disabled {
   opacity: 0.55;
@@ -1171,14 +1210,14 @@ html.dark .automation-schedule-list-heading small {
 /* Beat the global input[type="text"] solid surface so only the stepper shell shows fill. */
 .dark button.automation-schedule-add,
 html.dark button.automation-schedule-add {
-  color: rgba(235, 235, 245, 0.78);
-  background: rgba(118, 118, 128, 0.28);
+  color: color-mix(in srgb, var(--la-base-gray-150) 78%, transparent);
+  background: color-mix(in srgb, var(--la-base-gray-500) 28%, transparent);
 }
 @media (hover: hover) {
   .dark button.automation-schedule-add:hover:not(:disabled),
   html.dark button.automation-schedule-add:hover:not(:disabled) {
-    color: rgba(235, 235, 245, 0.92);
-    background: rgba(118, 118, 128, 0.38);
+    color: color-mix(in srgb, var(--la-base-gray-150) 92%, transparent);
+    background: color-mix(in srgb, var(--la-base-gray-500) 38%, transparent);
   }
 }
 .automation-schedule-empty {
@@ -1235,14 +1274,14 @@ html.dark button.automation-schedule-add {
   border-width: 1px;
 }
 .automation-notification-notice.is-success {
-  background: rgba(5, 150, 105, 0.1);
+  background: color-mix(in srgb, var(--la-base-emerald-600) 10%, transparent);
   color: var(--app-success-text);
-  box-shadow: inset 0 0 0 1px rgba(5, 150, 105, 0.2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--la-base-emerald-600) 20%, transparent);
 }
 .automation-notification-notice.is-error {
-  background: rgba(225, 29, 72, 0.1);
+  background: color-mix(in srgb, var(--la-base-rose-600) 10%, transparent);
   color: var(--app-danger-text);
-  box-shadow: inset 0 0 0 1px rgba(225, 29, 72, 0.2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--la-base-rose-600) 20%, transparent);
 }
 .automation-notification-channel {
   display: grid;
@@ -1531,10 +1570,10 @@ html.dark button.automation-schedule-add {
    Accent is reserved for active rows and commands; only the picker and
    preview controls behave as overlapping glass. */
 [data-automation-tasks] {
-  --automation-hairline: rgba(60, 60, 67, 0.1);
+  --automation-hairline: color-mix(in srgb, var(--la-base-slate-800) 10%, transparent);
 }
 .dark [data-automation-tasks] {
-  --automation-hairline: rgba(235, 235, 245, 0.12);
+  --automation-hairline: color-mix(in srgb, var(--la-base-gray-150) 12%, transparent);
 }
 [data-automation-tasks] :is(
   .automation-flow-header,
@@ -1586,8 +1625,8 @@ html.dark button.automation-schedule-add {
 }
 [data-automation-tasks] .automation-sequence-item.is-current .automation-sequence-node {
   background: var(--app-accent);
-  color: #fff;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 16%, transparent);
+  color: var(--la-base-white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--la-base-white) 16%, transparent);
 }
 [data-automation-tasks] .automation-sequence-item.is-current .automation-sequence-copy small {
   color: var(--app-accent-strong);
@@ -1595,8 +1634,8 @@ html.dark button.automation-schedule-add {
 }
 [data-automation-tasks] .automation-sequence-item.is-completed .automation-sequence-node {
   background: var(--app-success);
-  color: #fff;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 18%, transparent);
+  color: var(--la-base-white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--la-base-white) 18%, transparent);
 }
 [data-automation-tasks] .automation-task-editor details.group {
   margin-top: 1rem;
@@ -1761,8 +1800,8 @@ svg.w-5.h-5 {
       transparent 326deg 360deg
     );
     -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
+      linear-gradient(var(--la-base-black) 0 0) content-box,
+      linear-gradient(var(--la-base-black) 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     opacity: 0;
@@ -1788,7 +1827,7 @@ svg.w-5.h-5 {
       transparent 0deg 214deg,
       color-mix(in srgb, var(--app-accent) 12%, transparent) 232deg,
       color-mix(in srgb, var(--app-accent) 66%, transparent) 260deg,
-      color-mix(in srgb, var(--app-accent-strong) 82%, white 18%) 278deg,
+      color-mix(in srgb, var(--app-accent-strong) 82%, var(--la-base-white) 18%) 278deg,
       color-mix(in srgb, var(--app-accent) 34%, transparent) 302deg,
       transparent 326deg 360deg
     );
@@ -1830,7 +1869,7 @@ svg.w-5.h-5 {
       background: color-mix(in srgb, var(--app-accent) 78%, black);
       box-shadow:
         inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
-        0 7px 18px rgba(0, 0, 0, 0.2);
+        0 7px 18px color-mix(in srgb, var(--la-base-black) 20%, transparent);
     }
   }
 
@@ -1854,17 +1893,17 @@ svg.w-5.h-5 {
     background: var(--app-surface-solid);
     box-shadow:
       0 0 0 1px var(--app-border),
-      0 1px 3px rgba(15, 23, 42, 0.05),
-      0 14px 40px rgba(15, 23, 42, 0.05);
+      0 1px 3px color-mix(in srgb, var(--la-base-slate-800) 5%, transparent),
+      0 14px 40px color-mix(in srgb, var(--la-base-slate-800) 5%, transparent);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
 
   .dark .surface-panel {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 1px 0 color-mix(in srgb, var(--la-base-white) 6%, transparent),
       0 0 0 1px var(--app-border),
-      0 16px 40px rgba(0, 0, 0, 0.28);
+      0 16px 40px color-mix(in srgb, var(--la-base-black) 28%, transparent);
   }
 
   .smooth-panel-shell {
@@ -2179,8 +2218,8 @@ svg.w-5.h-5 {
     z-index: 1;
     overflow: hidden;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.72),
-      0 24px 56px rgba(15, 23, 42, 0.09);
+      inset 0 1px 0 color-mix(in srgb, var(--la-base-white) 72%, transparent),
+      0 24px 56px color-mix(in srgb, var(--la-base-slate-800) 9%, transparent);
   }
 
   .dashboard-flow-card::before,
@@ -2198,8 +2237,8 @@ svg.w-5.h-5 {
       var(--app-border) 100%
     );
     -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
+      linear-gradient(var(--la-base-black) 0 0) content-box,
+      linear-gradient(var(--la-base-black) 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
@@ -2211,8 +2250,8 @@ svg.w-5.h-5 {
 
   .dark .dashboard-flow-card {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 26px 64px rgba(0, 0, 0, 0.42);
+      inset 0 1px 0 color-mix(in srgb, var(--la-base-white) 6%, transparent),
+      0 26px 64px color-mix(in srgb, var(--la-base-black) 42%, transparent);
   }
 
   .dashboard-flow-header {
@@ -2298,12 +2337,12 @@ svg.w-5.h-5 {
     border-radius: var(--app-radius-lg);
     background: var(--app-accent);
     color: white;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--la-base-black) 18%, transparent);
   }
 
   .dashboard-flow-command-icon.is-running {
     background: var(--app-success);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--la-base-black) 18%, transparent);
   }
 
   .dashboard-flow-primary-action {
@@ -2324,13 +2363,13 @@ svg.w-5.h-5 {
     min-width: 0;
     border: 0;
     background: color-mix(in srgb, var(--app-accent-soft) 72%, var(--app-surface));
-    box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 6px 16px rgba(0, 0, 0, 0.14);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--la-base-white) 18%, transparent), 0 6px 16px color-mix(in srgb, var(--la-base-black) 14%, transparent);
   }
 
   @media (hover: hover) {
     .dashboard-flow-activity-action:not(:disabled):hover {
       background: color-mix(in srgb, var(--app-accent-soft) 88%, var(--app-surface));
-      box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 8px 18px rgba(0, 0, 0, 0.18);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--la-base-white) 18%, transparent), 0 8px 18px color-mix(in srgb, var(--la-base-black) 18%, transparent);
     }
   }
 
@@ -2993,7 +3032,7 @@ svg.w-5.h-5 {
   }
 
   .app-modal-backdrop {
-    background: rgba(2, 6, 23, 0.54);
+    background: color-mix(in srgb, var(--la-base-night-975) 54%, transparent);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
   }
@@ -3209,7 +3248,7 @@ svg.w-5.h-5 {
   .drop-records-period-button.is-selected {
     background: var(--app-surface-solid);
     color: var(--app-text);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--la-base-black) 14%, transparent);
   }
 
   .dark .drop-records-period-button.is-selected {
@@ -3362,7 +3401,7 @@ svg.w-5.h-5 {
     /* The copy floats over video, artwork and log wells, so it needs the
        tooltip's opaque base instead of the docked pill's bare status tint. */
     background: var(--app-surface-solid);
-    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 5px 14px color-mix(in srgb, var(--la-base-black) 16%, transparent);
     pointer-events: none;
     animation: app-floating-status-dock 160ms cubic-bezier(0.22, 1, 0.36, 1);
   }
@@ -3415,13 +3454,13 @@ svg.w-5.h-5 {
 
   @keyframes app-status-pulse {
     0% {
-      box-shadow: 0 0 0 0 rgba(var(--status-pulse-rgb), 0.7);
+      box-shadow: 0 0 0 0 color-mix(in srgb, rgb(var(--status-pulse-rgb)) 70%, transparent);
     }
     70% {
-      box-shadow: 0 0 0 4px rgba(var(--status-pulse-rgb), 0);
+      box-shadow: 0 0 0 4px transparent;
     }
     100% {
-      box-shadow: 0 0 0 0 rgba(var(--status-pulse-rgb), 0);
+      box-shadow: 0 0 0 0 transparent;
     }
   }
 
@@ -3450,7 +3489,7 @@ svg.w-5.h-5 {
     font-weight: 500;
     line-height: 1.4;
     text-align: center;
-    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 5px 14px color-mix(in srgb, var(--la-base-black) 16%, transparent);
     pointer-events: none;
     opacity: 0;
     transform: translateY(2px);
@@ -3544,7 +3583,7 @@ svg.w-5.h-5 {
       background: color-mix(in srgb, var(--app-surface-solid) 78%, transparent);
       box-shadow:
         inset 0 0 0 1px var(--app-border-strong),
-        0 1px 2px rgba(15, 23, 42, 0.025);
+        0 1px 2px color-mix(in srgb, var(--la-base-slate-800) 2.5%, transparent);
     }
   }
 
@@ -3553,7 +3592,7 @@ svg.w-5.h-5 {
       background: var(--app-surface-muted);
       box-shadow:
         inset 0 0 0 1px var(--app-border-strong),
-        0 1px 3px rgba(0, 0, 0, 0.18);
+        0 1px 3px color-mix(in srgb, var(--la-base-black) 18%, transparent);
     }
   }
 
@@ -3658,18 +3697,18 @@ svg.w-5.h-5 {
     .surface-panel-hover:hover:not(:disabled) {
       transform: translateY(-1px);
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        inset 0 1px 0 color-mix(in srgb, var(--la-base-white) 82%, transparent),
         0 0 0 1px color-mix(in srgb, var(--app-accent) 20%, var(--app-border)),
-        0 16px 38px color-mix(in srgb, var(--app-accent) 9%, rgba(15, 23, 42, 0.07));
+        0 16px 38px color-mix(in srgb, var(--app-accent) 9%, color-mix(in srgb, var(--la-base-slate-800) 7%, transparent));
     }
   }
 
   @media (hover: hover) {
     .dark .surface-panel-hover:hover:not(:disabled) {
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        inset 0 1px 0 color-mix(in srgb, var(--la-base-white) 8%, transparent),
         0 0 0 1px color-mix(in srgb, var(--app-accent) 24%, var(--app-border)),
-        0 18px 44px rgba(0, 0, 0, 0.34);
+        0 18px 44px color-mix(in srgb, var(--la-base-black) 34%, transparent);
     }
   }
 
@@ -3678,7 +3717,7 @@ svg.w-5.h-5 {
     color: var(--app-text);
     box-shadow:
       inset 0 0 0 1px var(--app-border-strong),
-      0 1px 2px rgba(15, 23, 42, 0.025);
+      0 1px 2px color-mix(in srgb, var(--la-base-slate-800) 2.5%, transparent);
   }
 
   @media (hover: hover) {
@@ -3686,7 +3725,7 @@ svg.w-5.h-5 {
       background: color-mix(in srgb, var(--app-accent-soft) 24%, var(--app-surface-solid));
       box-shadow:
         inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 26%, var(--app-border-strong)),
-        0 2px 5px rgba(15, 23, 42, 0.045);
+        0 2px 5px color-mix(in srgb, var(--la-base-slate-800) 4.5%, transparent);
     }
   }
 
@@ -3694,7 +3733,7 @@ svg.w-5.h-5 {
     background: var(--app-surface-muted);
     box-shadow:
       inset 0 0 0 1px var(--app-border-strong),
-      0 1px 3px rgba(0, 0, 0, 0.18);
+      0 1px 3px color-mix(in srgb, var(--la-base-black) 18%, transparent);
   }
 
   @media (hover: hover) {
@@ -3702,7 +3741,7 @@ svg.w-5.h-5 {
       background: color-mix(in srgb, var(--app-accent-soft) 20%, var(--app-surface-muted));
       box-shadow:
         inset 0 0 0 1px color-mix(in srgb, var(--app-accent-strong) 24%, var(--app-border-strong)),
-        0 2px 6px rgba(0, 0, 0, 0.24);
+        0 2px 6px color-mix(in srgb, var(--la-base-black) 24%, transparent);
     }
   }
 
@@ -3722,7 +3761,7 @@ svg.w-5.h-5 {
     background: color-mix(in srgb, var(--app-surface-solid) 70%, transparent);
     color: var(--app-accent);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.72),
+      inset 0 1px 0 color-mix(in srgb, var(--la-base-white) 72%, transparent),
       0 0 0 1px color-mix(in srgb, var(--app-accent) 14%, transparent),
       0 10px 26px color-mix(in srgb, var(--app-accent) 12%, transparent);
   }
@@ -3731,7 +3770,7 @@ svg.w-5.h-5 {
     background: var(--app-surface-muted);
     color: var(--app-accent-strong);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 1px 0 color-mix(in srgb, var(--la-base-white) 8%, transparent),
       0 0 0 1px var(--app-border);
   }
 

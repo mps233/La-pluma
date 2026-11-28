@@ -19,7 +19,6 @@ without re-investigation.
 
 | ID | Decision | Why blocked |
 | --- | --- | --- |
-| PD2 | Finish the primitive/semantic/component token layers from `DESIGN.md` | Effective theme tokens now use `--la-*` primitives for accent/status/surfaces/neutrals/spacing/radius and card/button component tokens (ADR-0008/0009); the `index.css` fallback palette and literals inside component rules remain |
 
 ## Completed
 
@@ -81,3 +80,4 @@ without re-investigation.
 - PD3: page run state stays a projection/local hybrid; C5b is rejected (ADR-0004, Round 60).
 - PD6/PD7/PD8: CustomTools palette is user content; GlassNav/GlassMenu are documented adapters; page base CSS stays global and C9 is rejected (ADR-0005/0006/0007, Round 60).
 - PD1: `go-verify.yml` now runs gofmt, lifecycle race tests, and the client verify suite with `contents: read` only (Round 61).
+- PD2: primitive/semantic/component token layers completed for both theme files, with a boundary test that rejects colour literals outside primitive definitions (ADR-0008/0009/0010, Rounds 61–63).

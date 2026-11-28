@@ -160,3 +160,27 @@ only; component tokens reference semantic tokens only. The `index.css`
 fallback palette and the remaining literals inside component rules still need
 the same pass.
 
+
+## ADR-0010: Token layers are complete and guarded
+
+Status: accepted (2026-11-28), completes PD2
+
+Context: the effective theme had primitive/semantic/component layers, but
+`index.css`'s fallback palette and colour literals inside component rules still
+bypassed them.
+
+Decision: add a self-contained `--la-base-*` primitive palette for the
+fallback layer and rewrite its semantic tokens against it. Map every remaining
+component-rule colour (shadows, gradients, masks, overlays, contrast
+overrides) to `--la-*` primitives, using `color-mix` for alpha variants. Add
+`src/styles/tokenLayerBoundary.test.ts`, which fails if a colour literal
+appears outside a `--la-*` primitive definition; the status pulse's
+`rgb(var(--status-pulse-rgb))` is the documented dynamic exception.
+
+Consequences: both theme files now follow primitive → semantic → component.
+A new colour must be added as a primitive first, then referenced by a semantic
+or component token. Visual comparison against the previous theme build was
+pixel-identical in static regions (light/dark, desktop/mobile); remaining
+frame differences come from the animated backdrop, island, PWA prompt, clock,
+and status text.
+

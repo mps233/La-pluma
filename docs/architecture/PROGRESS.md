@@ -950,3 +950,22 @@ deleted, verification, and follow-ups.
 - Remaining PD2 work: migrate the `index.css` fallback palette to primitives
   and replace the literals still inside component rules.
 - Verified: client production build (type-check included).
+
+### Round 63 — complete the token layers (2026-11-28)
+
+- PD2 phase 4: added a self-contained `--la-base-*` primitive palette to
+  `index.css` and rewired its fallback semantic tokens. Every remaining
+  component-rule colour in both theme files (shadows, gradients, masks,
+  overlays, contrast overrides) now references a primitive; alpha variants use
+  `color-mix`.
+- Added `src/styles/tokenLayerBoundary.test.ts`: colour literals are rejected
+  outside `--la-*` / `--la-base-*` primitive definitions. The status pulse's
+  `rgb(var(--status-pulse-rgb))` is the documented dynamic exception.
+- Fixed two self-references introduced while replacing `#fff`/`#ffffff`
+  tokens, then re-ran the visual comparison: static samples across dashboard
+  and automation (light/dark, 1440×900 and 390×844) match the previous build;
+  remaining differences are animated backdrop/island/PWA prompt/clock/status
+  text.
+- PD2 is complete; the blocked task pool is empty.
+- Verified: client type-check, lint at the ratchet, full suite (536 tests / 81
+  files), and production build.

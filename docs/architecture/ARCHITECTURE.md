@@ -105,11 +105,5 @@ depends on them.
 3. `client/src/components/common` exports only part of its usable primitives,
    so some consumers still deep-import. Page skeletons live next to their
    pages; form controls use the shared vitest glass harness.
-4. Token layers in `DESIGN.md` (primitive/semantic/component) are landed for
-   the effective theme (accent/status/surfaces/neutrals/spacing/radius plus
-   card/button component tokens, ADR-0008/0009). The `index.css` fallback and
-   literals inside component rules remain (PD2); page-prefixed base rules
-   intentionally stay in `index.css` (ADR-0007), and the CustomTools palette
-   is user content (ADR-0005).
-5. `agentapi` exercises ~45 of 107 routes; the remaining mutation/side-effect
+4. `agentapi` exercises ~45 of 107 routes; the remaining mutation/side-effect
    routes are covered indirectly by their service tests.
