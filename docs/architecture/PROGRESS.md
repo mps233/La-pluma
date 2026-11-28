@@ -637,7 +637,7 @@ deleted, verification, and follow-ups.
 - Follow-up: the remaining pool is client-heavy (C7/C10/C11/C8, C9) plus G13
   and T5.
 
-### Round 43 — skeletons next to their pages, part one (2026-11-28)
+### Round 43 — skeletons next to their pages, part one (2026-11-28, `2ea1984`)
 
 - C10a: `common/Loading.tsx` held both the spinner and every page skeleton,
   including a dashboard block that needs the dashboard layout hook.
