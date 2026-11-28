@@ -668,7 +668,7 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C7/C11/C8 remain, then C9/C10c.
 
-### Round 45 — extract AutomationTasks schedule helpers (2026-11-28)
+### Round 45 — extract AutomationTasks schedule helpers (2026-11-28, `13dd8bf`)
 
 - C11a: `AutomationTasks.tsx` inlined the schedule-time grammar: validation,
   dedupe, parse/clamp, entry normalization, legacy `times` fallback, and active
