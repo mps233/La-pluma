@@ -63,6 +63,12 @@ func TestTextIsATypeAssertion(t *testing.T) {
 			t.Fatalf("Text(%#v) = %q", value, got)
 		}
 	}
+	if got, ok := TextOK(""); !ok || got != "" {
+		t.Fatalf("TextOK(empty) = %q, %v", got, ok)
+	}
+	if _, ok := TextOK(1); ok {
+		t.Fatal("TextOK(1) accepted")
+	}
 }
 
 func TestTruthy(t *testing.T) {
@@ -72,7 +78,7 @@ func TestTruthy(t *testing.T) {
 			t.Fatalf("%#v is truthy", value)
 		}
 	}
-	truthy := []any{true, "x", json.Number("1"), 1.5, 1, uint(1), []any{}, map[string]any{}}
+	truthy := []any{true, "x", json.Number("1"), json.Number("1e999"), 1.5, 1, uint(1), []any{}, map[string]any{}}
 	for _, value := range truthy {
 		if !Truthy(value) {
 			t.Fatalf("%#v is falsy", value)
@@ -163,7 +169,7 @@ func TestFiniteNumber(t *testing.T) {
 		want  float64
 		ok    bool
 	}{
-		{nil, 0, true},
+		{nil, 0, false},
 		{true, 1, true},
 		{" 42 ", 42, true},
 		{"", 0, true},
@@ -181,8 +187,22 @@ func TestFiniteNumber(t *testing.T) {
 			t.Fatalf("FiniteNumber(%#v) = %v, %v; want %v, %v", tc.value, got, ok, tc.want, tc.ok)
 		}
 	}
+	if got, ok := FiniteNumberOrNull(nil); !ok || got != 0 {
+		t.Fatalf("FiniteNumberOrNull(nil) = %v, %v", got, ok)
+	}
 	if got := FiniteNumberOrZero("Infinity"); got != 0 {
 		t.Fatalf("FiniteNumberOrZero = %v", got)
+	}
+}
+
+func TestNumeric(t *testing.T) {
+	if got, ok := Numeric(json.Number("2")); !ok || got != 2 {
+		t.Fatalf("Numeric(2) = %v, %v", got, ok)
+	}
+	for _, value := range []any{nil, "2", true, math.Inf(1)} {
+		if _, ok := Numeric(value); ok {
+			t.Fatalf("Numeric(%#v) accepted", value)
+		}
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -57,35 +58,35 @@ type MaterialsBundle struct {
 // stages from item_table.json, mirroring fetch-all-materials.ts.
 func ParseMaterials(itemTable any) map[string]Material {
 	materials := map[string]Material{}
-	items := asRecord(asRecord(itemTable)["items"])
+	items := jsval.Record(jsval.Record(itemTable)["items"])
 
 	for itemID, rawItem := range items {
-		item := asRecord(rawItem)
+		item := jsval.Record(rawItem)
 		if item == nil {
 			continue
 		}
-		itemType, _ := stringValue(item["itemType"])
-		classifyType, _ := stringValue(item["classifyType"])
+		itemType, _ := jsval.TextOK(item["itemType"])
+		classifyType, _ := jsval.TextOK(item["classifyType"])
 		if itemType != "MATERIAL" || classifyType != "MATERIAL" {
 			continue
 		}
 
 		bestStages := make([]BestStage, 0, 3)
-		stageDropList := asArray(item["stageDropList"])
+		stageDropList := jsval.Array(item["stageDropList"])
 		limit := len(stageDropList)
 		if limit > 3 {
 			limit = 3
 		}
 		for index := 0; index < limit; index++ {
-			drop := asRecord(stageDropList[index])
+			drop := jsval.Record(stageDropList[index])
 			if drop == nil {
 				continue
 			}
-			stageID, ok := stringValue(drop["stageId"])
+			stageID, ok := jsval.TextOK(drop["stageId"])
 			if !ok || stageID == "" {
 				continue
 			}
-			occPer, ok := numericValue(drop["occPer"])
+			occPer, ok := jsval.Numeric(drop["occPer"])
 			if !ok || occPer == 0 {
 				continue
 			}
@@ -98,7 +99,7 @@ func ParseMaterials(itemTable any) map[string]Material {
 
 		materials[itemID] = Material{
 			ID:         itemID,
-			Name:       jsString(firstTruthy(item["name"], "")),
+			Name:       jsval.StringJSON(firstTruthy(item["name"], "")),
 			Rarity:     parseIntJS(firstTruthy(item["rarity"], "")),
 			BestStages: bestStages,
 		}
@@ -113,14 +114,14 @@ func BuildMaterialsFile(existing any, materials map[string]Material) MaterialsFi
 	if materials == nil {
 		materials = map[string]Material{}
 	}
-	root := asRecord(existing)
+	root := jsval.Record(existing)
 	recipes := map[string]any{}
 	stageSchedule := map[string]any{}
 	if root != nil {
-		if previous := asRecord(root["recipes"]); previous != nil {
+		if previous := jsval.Record(root["recipes"]); previous != nil {
 			recipes = previous
 		}
-		if previous := asRecord(root["stageSchedule"]); previous != nil {
+		if previous := jsval.Record(root["stageSchedule"]); previous != nil {
 			stageSchedule = previous
 		}
 	}
@@ -131,7 +132,7 @@ func BuildMaterialsFile(existing any, materials map[string]Material) MaterialsFi
 // buildingProductList, mirroring fetch-material-formulas.ts.
 func BuildFormulas(buildingData any, itemTable any) map[string]Recipe {
 	formulaCosts := map[string][]any{}
-	building := asRecord(buildingData)
+	building := jsval.Record(buildingData)
 	for _, group := range []struct {
 		field    string
 		roomType string
@@ -139,37 +140,37 @@ func BuildFormulas(buildingData any, itemTable any) map[string]Recipe {
 		{field: "workshopFormulas", roomType: "WORKSHOP"},
 		{field: "manufactFormulas", roomType: "MANUFACTURE"},
 	} {
-		for formulaID, rawFormula := range asRecord(building[group.field]) {
-			formula := asRecord(rawFormula)
+		for formulaID, rawFormula := range jsval.Record(building[group.field]) {
+			formula := jsval.Record(rawFormula)
 			if formula == nil {
 				continue
 			}
-			if costs, ok := asArrayOK(formula["costs"]); ok {
+			if costs := jsval.Array(formula["costs"]); costs != nil {
 				formulaCosts[group.roomType+"_"+formulaID] = costs
 			}
 		}
 	}
 
 	recipes := map[string]Recipe{}
-	items := asRecord(asRecord(itemTable)["items"])
+	items := jsval.Record(jsval.Record(itemTable)["items"])
 	for itemID, rawItem := range items {
-		item := asRecord(rawItem)
+		item := jsval.Record(rawItem)
 		if item == nil {
 			continue
 		}
-		productList, ok := asArrayOK(item["buildingProductList"])
-		if !ok || len(productList) == 0 {
+		productList := jsval.Array(item["buildingProductList"])
+		if len(productList) == 0 {
 			continue
 		}
-		productInfo := asRecord(productList[0])
+		productInfo := jsval.Record(productList[0])
 		if productInfo == nil {
 			continue
 		}
-		roomType, ok := stringValue(productInfo["roomType"])
+		roomType, ok := jsval.TextOK(productInfo["roomType"])
 		if !ok || roomType == "" {
 			continue
 		}
-		formulaID, ok := stringValue(productInfo["formulaId"])
+		formulaID, ok := jsval.TextOK(productInfo["formulaId"])
 		if !ok || formulaID == "" {
 			continue
 		}
@@ -180,15 +181,15 @@ func BuildFormulas(buildingData any, itemTable any) map[string]Recipe {
 
 		materials := map[string]any{}
 		for _, rawCost := range costs {
-			cost := asRecord(rawCost)
+			cost := jsval.Record(rawCost)
 			if cost == nil {
 				continue
 			}
-			materialID, ok := stringValue(cost["id"])
+			materialID, ok := jsval.TextOK(cost["id"])
 			if !ok || materialID == "" {
 				continue
 			}
-			if truthy(cost["count"]) {
+			if jsval.Truthy(cost["count"]) {
 				materials[materialID] = cost["count"]
 			}
 		}
@@ -202,7 +203,7 @@ func BuildFormulas(buildingData any, itemTable any) map[string]Recipe {
 		}
 		recipes[itemID] = Recipe{
 			ID:        itemID,
-			Name:      jsString(firstTruthy(item["name"], "")),
+			Name:      jsval.StringJSON(firstTruthy(item["name"], "")),
 			Type:      recipeType,
 			Materials: materials,
 		}
@@ -213,7 +214,7 @@ func BuildFormulas(buildingData any, itemTable any) map[string]Recipe {
 // MergeFormulas shallow-merges formulas into the root's recipes, with new
 // formulas overriding old ones, mirroring merge-formulas.ts.
 func MergeFormulas(materialsRoot any, formulas map[string]Recipe) (map[string]any, error) {
-	root := asRecord(materialsRoot)
+	root := jsval.Record(materialsRoot)
 	if root == nil {
 		normalized, err := jsonstore.Normalize(materialsRoot)
 		if err != nil {
@@ -225,7 +226,7 @@ func MergeFormulas(materialsRoot any, formulas map[string]Recipe) (map[string]an
 				map[string]any{"cause": err.Error()},
 			)
 		}
-		root = asRecord(normalized)
+		root = jsval.Record(normalized)
 	}
 	if root == nil {
 		return nil, apperrors.WithStatus(
@@ -238,7 +239,7 @@ func MergeFormulas(materialsRoot any, formulas map[string]Recipe) (map[string]an
 	}
 
 	mergedRecipes := map[string]any{}
-	if existing := asRecord(root["recipes"]); existing != nil {
+	if existing := jsval.Record(root["recipes"]); existing != nil {
 		for key, value := range existing {
 			mergedRecipes[key] = value
 		}
@@ -310,7 +311,7 @@ func RefreshMaterials(ctx context.Context, client *Client, outDir string) (Mater
 		FormulasPath:  formulasPath,
 		MaterialCount: len(bundle.Materials.Materials),
 		RecipeCount:   len(bundle.Formulas),
-		MergedCount:   len(asRecord(merged["recipes"])),
+		MergedCount:   len(jsval.Record(merged["recipes"])),
 	}, nil
 }
 

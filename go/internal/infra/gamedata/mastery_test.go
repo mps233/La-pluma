@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func TestParseOperatorMastery(t *testing.T) {
@@ -128,7 +130,7 @@ func TestParseOperatorMastery(t *testing.T) {
 	if levelOne.Unlock == nil || levelOne.Unlock.Phase == nil || *levelOne.Unlock.Phase != "PHASE_2" {
 		t.Fatalf("unlock = %#v", levelOne.Unlock)
 	}
-	if level, _ := jsNumber(levelOne.Unlock.Level); level != 1 {
+	if level, _ := jsval.FiniteNumberOrNull(levelOne.Unlock.Level); level != 1 {
 		t.Fatalf("unlock level = %#v", levelOne.Unlock.Level)
 	}
 

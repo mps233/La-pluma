@@ -8,6 +8,7 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // SeedResult reports the generated files and record counts.
@@ -55,7 +56,7 @@ func Seed(ctx context.Context, client *Client, outDir string) (SeedResult, error
 	stages := ParseStageData(tables["stage_table.json"])
 	zoneNames := ParseZoneNames(tables["zone_table.json"])
 	for code, stage := range stages {
-		if zoneID := strings.TrimSpace(jsString(stage.ZoneID)); zoneID != "" {
+		if zoneID := strings.TrimSpace(jsval.StringJSON(stage.ZoneID)); zoneID != "" {
 			stage.ZoneName = zoneNames[zoneID]
 			stages[code] = stage
 		}

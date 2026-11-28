@@ -3,6 +3,8 @@ package gamedata
 import (
 	"strings"
 	"time"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // OperatorMasteryFileName is the generated skill mastery material table.
@@ -68,15 +70,15 @@ type MasteryFile struct {
 // ParseOperatorMastery builds skill and M1-M3 mastery requirements for
 // recruitable 4-star-and-above operators, mirroring parseOperatorMastery.
 func ParseOperatorMastery(characterData any, skillTable any, itemTable any) map[string]OperatorMastery {
-	characters := asRecord(characterData)
-	skillRecords := asRecord(skillTable)
-	itemRecords := asRecord(asRecord(itemTable)["items"])
+	characters := jsval.Record(characterData)
+	skillRecords := jsval.Record(skillTable)
+	itemRecords := jsval.Record(jsval.Record(itemTable)["items"])
 	itemName := func(id string) string {
-		item := asRecord(itemRecords[id])
+		item := jsval.Record(itemRecords[id])
 		if item == nil {
 			return id
 		}
-		if name, ok := stringValue(item["name"]); ok && name != "" {
+		if name, ok := jsval.TextOK(item["name"]); ok && name != "" {
 			return name
 		}
 		return id
@@ -84,74 +86,74 @@ func ParseOperatorMastery(characterData any, skillTable any, itemTable any) map[
 
 	operators := map[string]OperatorMastery{}
 	for charID, rawCharacter := range characters {
-		character := asRecord(rawCharacter)
+		character := jsval.Record(rawCharacter)
 		if character == nil {
 			continue
 		}
 		if notObtainable, ok := character["isNotObtainable"].(bool); ok && notObtainable {
 			continue
 		}
-		phases, ok := asArrayOK(character["phases"])
-		if !ok || len(phases) == 0 {
+		phases := jsval.Array(character["phases"])
+		if len(phases) == 0 {
 			continue
 		}
 		rarity := masteryRarity(character["rarity"])
 		if rarity < 4 {
 			continue
 		}
-		rawSkills, ok := asArrayOK(character["skills"])
-		if !ok || len(rawSkills) == 0 {
+		rawSkills := jsval.Array(character["skills"])
+		if len(rawSkills) == 0 {
 			continue
 		}
 
 		skills := make([]OperatorSkill, 0, len(rawSkills))
 		for index, rawSkill := range rawSkills {
-			skill := asRecord(rawSkill)
+			skill := jsval.Record(rawSkill)
 			if skill == nil {
 				continue
 			}
-			skillID, ok := stringValue(skill["skillId"])
+			skillID, ok := jsval.TextOK(skill["skillId"])
 			if !ok || skillID == "" {
 				continue
 			}
 
-			skillRecord := asRecord(skillRecords[skillID])
-			levels := asArray(skillRecord["levels"])
+			skillRecord := jsval.Record(skillRecords[skillID])
+			levels := jsval.Array(skillRecord["levels"])
 			var firstLevel map[string]any
 			if len(levels) > 0 {
-				firstLevel = asRecord(levels[0])
+				firstLevel = jsval.Record(levels[0])
 			}
 			skillName := skillID
-			if name, ok := stringValue(firstLevel["name"]); ok && name != "" {
+			if name, ok := jsval.TextOK(firstLevel["name"]); ok && name != "" {
 				skillName = name
 			}
 
 			var iconID *string
-			if icon, ok := stringValue(firstLevel["iconId"]); ok && icon != "" {
+			if icon, ok := jsval.TextOK(firstLevel["iconId"]); ok && icon != "" {
 				iconID = &icon
-			} else if icon, ok := stringValue(skillRecord["iconId"]); ok {
+			} else if icon, ok := jsval.TextOK(skillRecord["iconId"]); ok {
 				iconID = &icon
 			}
 
 			mastery := make([]MasteryLevel, 0)
-			conditions := asArray(skill["levelUpCostCond"])
+			conditions := jsval.Array(skill["levelUpCostCond"])
 			for masteryIndex, rawCondition := range conditions {
-				condition := asRecord(rawCondition)
+				condition := jsval.Record(rawCondition)
 				if condition == nil {
 					continue
 				}
 
 				materials := make([]MasteryMaterial, 0)
-				for _, rawCost := range asArray(condition["levelUpCost"]) {
-					cost := asRecord(rawCost)
+				for _, rawCost := range jsval.Array(condition["levelUpCost"]) {
+					cost := jsval.Record(rawCost)
 					if cost == nil || cost["id"] == nil {
 						continue
 					}
-					count, ok := jsNumber(cost["count"])
+					count, ok := jsval.FiniteNumberOrNull(cost["count"])
 					if !ok || count <= 0 {
 						continue
 					}
-					id := jsString(cost["id"])
+					id := jsval.StringJSON(cost["id"])
 					materials = append(materials, MasteryMaterial{
 						ID:    id,
 						Name:  itemName(id),
@@ -160,12 +162,12 @@ func ParseOperatorMastery(characterData any, skillTable any, itemTable any) map[
 				}
 
 				var unlock *MasteryUnlock
-				if unlockRecord := asRecord(condition["unlockCond"]); unlockRecord != nil {
+				if unlockRecord := jsval.Record(condition["unlockCond"]); unlockRecord != nil {
 					unlock = &MasteryUnlock{}
-					if phase, ok := stringValue(unlockRecord["phase"]); ok {
+					if phase, ok := jsval.TextOK(unlockRecord["phase"]); ok {
 						unlock.Phase = &phase
 					}
-					if level, ok := numericValue(unlockRecord["level"]); ok {
+					if level, ok := jsval.Numeric(unlockRecord["level"]); ok {
 						unlock.Level = level
 					}
 				}
@@ -193,7 +195,7 @@ func ParseOperatorMastery(characterData any, skillTable any, itemTable any) map[
 		}
 
 		professionID := "UNKNOWN"
-		if value, ok := stringValue(character["profession"]); ok {
+		if value, ok := jsval.TextOK(character["profession"]); ok {
 			professionID = value
 		}
 		profession := professionID
@@ -238,17 +240,17 @@ func BuildMasteryFile(characterData any, skillTable any, itemTable any, now time
 // operator-mastery.json.
 
 func masteryRarity(value any) int {
-	if number, ok := numericValue(value); ok {
+	if number, ok := jsval.Numeric(value); ok {
 		return int(number) + 1
 	}
-	if text, ok := stringValue(value); ok && strings.HasPrefix(text, "TIER_") {
+	if text, ok := jsval.TextOK(value); ok && strings.HasPrefix(text, "TIER_") {
 		return parseIntJS(strings.TrimPrefix(text, "TIER_"))
 	}
 	return 0
 }
 
 func operatorName(value any, fallback string) string {
-	if name, ok := stringValue(value); ok && name != "" {
+	if name, ok := jsval.TextOK(value); ok && name != "" {
 		return name
 	}
 	return fallback

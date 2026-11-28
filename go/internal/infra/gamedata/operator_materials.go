@@ -3,6 +3,8 @@ package gamedata
 import (
 	"strings"
 	"time"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // OperatorMaterialsFileName is the generated elite promotion material table.
@@ -68,25 +70,25 @@ type OperatorMaterialsFile struct {
 // 4-star-and-above operators, mirroring parseOperatorMaterials.
 func ParseOperatorMaterials(characterData any, itemTable any) map[string]OperatorRecord {
 	operators := map[string]OperatorRecord{}
-	itemRecords := asRecord(asRecord(itemTable)["items"])
+	itemRecords := jsval.Record(jsval.Record(itemTable)["items"])
 	itemName := func(id any) any {
-		item := asRecord(itemRecords[jsString(id)])
+		item := jsval.Record(itemRecords[jsval.StringJSON(id)])
 		if item == nil {
 			return nil
 		}
 		return item["name"]
 	}
 
-	for charID, rawCharacter := range asRecord(characterData) {
-		character := asRecord(rawCharacter)
+	for charID, rawCharacter := range jsval.Record(characterData) {
+		character := jsval.Record(rawCharacter)
 		if character == nil {
 			continue
 		}
-		phases, ok := asArrayOK(character["phases"])
-		if !ok || len(phases) == 0 {
+		phases := jsval.Array(character["phases"])
+		if len(phases) == 0 {
 			continue
 		}
-		if truthy(character["isNotObtainable"]) {
+		if jsval.Truthy(character["isNotObtainable"]) {
 			continue
 		}
 
@@ -96,7 +98,7 @@ func ParseOperatorMaterials(characterData any, itemTable any) map[string]Operato
 		}
 
 		profession := character["profession"]
-		if professionID, ok := stringValue(profession); ok {
+		if professionID, ok := jsval.TextOK(profession); ok {
 			if mapped, exists := professionMap[professionID]; exists {
 				profession = mapped
 			}
@@ -104,15 +106,15 @@ func ParseOperatorMaterials(characterData any, itemTable any) map[string]Operato
 
 		operator := OperatorRecord{
 			ID:         charID,
-			Name:       jsString(firstTruthy(character["name"], charID)),
+			Name:       jsval.StringJSON(firstTruthy(character["name"], charID)),
 			Rarity:     rarity,
 			Profession: profession,
 		}
 
 		if len(phases) >= 2 {
-			phase1 := asRecord(phases[1])
+			phase1 := jsval.Record(phases[1])
 			if phase1 != nil {
-				if costs, ok := asArrayOK(phase1["evolveCost"]); ok {
+				if costs := jsval.Array(phase1["evolveCost"]); costs != nil {
 					operator.Elite1 = &Elite1Cost{
 						LMD:       eliteLMD(costs),
 						Materials: promotionMaterials(costs, itemName),
@@ -122,13 +124,13 @@ func ParseOperatorMaterials(characterData any, itemTable any) map[string]Operato
 		}
 
 		if len(phases) >= 3 {
-			phase2 := asRecord(phases[2])
+			phase2 := jsval.Record(phases[2])
 			if phase2 != nil {
-				if costs, ok := asArrayOK(phase2["evolveCost"]); ok {
+				if costs := jsval.Array(phase2["evolveCost"]); costs != nil {
 					materials := make([]OperatorMaterial, 0, len(costs))
 					chips := make([]OperatorMaterial, 0, len(costs))
 					for _, rawCost := range costs {
-						cost := asRecord(rawCost)
+						cost := jsval.Record(rawCost)
 						if cost == nil {
 							continue
 						}
@@ -136,8 +138,8 @@ func ParseOperatorMaterials(characterData any, itemTable any) map[string]Operato
 							continue
 						}
 						material := OperatorMaterial{
-							ID:    jsString(cost["id"]),
-							Name:  jsString(firstTruthy(itemName(cost["id"]), cost["id"])),
+							ID:    jsval.StringJSON(cost["id"]),
+							Name:  jsval.StringJSON(firstTruthy(itemName(cost["id"]), cost["id"])),
 							Count: cost["count"],
 						}
 						if strings.HasPrefix(material.ID, "32") {
@@ -189,7 +191,7 @@ func operatorRarity(value any) int {
 		}
 		return 0
 	default:
-		if number, ok := numericValue(value); ok {
+		if number, ok := jsval.Numeric(value); ok {
 			return int(number) + 1
 		}
 		return 0
@@ -198,11 +200,11 @@ func operatorRarity(value any) int {
 
 func eliteLMD(costs []any) any {
 	for _, rawCost := range costs {
-		cost := asRecord(rawCost)
+		cost := jsval.Record(rawCost)
 		if cost == nil {
 			continue
 		}
-		if id, ok := stringValue(cost["id"]); ok && id == "4001" {
+		if id, ok := jsval.TextOK(cost["id"]); ok && id == "4001" {
 			return firstTruthy(cost["count"], 0)
 		}
 	}
@@ -212,13 +214,13 @@ func eliteLMD(costs []any) any {
 func promotionMaterials(costs []any, itemName func(any) any) []OperatorMaterial {
 	materials := make([]OperatorMaterial, 0, len(costs))
 	for _, rawCost := range costs {
-		cost := asRecord(rawCost)
+		cost := jsval.Record(rawCost)
 		if cost == nil || isLMDCost(cost) {
 			continue
 		}
 		materials = append(materials, OperatorMaterial{
-			ID:    jsString(cost["id"]),
-			Name:  jsString(firstTruthy(itemName(cost["id"]), cost["id"])),
+			ID:    jsval.StringJSON(cost["id"]),
+			Name:  jsval.StringJSON(firstTruthy(itemName(cost["id"]), cost["id"])),
 			Count: cost["count"],
 		})
 	}
@@ -227,6 +229,6 @@ func promotionMaterials(costs []any, itemName func(any) any) []OperatorMaterial 
 
 // isLMDCost uses strict equality; a numeric 4001 id is a material, not LMD.
 func isLMDCost(cost map[string]any) bool {
-	id, ok := stringValue(cost["id"])
+	id, ok := jsval.TextOK(cost["id"])
 	return ok && id == "4001"
 }

@@ -6,6 +6,8 @@ import (
 
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // ParadoxOperatorsFileName is the generated paradox simulation index.
@@ -27,31 +29,31 @@ type ParadoxOperator struct {
 // Go maps have no insertion order, so equal names use the character id as a
 // deterministic tie-breaker. Node keeps document order for exact ties.
 func ParseParadoxOperators(handbook any, characters any) []ParadoxOperator {
-	handbookRecord := asRecord(handbook)
-	stageData := asRecord(handbookRecord["handbookStageData"])
-	handbookDict := asRecord(handbookRecord["handbookDict"])
-	characterRecords := asRecord(characters)
+	handbookRecord := jsval.Record(handbook)
+	stageData := jsval.Record(handbookRecord["handbookStageData"])
+	handbookDict := jsval.Record(handbookRecord["handbookDict"])
+	characterRecords := jsval.Record(characters)
 
 	operators := make([]ParadoxOperator, 0, len(stageData))
 	for charID, rawStage := range stageData {
-		stage := asRecord(rawStage)
+		stage := jsval.Record(rawStage)
 		if stage == nil {
 			stage = map[string]any{}
 		}
 
-		character := asRecord(characterRecords[charID])
+		character := jsval.Record(characterRecords[charID])
 		characterName := character["name"]
-		dictEntry := asRecord(handbookDict[charID])
+		dictEntry := jsval.Record(handbookDict[charID])
 		dictName := dictEntry["infoName"]
 
 		stageID := firstTruthy(stage["stageId"], stage["code"])
-		if !truthy(stageID) {
+		if !jsval.Truthy(stageID) {
 			continue
 		}
 
 		operators = append(operators, ParadoxOperator{
 			ID:        charID,
-			Name:      jsString(firstTruthy(characterName, dictName, charID)),
+			Name:      jsval.StringJSON(firstTruthy(characterName, dictName, charID)),
 			StageID:   stageID,
 			StageName: firstTruthy(stage["name"], ""),
 		})

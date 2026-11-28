@@ -12,6 +12,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
@@ -246,7 +247,7 @@ func (s *Service) RecognizeOperBoxRequest(ctx context.Context, request Request) 
 	if allOpersValue, ok := details["all_opers"].([]any); ok {
 		allOpers = make([]OperBoxRecord, 0, len(allOpersValue))
 		for _, oper := range allOpersValue {
-			record, _ := asRecord(oper)
+			record := jsval.Record(oper)
 			own := false
 			if value, ok := record["own"].(bool); ok && value {
 				own = true
@@ -331,8 +332,8 @@ func hasOperBoxPayload(payload Payload) bool {
 // toOperBoxRecord mirrors dataParserService.toOperBoxRecord, including the
 // strict `own === true` check.
 func toOperBoxRecord(oper any, own bool) (OperBoxRecord, bool) {
-	record, ok := asRecord(oper)
-	if !ok {
+	record := jsval.Record(oper)
+	if record == nil {
 		return OperBoxRecord{}, false
 	}
 	id, ok := record["id"].(string)
@@ -346,7 +347,7 @@ func toOperBoxRecord(oper any, own bool) (OperBoxRecord, bool) {
 	return OperBoxRecord{
 		ID:     id,
 		Name:   name,
-		Rarity: finiteNumberOrZero(record["rarity"]),
+		Rarity: jsval.FiniteNumberOrZero(record["rarity"]),
 		Own:    own,
 	}, true
 }

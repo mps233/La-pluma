@@ -3,6 +3,8 @@ package gamedata
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func TestParseStageData(t *testing.T) {
@@ -59,7 +61,7 @@ func TestParseStageData(t *testing.T) {
 	if main.DangerLevel != "-" {
 		t.Fatalf("dangerLevel = %#v", main.DangerLevel)
 	}
-	if number, _ := numericValue(main.APCost); number != 6 {
+	if number, _ := jsval.Numeric(main.APCost); number != 6 {
 		t.Fatalf("apCost = %#v", main.APCost)
 	}
 	if !main.IsMainStage || main.IsActivityStage || main.IsResourceStage {

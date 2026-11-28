@@ -47,6 +47,13 @@ func Text(value any) string {
 	return ""
 }
 
+// TextOK reports whether value is a string, preserving the distinction
+// between a non-string value and an empty string.
+func TextOK(value any) (string, bool) {
+	text, ok := value.(string)
+	return text, ok
+}
+
 // String mirrors JavaScript String(value) for JSON scalars. Nil is treated as
 // undefined; use StringOrNullish or StringOrEmpty for the other common idioms.
 func String(value any) string {
@@ -144,10 +151,11 @@ func Truthy(value any) bool {
 		return typed != ""
 	case json.Number:
 		number, err := typed.Float64()
-		if err != nil || math.IsNaN(number) {
+		if err != nil && math.IsNaN(number) {
 			return false
 		}
-		return number != 0
+		// A range error still yields ±Infinity, which is truthy in JS.
+		return !math.IsNaN(number) && number != 0
 	case float64:
 		return !math.IsNaN(typed) && typed != 0
 	case float32:
@@ -291,20 +299,23 @@ func NumberOrZero(value any) float64 {
 	return parsed
 }
 
-// FiniteNumber mirrors Number(value) followed by Number.isFinite for
-// JSON-decoded documents: null becomes 0 and the second result is false for
-// values that do not convert to a finite number. JSON-decoded values cannot
-// distinguish null from a missing key, and every document reader treats nil as
-// null here.
+// FiniteNumber mirrors Number.isFinite(Number(value)). Nil is undefined, so it
+// is not a finite number; use FiniteNumberOrNull for JSON null.
 func FiniteNumber(value any) (float64, bool) {
-	if value == nil {
-		return 0, true
-	}
 	parsed, ok := Number(value)
 	if !ok || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
 		return 0, false
 	}
 	return parsed, true
+}
+
+// FiniteNumberOrNull mirrors Number.isFinite(Number(value)) for JSON-decoded
+// documents, where nil is a real null and Number(null) is 0.
+func FiniteNumberOrNull(value any) (float64, bool) {
+	if value == nil {
+		return 0, true
+	}
+	return FiniteNumber(value)
 }
 
 // FiniteNumberOrZero coalesces a non-finite or inconvertible value to zero.
@@ -314,6 +325,46 @@ func FiniteNumberOrZero(value any) float64 {
 		return 0
 	}
 	return parsed
+}
+
+// Numeric mirrors a typeof value === "number" check for JSON-decoded values:
+// it accepts numbers and json.Number, and rejects numeric strings, booleans,
+// nil, and non-finite values.
+func Numeric(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case json.Number:
+		parsed, err := typed.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return parsed, !math.IsNaN(parsed) && !math.IsInf(parsed, 0)
+	case float64:
+		return typed, !math.IsNaN(typed) && !math.IsInf(typed, 0)
+	case float32:
+		return float64(typed), !math.IsNaN(float64(typed)) && !math.IsInf(float64(typed), 0)
+	case int:
+		return float64(typed), true
+	case int8:
+		return float64(typed), true
+	case int16:
+		return float64(typed), true
+	case int32:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case uint:
+		return float64(typed), true
+	case uint8:
+		return float64(typed), true
+	case uint16:
+		return float64(typed), true
+	case uint32:
+		return float64(typed), true
+	case uint64:
+		return float64(typed), true
+	default:
+		return 0, false
+	}
 }
 
 // Integer mirrors Number.isInteger(Number(value)).

@@ -2,6 +2,8 @@ package gamedata
 
 import (
 	"regexp"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // StagesFileName is the generated stage catalog consumed by the app.
@@ -32,24 +34,24 @@ type StageInfo struct {
 // are skipped, and the thumbnail strips #f#/#n# difficulty suffixes.
 func ParseStageData(stageTable any) map[string]StageInfo {
 	stages := map[string]StageInfo{}
-	table := asRecord(stageTable)
-	stageData := asRecord(table["stages"])
+	table := jsval.Record(stageTable)
+	stageData := jsval.Record(table["stages"])
 
 	for stageID, rawStage := range stageData {
-		stage := asRecord(rawStage)
+		stage := jsval.Record(rawStage)
 		if stage == nil {
 			continue
 		}
 		code, present := stage["code"]
-		if !present || !truthy(code) {
+		if !present || !jsval.Truthy(code) {
 			continue
 		}
 		if text, ok := code.(string); ok && text == "null" {
 			continue
 		}
 
-		stageType, _ := stringValue(stage["stageType"])
-		stages[jsString(code)] = StageInfo{
+		stageType, _ := jsval.TextOK(stage["stageType"])
+		stages[jsval.StringJSON(code)] = StageInfo{
 			ID:              stageID,
 			Code:            code,
 			Name:            stage["name"],

@@ -9,6 +9,7 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func TestParseMaterials(t *testing.T) {
@@ -172,7 +173,7 @@ func TestBuildFormulasAndMerge(t *testing.T) {
 	if len(steel.Materials) != 1 {
 		t.Fatalf("steel materials = %#v", steel.Materials)
 	}
-	if number, _ := jsNumber(steel.Materials["30012"]); number != 3 {
+	if number, _ := jsval.FiniteNumberOrNull(steel.Materials["30012"]); number != 3 {
 		t.Fatalf("steel material count = %#v", steel.Materials["30012"])
 	}
 	device := recipes["30064"]

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func TestParseOperatorMaterials(t *testing.T) {
@@ -69,7 +71,7 @@ func TestParseOperatorMaterials(t *testing.T) {
 	if ok.Elite1 == nil || ok.Elite2 == nil {
 		t.Fatalf("char_ok elite costs = %#v", ok)
 	}
-	if number, _ := jsNumber(ok.Elite1.LMD); number != 30000 {
+	if number, _ := jsval.FiniteNumberOrNull(ok.Elite1.LMD); number != 30000 {
 		t.Fatalf("elite1 lmd = %#v", ok.Elite1.LMD)
 	}
 	if got := materialIDs(ok.Elite1.Materials); len(got) != 3 || got[0] != "30012" || got[1] != "3251" || got[2] != "9999" {
@@ -95,7 +97,7 @@ func TestParseOperatorMaterials(t *testing.T) {
 	if numeric.Elite1.Materials == nil || len(numeric.Elite1.Materials) != 0 {
 		t.Fatalf("empty materials must be a JSON array: %#v", numeric.Elite1.Materials)
 	}
-	if number, _ := jsNumber(numeric.Elite1.LMD); number != 0 {
+	if number, _ := jsval.FiniteNumberOrNull(numeric.Elite1.LMD); number != 0 {
 		t.Fatalf("lmd fallback = %#v", numeric.Elite1.LMD)
 	}
 }

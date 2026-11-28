@@ -9,6 +9,7 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // customToolsDir is the runtime directory holding optional tool definitions.
@@ -201,18 +202,18 @@ func parseDefinitionList(items []any, fallbackID string) ([]Definition, string) 
 
 func parseDefinition(record map[string]any, fallbackID string) (Definition, string) {
 	var definition Definition
-	definition.ID = strings.TrimSpace(stringValue(record["id"]))
+	definition.ID = strings.TrimSpace(jsval.Text(record["id"]))
 	if definition.ID == "" {
 		definition.ID = fallbackID
 	}
 	if definition.ID == "" {
 		return definition, "缺少 id"
 	}
-	definition.Name = strings.TrimSpace(stringValue(record["name"]))
+	definition.Name = strings.TrimSpace(jsval.Text(record["name"]))
 	if definition.Name == "" {
 		definition.Name = definition.ID
 	}
-	definition.Description = strings.TrimSpace(stringValue(record["description"]))
+	definition.Description = strings.TrimSpace(jsval.Text(record["description"]))
 
 	taskNamesValue, hasTaskNames := firstValue(record, "taskNames", "task_names")
 	if !hasTaskNames {
@@ -248,11 +249,6 @@ func firstValue(record map[string]any, keys ...string) (any, bool) {
 		}
 	}
 	return nil, false
-}
-
-func stringValue(value any) string {
-	text, _ := value.(string)
-	return text
 }
 
 func toolFromDefinition(definition Definition) Tool {

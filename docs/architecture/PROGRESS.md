@@ -445,6 +445,29 @@ deleted, verification, and follow-ups.
   (mastery, scheduler, updates, run_resume, agentapi) hold the remaining
   copies.
 
+### Round 33 — jsval contracts for readers, three more packages (2026-11-28)
+
+- G1b: the audit showed two opposite nil conventions. Document readers treat
+  nil as JSON null (`Number(null) == 0`), while absence-aware services treat
+  nil as undefined. `FiniteNumber` now means `Number.isFinite(Number(value))`
+  with nil as undefined; added `FiniteNumberOrNull` for the document-reader
+  convention. Also added `Numeric` (`typeof value === "number"`), `TextOK`
+  (type assertion that keeps present-empty distinct), and corrected `Truthy`
+  for numbers that overflow to ±Infinity (truthy in JavaScript) and NaN
+  (falsy).
+- Migrated `infra/gamedata` (7 files, ~80 call sites) and deleted its
+  `asRecord`/`asArray`/`asArrayOK`/`truthy`/`jsString`/`jsNumber`/
+  `numericValue`/`stringValue` copies; `firstTruthy`, `parseIntJS`,
+  `roundToFixed4`, and `dateOnly` remain as domain helpers.
+- Migrated `recognition` (coercion file reduced to the depot iteration-order
+  helpers) and `customtools` (`stringValue` → `jsval.Text`).
+- Behavior notes: gamedata now treats NaN as falsy and rejects non-finite
+  numeric candidates, matching the documented JS rules; no reader output
+  shape changed.
+- Verified: full Go test suite (705 tests / 49 packages), vet, gofmt.
+- Follow-up: G1b remains `training` (absence-aware semantics); G1c holds the
+  mixed domain/coercion files.
+
 
 
 

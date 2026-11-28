@@ -18,5 +18,5 @@ func lookupNumber(record map[string]any, key string) (float64, bool) {
 	if !hasField(record, key) {
 		return 0, false
 	}
-	return jsval.FiniteNumber(record[key])
+	return jsval.FiniteNumberOrNull(record[key])
 }

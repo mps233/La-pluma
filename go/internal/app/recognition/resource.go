@@ -13,6 +13,7 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // provisionalOperatorPattern matches the placeholder operators (char_5xx /
@@ -58,9 +59,9 @@ func (s *Service) loadItemDatabase() (*itemDatabase, error) {
 		return nil, err
 	}
 
-	items, _ := asRecord(indexValue)
-	table, _ := asRecord(tableValue)
-	tableItems, _ := asRecord(table["items"])
+	items := jsval.Record(indexValue)
+	table := jsval.Record(tableValue)
+	tableItems := jsval.Record(table["items"])
 	return &itemDatabase{items: items, table: tableItems}, nil
 }
 
@@ -82,8 +83,8 @@ func (database *itemDatabase) info(itemID string) itemInfo {
 		return fallback
 	}
 
-	item, _ := asRecord(rawItem)
-	tableItem, _ := asRecord(database.table[itemID])
+	item := jsval.Record(rawItem)
+	tableItem := jsval.Record(database.table[itemID])
 
 	name, ok := nonEmptyString(item["name"])
 	if !ok {
@@ -104,9 +105,9 @@ func (database *itemDatabase) info(itemID string) itemInfo {
 		}
 	}
 
-	sortID, ok := jsonNumberValue(item["sortId"])
+	sortID, ok := jsval.Numeric(item["sortId"])
 	if !ok {
-		if sortID, ok = jsonNumberValue(tableItem["sortId"]); !ok {
+		if sortID, ok = jsval.Numeric(tableItem["sortId"]); !ok {
 			sortID = 999999
 		}
 	}
@@ -126,7 +127,7 @@ func (database *itemDatabase) info(itemID string) itemInfo {
 }
 
 func nonEmptyString(value any) (string, bool) {
-	text, ok := value.(string)
+	text, ok := jsval.TextOK(value)
 	return text, ok && text != ""
 }
 
@@ -139,12 +140,12 @@ func (s *Service) GetAllOperators() ([]OperatorSummary, error) {
 	if err != nil {
 		return nil, operatorCatalogError(path, err)
 	}
-	record, ok := asRecord(value)
-	if !ok {
+	record := jsval.Record(value)
+	if record == nil {
 		return nil, operatorCatalogError(path, errors.New("无法读取干员数据"))
 	}
-	chars, ok := asRecord(record["chars"])
-	if !ok {
+	chars := jsval.Record(record["chars"])
+	if chars == nil {
 		return nil, operatorCatalogError(path, errors.New("无法读取干员数据"))
 	}
 
@@ -153,7 +154,7 @@ func (s *Service) GetAllOperators() ([]OperatorSummary, error) {
 		if !strings.HasPrefix(id, "char_") || provisionalOperatorPattern.MatchString(id) {
 			continue
 		}
-		char, _ := asRecord(rawChar)
+		char := jsval.Record(rawChar)
 		name, ok := nonEmptyString(char["name"])
 		if !ok {
 			name = id
@@ -161,7 +162,7 @@ func (s *Service) GetAllOperators() ([]OperatorSummary, error) {
 		operators = append(operators, OperatorSummary{
 			ID:         id,
 			Name:       name,
-			Rarity:     finiteNumberOrZero(char["rarity"]),
+			Rarity:     jsval.FiniteNumberOrZero(char["rarity"]),
 			Profession: char["profession"],
 			Position:   char["position"],
 		})
