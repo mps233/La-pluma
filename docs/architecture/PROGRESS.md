@@ -596,7 +596,7 @@ deleted, verification, and follow-ups.
 - Follow-up: the Go pool is now G12/G13/G5/G10; client risk work remains in
   C7/C10/C11/C8/C9.
 
-### Round 40 — one HTTP client factory (2026-11-28)
+### Round 40 — one HTTP client factory (2026-11-28, `84a37ca`)
 
 - G5: nine production sites built `&http.Client` with per-site timeouts, so a
   transport or proxy change would have to find them all.
