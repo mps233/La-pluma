@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	runapp "github.com/mps233/la-pluma/go/internal/app/agentrun"
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	"github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	"github.com/mps233/la-pluma/go/internal/transport/httpx"
@@ -133,7 +134,7 @@ func (h *Handler) executeSchedule(w http.ResponseWriter, r *http.Request) {
 			return nil, dailyFlowError(result, "AGENT_SCHEDULE_EXECUTE_FAILED")
 		}
 		if result.Stopped {
-			return nil, errTrackedActionStopped
+			return nil, runapp.ErrActionStopped
 		}
 		return structMap(result), nil
 	})
@@ -191,7 +192,7 @@ func (h *Handler) runDailyFlow(w http.ResponseWriter, r *http.Request) {
 			return nil, dailyFlowError(result, "AGENT_DAILY_FLOW_REJECTED")
 		}
 		if result.Stopped {
-			return nil, errTrackedActionStopped
+			return nil, runapp.ErrActionStopped
 		}
 		return structMap(result), nil
 	})

@@ -71,7 +71,9 @@ func (a *App) ResumeInterruptedFlows(ctx context.Context, logger *slog.Logger) i
 		return 0
 	}
 	if err := a.Runs.MarkResumed(chosen.RunID, newRun.RunID); err != nil {
-		_, _ = a.Runs.Fail(newRun.RunID, err)
+		if scope, ok := a.Runs.Scope(newRun.RunID); ok {
+			_ = scope.Settle(runapp.Outcome{}, err)
+		}
 		logger.Error("mark interrupted flow resumed failed", "runId", chosen.RunID, "error", err.Error())
 		return 0
 	}
@@ -245,7 +247,7 @@ func (a *App) startResumedFlow(candidate runapp.ResumeCandidate, plan scheduleRe
 		"message":     "继续执行上次任务流程",
 		"resumedFrom": candidate.RunID,
 	}
-	run, _, err := a.Runs.Begin(runapp.BeginInput{
+	scope, _, err := a.Runs.Open(runapp.Request{
 		OperationID: candidate.OperationID,
 		Input:       input,
 		Metadata:    metadata,
@@ -256,37 +258,34 @@ func (a *App) startResumedFlow(candidate runapp.ResumeCandidate, plan scheduleRe
 	if err != nil {
 		return domainrun.DTO{}, err
 	}
-	if _, err := a.Runs.StartForExecution(run.RunID); err != nil {
-		_, _ = a.Runs.Fail(run.RunID, err)
+	run, _ := scope.Run()
+	if _, err := scope.Start(); err != nil {
 		return domainrun.DTO{}, err
 	}
 
 	go func() {
-		flowCtx := runapp.WithParentRun(context.Background(), run.RunID)
-		result := a.Scheduler.StartDailyFlow(flowCtx, scheduler.DailyFlowRequest{
-			ScheduleID: plan.scheduleID,
-			TaskFlow:   plan.taskFlow,
-			ResumeFrom: plan.nextStep,
+		_, _ = scope.Execute(context.Background(), func(flowCtx context.Context) (any, error) {
+			result := a.Scheduler.StartDailyFlow(flowCtx, scheduler.DailyFlowRequest{
+				ScheduleID: plan.scheduleID,
+				TaskFlow:   plan.taskFlow,
+				ResumeFrom: plan.nextStep,
+			})
+			if result.Summary != nil {
+				result.Summary.Warnings = append(result.Summary.Warnings,
+					"该流程在服务重启后从第 "+strconv.Itoa(plan.nextStep+1)+" 项继续执行")
+			}
+			switch {
+			case result.Stopped:
+				return nil, runapp.ErrActionStopped
+			case !result.Success:
+				return nil, apperrors.WithStatus("AGENT_RESUME_FAILED", result.Message, 500, true, map[string]any{
+					"scheduleId": plan.scheduleID,
+					"fromStep":   plan.nextStep + 1,
+				})
+			default:
+				return result, nil
+			}
 		})
-		current, ok := a.Runs.Get(run.RunID)
-		if ok && current.State.Terminal() {
-			return
-		}
-		if result.Summary != nil {
-			result.Summary.Warnings = append(result.Summary.Warnings,
-				"该流程在服务重启后从第 "+strconv.Itoa(plan.nextStep+1)+" 项继续执行")
-		}
-		switch {
-		case result.Stopped:
-			_, _ = a.Runs.Stop(run.RunID, result)
-		case !result.Success:
-			_, _ = a.Runs.Fail(run.RunID, apperrors.WithStatus("AGENT_RESUME_FAILED", result.Message, 500, true, map[string]any{
-				"scheduleId": plan.scheduleID,
-				"fromStep":   plan.nextStep + 1,
-			}))
-		default:
-			_, _ = a.Runs.Complete(run.RunID, result)
-		}
 	}()
 
 	return run, nil

@@ -48,7 +48,7 @@ func (h *Handler) webrtcStart(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	run, replayed, err := h.executeTrackedResult(ctx, "webrtc_start", map[string]any{
+	run, replayed, err := h.executeTrackedOperation(ctx, "webrtc_start", map[string]any{
 		"profileId": body.ProfileID, "adbPath": request.ADBPath, "address": request.Address, "deviceId": request.DeviceID,
 	}, map[string]any{"taskName": "启动实时预览", "taskType": "preview"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
 		status, startErr := h.app.WebRTC.Start(actionCtx, request)

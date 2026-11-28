@@ -33,6 +33,7 @@ concepts, with the old copies deleted:
 | Agent operation → route | `internal/contract` + `agentapi` mux | `route_contract_test.go` |
 | HTTP envelope and error mapping | `transport/httpx` + `util/errors` | unit tests |
 | Run status/record/DTO | `domain/agentrun` | contract tests |
+| Run lifecycle transitions | `app/agentrun` (`Scope`) | unexported mutators + `TestRunLifecycleStaysInAgentRunScope` |
 | Atomic persistence | `util/jsonstore` (`Write`, `WriteRaw`) | store tests |
 | JS value coercion | `util/jsval` | coercion tests |
 | Timestamp layouts | `util/timefmt` | layout tests |
@@ -51,17 +52,18 @@ concepts, with the old copies deleted:
 Deleted along the way: the private atomic writer, `MAAServiceService`, the
 second `Profiles` cache, the dead `uibrik` kit, the `store/` vs `stores/`
 split, three token/queue implementations, the local duration/timestamp/
-error copies, the 3,450-line `handler.go`, and the quotes router inside the
-application package.
+error copies, the 3,450-line `handler.go`, the quotes router inside the
+application package, and the transport-local run lifecycle (begin/start/
+fail/stop/settle helpers).
 
-Remaining high-value work is recorded in `TASKS.md`; the largest items are the
-transport-owned run lifecycle (`G7`), typed operbox/depot schemas (`G3`), the
-remaining `jsval` packages (`G1`, blocked on intentional null/undefined
-differences), one PRTS client (`G2`, blocked on retry semantics), the assets
-router move (`G6`), the API module split (`C7`), and the visual token/CSS
-migrations (`C8`, `C9`). Workflow changes (`PD1`) remain intentionally
-untouched. Each is either a decision-blocked item or a dedicated multi-round
-refactor; no half-migrated state was left behind.
+Remaining high-value work is recorded in `TASKS.md`; the largest items are
+typed operbox/depot schemas (`G3`), the remaining `jsval` packages (`G1`,
+blocked on intentional null/undefined differences), one PRTS client (`G2`,
+blocked on retry semantics), the assets router move (`G6`), the API module
+split (`C7`), and the visual token/CSS migrations (`C8`, `C9`). Workflow
+changes (`PD1`) remain intentionally untouched. Each is either a
+decision-blocked item or a dedicated multi-round refactor; no half-migrated
+state was left behind.
 
 ## Round log
 
@@ -275,7 +277,8 @@ deleted, verification, and follow-ups.
 - Added `TestAgentAPIFilesStaySmall` (800-line limit) so a god file cannot
   grow back unnoticed.
 - Verified: full Go test suite, vet, gofmt.
-- Follow-up: the run lifecycle is still called from handlers (G7).
+- Follow-up: the run lifecycle is still called from handlers (G7, closed in
+  Round 31).
 
 ### Round 22 — move the quotes router into transport (2026-11-28)
 
@@ -376,6 +379,44 @@ deleted, verification, and follow-ups.
   and made recognition alias them so its API and tests are unchanged.
 - Verified: full Go test suite, vet, gofmt.
 - Follow-up: readers still decode untyped maps (G3 remainder).
+
+### Round 31 — one writer for the run lifecycle (2026-11-28)
+
+- G7 / PD4: transport, the MAA service, the startup resumer, and the cron
+  flow wrapper each carried their own begin/start/fail/stop/complete sequence,
+  with three copies of the "action ended because stop was requested" rule.
+- Added `app/agentrun.Scope`: `Open` begins or replays a run; `Execute` starts
+  it, attaches the parent-run context, invokes the action, and settles exactly
+  once (`succeeded` / `failed` / `stopped`, including a concurrent stop that
+  already moved the run to `stopping`); `Settle` owns the manual copilot-step
+  matrix (`completed` / `stopped` / `waiting` / `failed`); `Stop` owns accepted
+  cancellation (with idempotency release), stopping escalation, and the
+  external stop callback; `Progress` owns task-result updates; `Interrupt`
+  owns graceful shutdown.
+- Every lifecycle mutator on `Service` is now unexported, so the compiler
+  enforces the scope as the only writer. Transport keeps only `Get`/`Current`
+  reads and response marshalling; `executeTrackedOperation` is a thin
+  `Open`/`Execute` delegate.
+- Migrated all callers and deleted the old implementations: the transport
+  `settleManualRun`, stop-run transition block, `isTrackedStopError`,
+  `errTrackedActionStopped`, `runFailureError`, and the duplicated
+  `executeTrackedResult` alias; the MAA service's private begin/start/fail/
+  complete sequence and `StopCurrent` transition block; the resume and cron
+  wrappers' switch statements.
+- Preserved behavior: accepted-stop releases the idempotency key; a forced
+  global stop (`/actions/stop` → `StopCurrent`) sends an accepted run through
+  stopping and the process stop and keeps its key, matching the pre-scope
+  implementation; a failed MAA process stop leaves the run `stopping` in
+  `StopCurrent`; the `webrtc_start` terminal special case stays in
+  `/actions/stop`; manual session cleanup still precedes the waiting-run stop.
+- Added `TestRunLifecycleStaysInAgentRunScope` (archguard) plus lifecycle,
+  manual-settle, stop-escalation, concurrent-stop, and concurrent-idempotency
+  tests in `agentrun`; ran `go test -race` on `agentrun`, `maa`, `app`, and
+  `agentapi`.
+- Verified: full Go test suite (701 tests / 49 packages), vet, gofmt;
+  `agentrun` + `maa` + `app` + `agentapi` under `-race`.
+- Follow-up: two settle paths still discard persistence errors, matching the
+  previous transport behavior (G13).
 
 
 

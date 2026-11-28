@@ -115,14 +115,15 @@ func TestRunTaskWithOptionsUsesAddress(t *testing.T) {
 
 func TestRunUnderParentAttachesToOuterRun(t *testing.T) {
 	service, _ := newTestService(t)
-	outer, _, err := service.runs.Begin(runapp.BeginInput{
+	scope, _, err := service.runs.Open(runapp.Request{
 		OperationID: "run_daily_flow",
 		Input:       map[string]any{"scheduleId": "default"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.runs.StartForExecution(outer.RunID); err != nil {
+	outer, _ := scope.Run()
+	if _, err := scope.Start(); err != nil {
 		t.Fatal(err)
 	}
 	ctx := runapp.WithParentRun(context.Background(), outer.RunID)

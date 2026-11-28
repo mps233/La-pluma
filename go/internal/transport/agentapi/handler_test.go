@@ -76,10 +76,11 @@ func TestStatusAndCurrentRun(t *testing.T) {
 		t.Fatalf("expected no current run: %#v", currentData)
 	}
 
-	run, _, err := application.Runs.Begin(appRunInput("run_task", "test-run"))
+	scope, _, err := application.Runs.Open(appRunInput("run_task", "test-run"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	run, _ := scope.Run()
 	got := doRequest(t, handler, http.MethodGet, "/runs/"+run.RunID)
 	if got.Code != http.StatusOK {
 		t.Fatalf("get run status = %d, body = %s", got.Code, got.Body.String())
@@ -92,10 +93,11 @@ func TestStatusAndCurrentRun(t *testing.T) {
 
 func TestStopAcceptedRun(t *testing.T) {
 	application, handler := newTestHandler(t)
-	run, _, err := application.Runs.Begin(appRunInput("run_task", "stop-run"))
+	scope, _, err := application.Runs.Open(appRunInput("run_task", "stop-run"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	run, _ := scope.Run()
 	stopped := doRequest(t, handler, http.MethodPost, "/runs/"+run.RunID+"/stop")
 	if stopped.Code != http.StatusOK {
 		t.Fatalf("stop status = %d, body = %s", stopped.Code, stopped.Body.String())
@@ -130,8 +132,8 @@ func TestManifestAndOpenAPI(t *testing.T) {
 		t.Fatalf("openapi status = %d", openapi.Code)
 	}
 }
-func appRunInput(operationID, idempotencyKey string) runapp.BeginInput {
-	return runapp.BeginInput{
+func appRunInput(operationID, idempotencyKey string) runapp.Request {
+	return runapp.Request{
 		OperationID:    operationID,
 		IdempotencyKey: &idempotencyKey,
 		Input:          map[string]any{"source": "test"},
@@ -302,17 +304,16 @@ func TestRunDailyFlowUsesSingleOuterRun(t *testing.T) {
 func TestExecuteTrackedOperationMarksStopped(t *testing.T) {
 	root := t.TempDir()
 	paths := config.Paths{DataDir: filepath.Join(root, "data"), MaaConfigDir: filepath.Join(root, "maa-config")}
-	application, handler := newActionApp(t, paths, filepath.Join(root, "missing-maa"))
+	_, handler := newActionApp(t, paths, filepath.Join(root, "missing-maa"))
 
 	run, replayed, err := handler.executeTrackedOperation(context.Background(), "test_stopped", map[string]any{"source": "test"}, nil, nil, func(ctx context.Context) (any, error) {
-		runID := runapp.ParentRunID(ctx)
-		if runID == "" {
+		if runapp.ParentRunID(ctx) == "" {
 			t.Fatal("parent run missing from context")
 		}
-		if _, err := application.Runs.MarkStopping(runID); err != nil {
-			t.Fatal(err)
+		if _, ok := runapp.ScopeFrom(ctx); !ok {
+			t.Fatal("run scope missing from context")
 		}
-		return nil, errTrackedActionStopped
+		return nil, runapp.ErrActionStopped
 	})
 	if err != nil || replayed {
 		t.Fatalf("err = %v replayed = %v", err, replayed)
@@ -515,10 +516,11 @@ func TestStopActionResponseShape(t *testing.T) {
 		t.Fatalf("missing run stop = %d, body = %s", missing.Code, missing.Body.String())
 	}
 
-	accepted, _, err := application.Runs.Begin(appRunInput("run_task", "stop-accepted"))
+	acceptedScope, _, err := application.Runs.Open(appRunInput("run_task", "stop-accepted"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	accepted, _ := acceptedScope.Run()
 	notStarted := doJSONRequest(t, handler, http.MethodPost, "/actions/stop", `{"runId":"`+accepted.RunID+`"}`)
 	if notStarted.Code != http.StatusConflict || envelopeErrorCode(t, notStarted) != "AGENT_RUN_NOT_STARTED" {
 		t.Fatalf("accepted run stop = %d, body = %s", notStarted.Code, notStarted.Body.String())

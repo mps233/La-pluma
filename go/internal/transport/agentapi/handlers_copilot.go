@@ -303,15 +303,18 @@ func (h *Handler) executeCopilotSet(w http.ResponseWriter, r *http.Request) {
 		"raid":            raid,
 		"options":         options,
 	}, map[string]any{"taskName": "作业集执行", "taskType": "copilot"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
-		runID := runapp.ParentRunID(actionCtx)
+		scope, hasScope := runapp.ScopeFrom(actionCtx)
 		lifecycle := &copilot.ExecutionLifecycle{
-			RunID: runID,
+			RunID: runapp.ParentRunID(actionCtx),
 			OnProgress: func(progress map[string]any, taskResults []copilot.ProgressEntryResult) {
+				if !hasScope {
+					return
+				}
 				results := make([]any, 0, len(taskResults))
 				for _, item := range taskResults {
 					results = append(results, item)
 				}
-				_, _ = h.app.Runs.UpdateProgress(runID, progress, results)
+				_, _ = scope.Progress(progress, results)
 			},
 		}
 		result, runErr := h.app.Copilot.ExecutePlan(actionCtx, copilot.PlanExecution{
@@ -341,38 +344,13 @@ func (h *Handler) executeCopilotSet(w http.ResponseWriter, r *http.Request) {
 	sendTrackedRunResponse(w, run, replayed, "作业集执行完成")
 }
 
-func (h *Handler) settleManualRun(runID string, result *copilot.ManualStepResult, actionErr error) error {
-	if current, ok := h.app.Runs.Get(runID); ok && current.State.Terminal() {
-		if current.State == agentrun.StatusStopped {
-			return nil
-		}
-		return runFailureError(current)
-	}
-	if actionErr != nil {
-		if isTrackedStopError(actionErr) {
-			_, stopErr := h.app.Runs.Stop(runID, map[string]any{"message": actionErr.Error()})
-			return stopErr
-		}
-		_, _ = h.app.Runs.Fail(runID, actionErr)
-		return actionErr
-	}
+// manualOutcome maps a manual step result to the transport-neutral settle
+// contract owned by agentrun.Scope.
+func manualOutcome(result *copilot.ManualStepResult) runapp.Outcome {
 	if result == nil {
-		_, err := h.app.Runs.Complete(runID, nil)
-		return err
+		return runapp.Outcome{}
 	}
-	if result.Stopped {
-		_, err := h.app.Runs.Stop(runID, result)
-		return err
-	}
-	if result.Finished {
-		_, err := h.app.Runs.Complete(runID, result)
-		return err
-	}
-	if _, err := h.app.Runs.MarkWaiting(runID); err != nil {
-		return err
-	}
-	_, err := h.app.Runs.SetAcceptedResult(runID, result)
-	return err
+	return runapp.Outcome{Result: result, Stopped: result.Stopped, Finished: result.Finished}
 }
 
 func (h *Handler) sendManualResult(w http.ResponseWriter, runID string, result *copilot.ManualStepResult) {
@@ -398,7 +376,9 @@ func (h *Handler) startManualCopilotSet(w http.ResponseWriter, r *http.Request) 
 	setID := r.PathValue("id")
 	raid := firstNonEmpty(stringField(body, "raid"), "normal")
 	selectedIndexes := anySlice(body["selectedIndexes"])
-	run, replayed, err := h.app.Runs.Begin(runapp.BeginInput{
+	// Manual start is intentionally not idempotent: no idempotency key is
+	// attached, so Open never replays and every start creates a new run.
+	scope, _, err := h.app.Runs.Open(runapp.Request{
 		OperationID: "run_copilot_set_manual",
 		Input: map[string]any{
 			"clientType":      connection.ClientType,
@@ -413,31 +393,25 @@ func (h *Handler) startManualCopilotSet(w http.ResponseWriter, r *http.Request) 
 		writeError(w, err)
 		return
 	}
-	if replayed {
-		data := map[string]any{"runId": run.RunID, "state": run.State, "run": run}
-		httpx.Success(w, http.StatusOK, data, "返回已有手动作业集", nil)
-		return
-	}
-	if _, err := h.app.Runs.StartForExecution(run.RunID); err != nil {
-		_, _ = h.app.Runs.Fail(run.RunID, err)
+	runID := scope.RunID()
+	if _, err := scope.Start(); err != nil {
 		writeError(w, err)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
-	result, actionErr := h.app.Copilot.Manual().StartManualSet(runapp.WithParentRun(ctx, run.RunID), copilot.ManualStartRequest{
+	result, actionErr := h.app.Copilot.Manual().StartManualSet(runapp.WithParentRun(ctx, runID), copilot.ManualStartRequest{
 		SetID:           setID,
 		Raid:            raid,
 		SelectedIndexes: selectedIndexes,
 		Options:         options,
-		RunID:           run.RunID,
+		RunID:           runID,
 	})
 	if result != nil && result.RunID == "" {
-		result.RunID = run.RunID
+		result.RunID = runID
 	}
-	if err := h.settleManualRun(run.RunID, result, actionErr); err != nil {
-		current, ok := h.app.Runs.Get(run.RunID)
-		if ok && (current.State == agentrun.StatusFailed || current.State == agentrun.StatusInterrupted) {
+	if err := scope.Settle(manualOutcome(result), actionErr); err != nil {
+		if current, ok := scope.Run(); ok && (current.State == agentrun.StatusFailed || current.State == agentrun.StatusInterrupted) {
 			sendRunFailureResponse(w, current)
 			return
 		}
@@ -445,9 +419,9 @@ func (h *Handler) startManualCopilotSet(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if result == nil {
-		result = &copilot.ManualStepResult{RunID: run.RunID, State: copilot.ManualStateSucceeded, Finished: true}
+		result = &copilot.ManualStepResult{RunID: runID, State: copilot.ManualStateSucceeded, Finished: true}
 	}
-	h.sendManualResult(w, run.RunID, result)
+	h.sendManualResult(w, runID, result)
 }
 
 func (h *Handler) continueManualCopilotSet(w http.ResponseWriter, r *http.Request) {
@@ -467,25 +441,24 @@ func (h *Handler) continueManualCopilotSet(w http.ResponseWriter, r *http.Reques
 		options = map[string]any{}
 	}
 	injectConnectionOptions(options, connection)
-	run, ok := h.app.Runs.Get(runID)
+	scope, ok := h.app.Runs.Scope(runID)
 	if !ok {
 		writeError(w, apperrors.WithStatus("AGENT_RUN_NOT_FOUND", "未找到 Agent run: "+runID, http.StatusNotFound, false, map[string]any{"runId": runID}))
 		return
 	}
-	if run.State.Terminal() {
+	if run, _ := scope.Run(); run.State.Terminal() {
 		writeError(w, apperrors.WithStatus("AGENT_RUN_NOT_RUNNING", "手动作业集 Run 已结束", http.StatusConflict, false, map[string]any{"runId": runID, "state": run.State}))
 		return
 	}
-	if _, err := h.app.Runs.StartForExecution(runID); err != nil {
+	if _, err := scope.Start(); err != nil {
 		writeError(w, err)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
 	result, actionErr := h.app.Copilot.Manual().ContinueManualSet(runapp.WithParentRun(ctx, runID), runID, options)
-	if err := h.settleManualRun(runID, result, actionErr); err != nil {
-		current, exists := h.app.Runs.Get(runID)
-		if exists && (current.State == agentrun.StatusFailed || current.State == agentrun.StatusInterrupted) {
+	if err := scope.Settle(manualOutcome(result), actionErr); err != nil {
+		if current, ok := scope.Run(); ok && (current.State == agentrun.StatusFailed || current.State == agentrun.StatusInterrupted) {
 			sendRunFailureResponse(w, current)
 			return
 		}

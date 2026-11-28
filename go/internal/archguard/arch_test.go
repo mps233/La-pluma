@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -243,6 +244,48 @@ func TestLayersAreKnown(t *testing.T) {
 		layer := "internal/" + entry.Name()
 		if _, ok := allowedInternalDeps[layer]; !ok {
 			t.Fatalf("internal/%s is not assigned a dependency rule; add it to allowedInternalDeps", entry.Name())
+		}
+	}
+}
+
+// TestRunLifecycleStaysInAgentRunScope keeps one writer for run state. Services
+// and transport read runs through Get/Current/List and act through
+// agentrun.Scope; a second exported transition method would reopen the drift
+// that G7 closed.
+func TestRunLifecycleStaysInAgentRunScope(t *testing.T) {
+	root := moduleRoot(t)
+	mutators := regexp.MustCompile(`\.(?:Runs|runs)\.(Begin|StartForExecution|MarkWaiting|MarkStopping|SetAcceptedResult|Complete|Fail|Stop|ReleaseIdempotency|UpdateProgress|Interrupt)\(`)
+	allowedPrefix := filepath.Join("internal", "app", "agentrun")
+	for _, top := range []string{"internal/transport", "internal/app"} {
+		base := filepath.Join(root, filepath.FromSlash(top))
+		if _, err := os.Stat(base); err != nil {
+			continue
+		}
+		err := filepath.WalkDir(base, func(path string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			if strings.HasPrefix(rel, allowedPrefix+string(filepath.Separator)) {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if match := mutators.Find(data); match != nil {
+				t.Errorf("%s calls %s; delegate run transitions to agentrun.Scope", filepath.ToSlash(rel), match)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", top, err)
 		}
 	}
 }

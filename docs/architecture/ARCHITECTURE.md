@@ -54,7 +54,7 @@ transport → app → infra / domain
 | --- | --- | --- |
 | Run status strings, record, DTO, links | `internal/domain/agentrun` | Public API contract; tested |
 | Persisted recognition schema | `internal/domain/snapshot` | operbox/depot document shapes; recognition aliases them |
-| Run persistence, idempotency, restore | `internal/app/agentrun` | Single writer in-process |
+| Run lifecycle, persistence, idempotency, restore | `internal/app/agentrun` (`Service` + single-writer `Scope`) | Transition methods are unexported; transport and services delegate through `Scope` and only read via `Get`/`Current`/`List` |
 | MAA process lifecycle | `internal/infra/maa` + `internal/app/maa` | CLI spawn/stop/line capture |
 | MAA execution lease | `internal/app/execution` | Cross-process admission |
 | Data directory and env-derived paths | `internal/config` | `Paths` also owns the on-disk file and directory names; `Tuning` owns optional runtime knobs |
@@ -89,20 +89,16 @@ transport → app → infra / domain
 These are real today and tracked in `TASKS.md`; do not add new code that
 depends on them.
 
-1. `agentapi` handlers can begin/stop runs directly, so run lifecycle has more
-   than one writer. The endpoint package is now split by domain (no file over
-   800 lines); the remaining fix is to delegate lifecycle to an `app` run
-   scope.
-2. `infra/assets` still owns its HTTP router and raw response writer. Quotes
+1. `infra/assets` still owns its HTTP router and raw response writer. Quotes
    moved to `transport/quotesapi`; assets needs a small transport wrapper
    before the same is possible.
-3. `operbox.json` / `depot.json` and the `user-configs` path are composed in
+2. `operbox.json` / `depot.json` and the `user-configs` path are composed in
    multiple packages without one typed owner.
-4. JS-coercion helpers and PRTS clients exist in more than one package.
-5. The client keeps local run flags alongside the global run projection, and
+3. JS-coercion helpers and PRTS clients exist in more than one package.
+4. The client keeps local run flags alongside the global run projection, and
    configuration-sync drafts are implemented per page.
-6. `client/src/components/common` exports only part of its usable primitives,
+5. `client/src/components/common` exports only part of its usable primitives,
    so some consumers still deep-import; page skeletons live in `Loading.tsx`.
-7. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
+6. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
    aspirational; page CSS and some JS colors still use literals.
-8. `internal/app/logs` has no tests; `agentapi` exercises ~17% of its routes.
+7. `internal/app/logs` has no tests; `agentapi` exercises ~17% of its routes.

@@ -3,7 +3,6 @@ package agentapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -262,37 +261,11 @@ func (h *Handler) resolveRequestConnection(body map[string]any) (appconfig.Resol
 	return appconfig.ResolveConnection(profile, overrides)
 }
 
-var errTrackedActionStopped = errors.New("tracked action stopped")
-
-func isTrackedStopError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, errTrackedActionStopped) || errors.Is(err, context.Canceled) {
-		return true
-	}
-	if appErr, ok := apperrors.As(err); ok {
-		if appErr.Code == "COPILOT_PLAN_STOPPED" {
-			return true
-		}
-		if stopped, _ := appErr.Details["stopped"].(bool); stopped {
-			return true
-		}
-	}
-	return false
-}
-
-// executeTrackedResult runs a short, synchronous side effect under the shared
-// Agent run lifecycle.
-func (h *Handler) executeTrackedResult(ctx context.Context, operationID string, input, metadata any, idem *string, action func(context.Context) (any, error)) (agentrun.DTO, bool, error) {
-	return h.executeTrackedOperation(ctx, operationID, input, metadata, idem, action)
-}
-
-// executeTrackedOperation wraps a long action in one durable Agent run. MAA
-// commands invoked by the action attach to this run through the context
-// parent, so the stop endpoint and polling see one run id.
+// executeTrackedOperation runs one action under the shared Agent run scope.
+// Decoding and validation stay with the endpoint; begin, start, stop, and
+// terminal transitions belong to agentrun.Scope.
 func (h *Handler) executeTrackedOperation(ctx context.Context, operationID string, input, metadata any, idem *string, action func(context.Context) (any, error)) (agentrun.DTO, bool, error) {
-	run, replayed, err := h.app.Runs.Begin(runapp.BeginInput{
+	scope, replayed, err := h.app.Runs.Open(runapp.Request{
 		OperationID:    operationID,
 		IdempotencyKey: idem,
 		Input:          input,
@@ -302,55 +275,11 @@ func (h *Handler) executeTrackedOperation(ctx context.Context, operationID strin
 		return agentrun.DTO{}, false, err
 	}
 	if replayed {
+		run, _ := scope.Run()
 		return run, true, nil
 	}
-	if _, err := h.app.Runs.StartForExecution(run.RunID); err != nil {
-		failed, _ := h.app.Runs.Fail(run.RunID, err)
-		return failed, false, err
-	}
-	actionCtx := runapp.WithParentRun(ctx, run.RunID)
-	result, actionErr := action(actionCtx)
-
-	current, ok := h.app.Runs.Get(run.RunID)
-	if !ok {
-		current = run
-	}
-	if current.State.Terminal() {
-		if current.State == agentrun.StatusStopped {
-			return current, false, nil
-		}
-		return current, false, runFailureError(current)
-	}
-	if actionErr != nil {
-		if isTrackedStopError(actionErr) || current.State == agentrun.StatusStopping {
-			stopped, stopErr := h.app.Runs.Stop(run.RunID, map[string]any{"message": actionErr.Error()})
-			if stopErr != nil {
-				return agentrun.DTO{}, false, stopErr
-			}
-			return stopped, false, nil
-		}
-		failed, _ := h.app.Runs.Fail(run.RunID, actionErr)
-		return failed, false, actionErr
-	}
-	if current.State == agentrun.StatusStopping {
-		stopped, stopErr := h.app.Runs.Stop(run.RunID, result)
-		if stopErr != nil {
-			return agentrun.DTO{}, false, stopErr
-		}
-		return stopped, false, nil
-	}
-	completed, err := h.app.Runs.Complete(run.RunID, result)
-	if err != nil {
-		return agentrun.DTO{}, false, err
-	}
-	return completed, false, nil
-}
-
-func runFailureError(run agentrun.DTO) error {
-	if run.Error != nil {
-		return apperrors.WithStatus(run.Error.Code, run.Error.Message, run.Error.StatusCode, run.Error.Retryable, run.Error.Details)
-	}
-	return apperrors.New("AGENT_RUN_FAILED", "Agent run 执行失败")
+	run, err := scope.Execute(ctx, action)
+	return run, false, err
 }
 
 type fightStage struct {

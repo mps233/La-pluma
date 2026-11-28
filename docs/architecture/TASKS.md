@@ -13,13 +13,13 @@ without re-investigation.
 | G3 | P1 | go | Wire the operbox/depot readers to `internal/domain/snapshot` so field definitions are shared | The document shapes now live in `domain/snapshot` (recognition aliases them); `training/data.go:212,293`, `mastery/data.go:107,112`, `handler.go:1849,1858` still read untyped maps |
 | G2 | P1 | go | One PRTS client in `internal/infra/prts`; unify retry/timeout semantics | `activity/prts.go:50-223` vs `copilot/prts.go:73-473` |
 | G12 | P2 | go | Raise `agentapi` route coverage beyond the current ~18 of 107 paths | `handler_test.go` exercises ~18 distinct routes; contract tests cover the registry, not handler behavior |
+| G13 | P3 | go | Surface persistence errors discarded by stop/settle paths | `agentrun.Scope.Stop` ignores `releaseIdempotency` errors and `Settle` ignores `fail` errors, matching the pre-scope transport; decide whether a failed terminal write must fail the request |
 
 ## Larger refactors
 
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
 | G6 | P1 | go | Move the `assets` HTTP router into `transport/` while keeping its raw-image contract | Quotes moved to `transport/quotesapi`; `infra/assets/handler.go:84` still owns routing and its own writer |
-| G7 | P1 | go | Give `app/agentrun` a run scope so transport only decodes/validates/delegates | `handlers_runs.go`, `handlers_copilot.go`, `handlers_schedule.go` still call begin/start/fail/stop; 5 lifecycle writers; high risk |
 | G5 | P2 | go | Shared HTTP client/retry factory | 10 `&http.Client{...}` sites; retries only in PRTS |
 | G10 | P2 | go | One bootstrap for desktop and headless mounts | `go/main.go:277-289` vs `cmd/server/main.go:40-50` |
 | C5 | P1 | client | Derive page `isRunning` from the global run projection; keep local state only for submit-in-flight | four local flags; `statusStore.runStatus` + `runStore` already project runs; behavior-sensitive |
@@ -38,7 +38,6 @@ without re-investigation.
 | PD1 | Add client verify/gofmt/race jobs to `.github/workflows` | `AGENTS.md` forbids workflow edits without an explicit request; record and wait |
 | PD2 | Implement the primitive/semantic/component token layers from `DESIGN.md` | Visual system change; needs rendered light/dark/mobile verification |
 | PD3 | Make the global run projection the only owner of page run state | Changes polling and keep-alive semantics; needs product confirmation |
-| PD4 | Move run lifecycle out of transport (G7) | Large behavioral refactor; needs a dedicated round with race/cancellation tests |
 | PD5 | Choose one PRTS retry contract (activity starts at attempt 0, copilot at 1) | Product-visible retry count; pick canonical semantics first |
 
 ## Completed
@@ -70,3 +69,4 @@ without re-investigation.
 - Environment reads confined to the config layer: TURN, ADB defaults, Docker detection, and client type resolved by `config.Tuning`; archguard enforces it.
 - operbox/depot document shapes moved to `internal/domain/snapshot` with JSON tests; recognition aliases them.
 - Common component barrel completed; all primitive deep imports migrated.
+- G7: `agentrun.Scope` is the single run-lifecycle writer; transport, MAA, resume, and cron flows delegate to it; lifecycle methods are unexported and guarded (Round 31).

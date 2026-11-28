@@ -1,6 +1,7 @@
 package agentrun
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -32,19 +33,26 @@ func interruptAll(t *testing.T, service *Service) {
 	}
 }
 
+func openStarted(t *testing.T, service *Service, request Request) *Scope {
+	t.Helper()
+	scope, _, err := service.Open(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scope.Start(); err != nil {
+		t.Fatal(err)
+	}
+	return scope
+}
+
 func TestResumeCandidatesIncludeRestartInterruptions(t *testing.T) {
 	service := resumeTestService(t)
-	run, _, err := service.Begin(BeginInput{
+	scope := openStarted(t, service, Request{
 		OperationID: "execute_schedule",
 		Input:       map[string]any{"scheduleId": "daily"},
 		Progress:    map[string]any{"currentStep": 2},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.StartForExecution(run.RunID); err != nil {
-		t.Fatal(err)
-	}
+	run, _ := scope.Run()
 	interruptAll(t, service)
 
 	candidates := service.ResumeCandidates()
@@ -64,13 +72,8 @@ func TestResumeCandidatesIncludeRestartInterruptions(t *testing.T) {
 
 func TestMarkResumedRemovesTheCandidate(t *testing.T) {
 	service := resumeTestService(t)
-	run, _, err := service.Begin(BeginInput{OperationID: "execute_schedule", Input: map[string]any{}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.StartForExecution(run.RunID); err != nil {
-		t.Fatal(err)
-	}
+	scope := openStarted(t, service, Request{OperationID: "execute_schedule", Input: map[string]any{}})
+	run, _ := scope.Run()
 	interruptAll(t, service)
 
 	if err := service.MarkResumed(run.RunID, "new-run"); err != nil {
@@ -90,13 +93,8 @@ func TestMarkResumedRemovesTheCandidate(t *testing.T) {
 
 func TestMarkResumeSkippedRemovesTheCandidate(t *testing.T) {
 	service := resumeTestService(t)
-	run, _, err := service.Begin(BeginInput{OperationID: "run_copilot_set", Input: map[string]any{}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.StartForExecution(run.RunID); err != nil {
-		t.Fatal(err)
-	}
+	scope := openStarted(t, service, Request{OperationID: "run_copilot_set", Input: map[string]any{}})
+	run, _ := scope.Run()
 	interruptAll(t, service)
 
 	if err := service.MarkResumeSkipped(run.RunID, "operation_not_resumable"); err != nil {
@@ -109,14 +107,8 @@ func TestMarkResumeSkippedRemovesTheCandidate(t *testing.T) {
 
 func TestResumeCandidatesIgnoreUserStops(t *testing.T) {
 	service := resumeTestService(t)
-	run, _, err := service.Begin(BeginInput{OperationID: "execute_schedule", Input: map[string]any{}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.StartForExecution(run.RunID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.Stop(run.RunID, map[string]any{"stopped": true}); err != nil {
+	scope := openStarted(t, service, Request{OperationID: "execute_schedule", Input: map[string]any{}})
+	if _, err := scope.Stop(context.Background(), StopRequest{StopResult: map[string]any{"stopped": true}}); err != nil {
 		t.Fatal(err)
 	}
 	interruptAll(t, service)
@@ -128,14 +120,9 @@ func TestResumeCandidatesIgnoreUserStops(t *testing.T) {
 
 func TestInterruptMakesAGracefulShutdownResumable(t *testing.T) {
 	service := resumeTestService(t)
-	run, _, err := service.Begin(BeginInput{OperationID: "execute_schedule", Input: map[string]any{}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := service.StartForExecution(run.RunID); err != nil {
-		t.Fatal(err)
-	}
-	interrupted, err := service.Interrupt(run.RunID, "server_shutdown")
+	scope := openStarted(t, service, Request{OperationID: "execute_schedule", Input: map[string]any{}})
+	run, _ := scope.Run()
+	interrupted, err := scope.Interrupt("server_shutdown")
 	if err != nil {
 		t.Fatal(err)
 	}

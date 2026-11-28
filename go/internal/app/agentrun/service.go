@@ -50,16 +50,6 @@ type Service struct {
 	maxTerminal int
 }
 
-type BeginInput struct {
-	OperationID    string
-	IdempotencyKey *string
-	Input          any
-	Metadata       any
-	Trigger        any
-	Progress       any
-	TaskResults    []any
-}
-
 type Summary struct {
 	InterruptedRuns int
 }
@@ -304,7 +294,7 @@ func validateSnapshot(snapshot *storeSnapshot, now time.Time) ([]*agentrun.Recor
 	return snapshot.Runs, sequence, terminalSeq, interrupted, nil
 }
 
-func (s *Service) Begin(input BeginInput) (agentrun.DTO, bool, error) {
+func (s *Service) begin(input Request) (agentrun.DTO, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.required && !s.enabled {
@@ -400,15 +390,11 @@ func (s *Service) Begin(input BeginInput) (agentrun.DTO, bool, error) {
 	return run.ToDTO(), false, nil
 }
 
-func (s *Service) Start(runID string) (agentrun.DTO, error) {
-	return s.transition(runID, agentrun.StatusRunning, []agentrun.Status{agentrun.StatusAccepted}, nil)
-}
-
-func (s *Service) MarkWaiting(runID string) (agentrun.DTO, error) {
+func (s *Service) markWaiting(runID string) (agentrun.DTO, error) {
 	return s.transition(runID, agentrun.StatusWaiting, []agentrun.Status{agentrun.StatusRunning}, nil)
 }
 
-func (s *Service) StartForExecution(runID string) (agentrun.DTO, error) {
+func (s *Service) startForExecution(runID string) (agentrun.DTO, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	record, err := s.requireRecordLocked(runID)
@@ -425,11 +411,11 @@ func (s *Service) StartForExecution(runID string) (agentrun.DTO, error) {
 	}
 }
 
-func (s *Service) MarkStopping(runID string) (agentrun.DTO, error) {
+func (s *Service) markStopping(runID string) (agentrun.DTO, error) {
 	return s.transition(runID, agentrun.StatusStopping, []agentrun.Status{agentrun.StatusAccepted, agentrun.StatusWaiting, agentrun.StatusRunning}, nil)
 }
 
-func (s *Service) SetAcceptedResult(runID string, result any) (agentrun.DTO, error) {
+func (s *Service) setAcceptedResult(runID string, result any) (agentrun.DTO, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	record, err := s.requireRecordLocked(runID)
@@ -451,7 +437,7 @@ func (s *Service) SetAcceptedResult(runID string, result any) (agentrun.DTO, err
 	return record.Run.ToDTO(), nil
 }
 
-func (s *Service) Complete(runID string, result any) (agentrun.DTO, error) {
+func (s *Service) complete(runID string, result any) (agentrun.DTO, error) {
 	normalized, err := normalizeJSON(result, "result")
 	if err != nil {
 		return agentrun.DTO{}, err
@@ -462,7 +448,7 @@ func (s *Service) Complete(runID string, result any) (agentrun.DTO, error) {
 	})
 }
 
-func (s *Service) Fail(runID string, cause any) (agentrun.DTO, error) {
+func (s *Service) fail(runID string, cause any) (agentrun.DTO, error) {
 	failure := NormalizeFailure(cause)
 	return s.transition(runID, agentrun.StatusFailed, []agentrun.Status{agentrun.StatusAccepted, agentrun.StatusWaiting, agentrun.StatusRunning, agentrun.StatusStopping}, func(run *agentrun.Run) {
 		run.Result = nil
@@ -473,7 +459,7 @@ func (s *Service) Fail(runID string, cause any) (agentrun.DTO, error) {
 // Interrupt marks an active Run as interrupted by a deliberate shutdown. The
 // startup resumer treats "server_shutdown" like "server_restart" and continues
 // a supported flow; a user stop still goes through Stop and is not resumed.
-func (s *Service) Interrupt(runID, reason string) (agentrun.DTO, error) {
+func (s *Service) interrupt(runID, reason string) (agentrun.DTO, error) {
 	if reason == "" {
 		reason = "server_shutdown"
 	}
@@ -494,7 +480,7 @@ func (s *Service) Interrupt(runID, reason string) (agentrun.DTO, error) {
 	})
 }
 
-func (s *Service) Stop(runID string, result any) (agentrun.DTO, error) {
+func (s *Service) stop(runID string, result any) (agentrun.DTO, error) {
 	normalized, err := normalizeJSON(result, "result")
 	if err != nil {
 		return agentrun.DTO{}, err
@@ -505,7 +491,7 @@ func (s *Service) Stop(runID string, result any) (agentrun.DTO, error) {
 	})
 }
 
-func (s *Service) UpdateProgress(runID string, progress any, taskResults []any) (agentrun.DTO, error) {
+func (s *Service) updateProgress(runID string, progress any, taskResults []any) (agentrun.DTO, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	record, err := s.requireRecordLocked(runID)
@@ -534,7 +520,7 @@ func (s *Service) UpdateProgress(runID string, progress any, taskResults []any) 
 	return record.Run.ToDTO(), nil
 }
 
-func (s *Service) ReleaseIdempotency(runID string) (agentrun.DTO, error) {
+func (s *Service) releaseIdempotency(runID string) (agentrun.DTO, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	record, err := s.requireRecordLocked(runID)

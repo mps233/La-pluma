@@ -166,11 +166,14 @@ func (h *Handler) activityRun(w http.ResponseWriter, r *http.Request) {
 		"raid":            raid,
 		"options":         options,
 	}, map[string]any{"taskName": "当前活动作业", "taskType": "activity"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
-		runID := runapp.ParentRunID(actionCtx)
+		scope, hasScope := runapp.ScopeFrom(actionCtx)
 		lifecycle := &activity.Lifecycle{
-			RunID: runID,
+			RunID: runapp.ParentRunID(actionCtx),
 			OnProgress: func(progress any, taskResults []any) any {
-				updated, _ := h.app.Runs.UpdateProgress(runID, progress, taskResults)
+				if !hasScope {
+					return nil
+				}
+				updated, _ := scope.Progress(progress, taskResults)
 				return updated
 			},
 		}
@@ -191,7 +194,7 @@ func (h *Handler) activityRun(w http.ResponseWriter, r *http.Request) {
 			return nil, runErr
 		}
 		if stopped, _ := result["stopped"].(bool); stopped {
-			return nil, errTrackedActionStopped
+			return nil, runapp.ErrActionStopped
 		}
 		return result, nil
 	})

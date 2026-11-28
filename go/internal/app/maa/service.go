@@ -93,7 +93,7 @@ func (s *Service) Run(ctx context.Context, request RunRequest) (domainrun.DTO, b
 	if operationID == "" {
 		operationID = "run_task"
 	}
-	run, replayed, err := s.runs.Begin(runapp.BeginInput{
+	scope, replayed, err := s.runs.Open(runapp.Request{
 		OperationID:    operationID,
 		IdempotencyKey: request.IdempotencyKey,
 		Input:          request.Input,
@@ -104,16 +104,18 @@ func (s *Service) Run(ctx context.Context, request RunRequest) (domainrun.DTO, b
 		return domainrun.DTO{}, false, err
 	}
 	if replayed {
+		run, _ := scope.Run()
 		return run, true, nil
 	}
 
+	run, _ := scope.Run()
 	if request.Wait {
-		return s.execute(ctx, run, request)
+		return s.execute(ctx, scope, request)
 	}
 	go func() {
 		execCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
-		if _, _, err := s.execute(execCtx, run, request); err != nil {
+		if _, _, err := s.execute(execCtx, scope, request); err != nil {
 			s.logger.Warn("background MAA task failed", "run_id", run.RunID, "error", err)
 		}
 	}()
@@ -124,7 +126,14 @@ func (s *Service) Run(ctx context.Context, request RunRequest) (domainrun.DTO, b
 // parent run owns the idempotency key, stop link and terminal state; the MAA
 // command only contributes a task result.
 func (s *Service) runUnderParent(ctx context.Context, parentRunID string, request RunRequest) (domainrun.DTO, bool, error) {
-	parent, ok := s.runs.Get(parentRunID)
+	scope, ok := runapp.ScopeFrom(ctx)
+	if !ok || scope.RunID() != parentRunID {
+		scope, ok = s.runs.Scope(parentRunID)
+	}
+	if !ok {
+		return domainrun.DTO{}, false, apperrors.WithStatus("AGENT_RUN_NOT_FOUND", "父级 Agent run 不存在", 404, false, map[string]any{"runId": parentRunID})
+	}
+	parent, ok := scope.Run()
 	if !ok {
 		return domainrun.DTO{}, false, apperrors.WithStatus("AGENT_RUN_NOT_FOUND", "父级 Agent run 不存在", 404, false, map[string]any{"runId": parentRunID})
 	}
@@ -150,22 +159,22 @@ func (s *Service) runUnderParent(ctx context.Context, parentRunID string, reques
 		OnLine:   s.lineHandler(),
 	})
 	if err != nil {
-		_, _ = s.appendParentTaskResult(parentRunID, parent, request, "failed", err)
+		_, _ = s.appendParentTaskResult(scope, parent, request, "failed", err)
 		return parent, false, err
 	}
 	result := task.Wait(ctx)
 	if result.Err != nil {
-		_, _ = s.appendParentTaskResult(parentRunID, parent, request, "failed", result.Err)
+		_, _ = s.appendParentTaskResult(scope, parent, request, "failed", result.Err)
 		return parent, false, result.Err
 	}
-	updated, err := s.appendParentTaskResult(parentRunID, parent, request, "succeeded", nil)
+	updated, err := s.appendParentTaskResult(scope, parent, request, "succeeded", nil)
 	if err != nil {
 		return domainrun.DTO{}, false, err
 	}
 	return updated, false, nil
 }
 
-func (s *Service) appendParentTaskResult(runID string, parent domainrun.DTO, request RunRequest, state string, cause error) (domainrun.DTO, error) {
+func (s *Service) appendParentTaskResult(scope *runapp.Scope, parent domainrun.DTO, request RunRequest, state string, cause error) (domainrun.DTO, error) {
 	results := append([]any{}, parent.TaskResults...)
 	entry := map[string]any{
 		"taskName": request.TaskName,
@@ -177,49 +186,42 @@ func (s *Service) appendParentTaskResult(runID string, parent domainrun.DTO, req
 		entry["error"] = cause.Error()
 	}
 	results = append(results, entry)
-	return s.runs.UpdateProgress(runID, nil, results)
+	return scope.Progress(nil, results)
 }
 
-func (s *Service) execute(ctx context.Context, run domainrun.DTO, request RunRequest) (domainrun.DTO, bool, error) {
-	if _, err := s.runs.StartForExecution(run.RunID); err != nil {
-		return domainrun.DTO{}, false, err
-	}
-	lease, err := s.execution.Acquire(ctx, execution.Request{
-		Source:   request.TaskType,
-		TaskName: stringPtr(request.TaskName),
-		Command:  stringPtr(request.Command),
-		RunID:    stringPtr(run.RunID),
-	})
-	if err != nil {
-		failed, _ := s.runs.Fail(run.RunID, err)
-		return failed, false, err
-	}
-	defer lease.Release()
+func (s *Service) execute(ctx context.Context, scope *runapp.Scope, request RunRequest) (domainrun.DTO, bool, error) {
+	run, err := scope.Execute(ctx, func(actionCtx context.Context) (any, error) {
+		lease, leaseErr := s.execution.Acquire(actionCtx, execution.Request{
+			Source:   request.TaskType,
+			TaskName: stringPtr(request.TaskName),
+			Command:  stringPtr(request.Command),
+			RunID:    stringPtr(scope.RunID()),
+		})
+		if leaseErr != nil {
+			return nil, leaseErr
+		}
+		defer lease.Release()
 
-	task, err := s.runner.Exec(ctx, request.Command, request.Args, infraMaa.ExecOptions{
-		TaskName: request.TaskName,
-		Wait:     true,
-		Dir:      s.cfg.Paths.MaaConfigDir,
-		Env:      os.Environ(),
-		OnLine:   s.lineHandler(),
+		task, execErr := s.runner.Exec(actionCtx, request.Command, request.Args, infraMaa.ExecOptions{
+			TaskName: request.TaskName,
+			Wait:     true,
+			Dir:      s.cfg.Paths.MaaConfigDir,
+			Env:      os.Environ(),
+			OnLine:   s.lineHandler(),
+		})
+		if execErr != nil {
+			return nil, execErr
+		}
+		result := task.Wait(actionCtx)
+		if result.Err != nil {
+			return nil, result.Err
+		}
+		return map[string]any{
+			"exitCode": result.ExitCode,
+			"stdout":   result.Stdout,
+		}, nil
 	})
-	if err != nil {
-		failed, _ := s.runs.Fail(run.RunID, err)
-		return failed, false, err
-	}
-	result := task.Wait(ctx)
-	if result.Err != nil {
-		failed, _ := s.runs.Fail(run.RunID, result.Err)
-		return failed, false, result.Err
-	}
-	completed, err := s.runs.Complete(run.RunID, map[string]any{
-		"exitCode": result.ExitCode,
-		"stdout":   result.Stdout,
-	})
-	if err != nil {
-		return domainrun.DTO{}, false, err
-	}
-	return completed, false, nil
+	return run, false, err
 }
 
 // RunTaskOptions overrides the device target for a dynamic task. Empty values
@@ -391,18 +393,22 @@ func (s *Service) StopCurrent(ctx context.Context) StopResult {
 	task, hasTask := s.runner.Current()
 	running := hasTask && task != nil && task.Running()
 	activeRun := hasRun && !current.State.Terminal()
-	if hasRun {
-		_, _ = s.runs.MarkStopping(current.RunID)
-	}
-	if err := s.runner.Stop(ctx, 3*time.Second); err != nil {
-		return StopResult{Message: "终止失败: " + err.Error(), Err: err}
-	}
-	if hasRun {
-		if _, err := s.runs.Stop(current.RunID, map[string]any{"stopped": true}); err != nil {
-			if record, exists := s.runs.Get(current.RunID); !exists || !record.State.Terminal() {
-				return StopResult{Message: "终止失败: " + err.Error(), Err: err}
-			}
+	scope, hasScope := s.runs.Scope(current.RunID)
+	if hasScope && activeRun {
+		if _, err := scope.Stop(ctx, runapp.StopRequest{
+			StopResult: map[string]any{"stopped": true},
+			StopProcess: func(stopCtx context.Context) error {
+				return s.runner.Stop(stopCtx, 3*time.Second)
+			},
+			AbortOnProcessError: true,
+			Force:               true,
+		}); err != nil {
+			return StopResult{Message: "终止失败: " + err.Error(), Err: err}
 		}
+	} else if err := s.runner.Stop(ctx, 3*time.Second); err != nil {
+		// No active run to settle, but a terminal run may still own a stray
+		// process, so the global stop path always reaches the runner.
+		return StopResult{Message: "终止失败: " + err.Error(), Err: err}
 	}
 	if running || activeRun {
 		return StopResult{Success: true, Message: "已发送终止请求"}

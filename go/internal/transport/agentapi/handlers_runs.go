@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/app"
+	runapp "github.com/mps233/la-pluma/go/internal/app/agentrun"
 	maaapp "github.com/mps233/la-pluma/go/internal/app/maa"
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	"github.com/mps233/la-pluma/go/internal/app/updates"
@@ -150,43 +151,34 @@ func (h *Handler) getRun(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) stopRun(w http.ResponseWriter, r *http.Request) {
 	runID := r.PathValue("runId")
-	run, ok := h.app.Runs.Get(runID)
+	scope, ok := h.app.Runs.Scope(runID)
 	if !ok {
 		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{Code: "AGENT_RUN_NOT_FOUND", Message: "未找到 Agent run: " + runID, Retryable: false, Details: map[string]any{"runId": runID}})
 		return
 	}
-	if run.State.Terminal() {
-		httpx.Success(w, http.StatusOK, map[string]any{"stopped": false, "alreadyTerminal": true, "run": run}, "任务已经结束", nil)
-		return
-	}
-	if run.State == agentrun.StatusAccepted {
-		stopped, err := h.app.Runs.Stop(runID, map[string]any{"canceled": true})
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-		_, _ = h.app.Runs.ReleaseIdempotency(runID)
-		httpx.Success(w, http.StatusOK, map[string]any{"stopped": true, "acceptedRunCanceled": true, "run": stopped}, "已取消尚未开始的执行", nil)
-		return
-	}
-
-	if _, err := h.app.Runs.MarkStopping(runID); err != nil {
-		// Waiting/manual runs may not be stoppable here; return the current state.
-		current, _ := h.app.Runs.Get(runID)
-		httpx.Success(w, http.StatusOK, map[string]any{"stopped": false, "run": current}, "任务未在运行", nil)
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	if err := h.app.MAA.Stop(ctx, 3*time.Second); err != nil {
-		h.logger.Warn("stop MAA", "error", err)
-	}
-	stopped, err := h.app.Runs.Stop(runID, map[string]any{"stopped": true})
+	outcome, err := scope.Stop(ctx, runapp.StopRequest{
+		CancelResult: map[string]any{"canceled": true},
+		StopResult:   map[string]any{"stopped": true},
+		StopProcess: func(stopCtx context.Context) error {
+			return h.app.MAA.Stop(stopCtx, 3*time.Second)
+		},
+	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, map[string]any{"stopped": true, "run": stopped}, "任务已停止", nil)
+	switch {
+	case outcome.AlreadyTerminal:
+		httpx.Success(w, http.StatusOK, map[string]any{"stopped": false, "alreadyTerminal": true, "run": outcome.Run}, "任务已经结束", nil)
+	case outcome.Canceled:
+		httpx.Success(w, http.StatusOK, map[string]any{"stopped": true, "acceptedRunCanceled": true, "run": outcome.Run}, "已取消尚未开始的执行", nil)
+	case outcome.NotStoppable:
+		httpx.Success(w, http.StatusOK, map[string]any{"stopped": false, "run": outcome.Run}, "任务未在运行", nil)
+	default:
+		httpx.Success(w, http.StatusOK, map[string]any{"stopped": true, "run": outcome.Run}, "任务已停止", nil)
+	}
 }
 
 func (h *Handler) taskStatus(w http.ResponseWriter, r *http.Request) {
@@ -493,12 +485,17 @@ func (h *Handler) stopActions(w http.ResponseWriter, r *http.Request) {
 		}
 		if requested.State == agentrun.StatusWaiting {
 			if stopped, ok := h.app.Copilot.Manual().StopManualSetRun(requestedRunID); ok {
-				updated, stopErr := h.app.Runs.Stop(requestedRunID, stopped)
+				scope, exists := h.app.Runs.Scope(requestedRunID)
+				if !exists {
+					writeError(w, apperrors.WithStatus("AGENT_RUN_NOT_FOUND", "未找到 Agent run: "+requestedRunID, http.StatusNotFound, false, map[string]any{"runId": requestedRunID}))
+					return
+				}
+				outcome, stopErr := scope.Stop(ctx, runapp.StopRequest{StopResult: stopped})
 				if stopErr != nil {
 					writeError(w, stopErr)
 					return
 				}
-				httpx.Success(w, http.StatusOK, map[string]any{"stopped": true, "run": updated}, "手动作业集已停止", nil)
+				httpx.Success(w, http.StatusOK, map[string]any{"stopped": true, "run": outcome.Run}, "手动作业集已停止", nil)
 				return
 			}
 		}

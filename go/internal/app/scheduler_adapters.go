@@ -182,7 +182,7 @@ type trackedFlowWrapper struct{ runs *runapp.Service }
 // WrapDailyFlow gives cron-triggered flows the same outer run lifecycle as an
 // HTTP invocation. MAA commands attach to this run through the context parent.
 func (w trackedFlowWrapper) WrapDailyFlow(ctx context.Context, scheduleID string, run func(context.Context) scheduler.DailyFlowResult) scheduler.DailyFlowResult {
-	outer, _, err := w.runs.Begin(runapp.BeginInput{
+	scope, _, err := w.runs.Open(runapp.Request{
 		OperationID: "run_daily_flow",
 		Input:       map[string]any{"scheduleId": scheduleID},
 		Metadata:    map[string]any{"taskName": "今日流程 " + scheduleID, "taskType": "schedule"},
@@ -191,25 +191,33 @@ func (w trackedFlowWrapper) WrapDailyFlow(ctx context.Context, scheduleID string
 	if err != nil {
 		return scheduler.DailyFlowResult{Success: false, Message: err.Error(), ScheduleID: scheduleID}
 	}
-	if _, err := w.runs.StartForExecution(outer.RunID); err != nil {
-		_, _ = w.runs.Fail(outer.RunID, err)
-		return scheduler.DailyFlowResult{Success: false, Message: err.Error(), ScheduleID: scheduleID}
-	}
-	result := run(runapp.WithParentRun(ctx, outer.RunID))
-	result.RunID = outer.RunID
-	switch {
-	case result.Stopped:
-		_, _ = w.runs.Stop(outer.RunID, result)
-	case !result.Success:
-		code := "AGENT_DAILY_FLOW_REJECTED"
-		status := 400
-		if result.Busy {
-			code = "AGENT_SCHEDULE_ALREADY_RUNNING"
-			status = 409
+	var result scheduler.DailyFlowResult
+	actionRan := false
+	_, execErr := scope.Execute(ctx, func(actionCtx context.Context) (any, error) {
+		actionRan = true
+		result = run(actionCtx)
+		result.RunID = scope.RunID()
+		switch {
+		case result.Stopped:
+			return nil, runapp.ErrActionStopped
+		case !result.Success:
+			code := "AGENT_DAILY_FLOW_REJECTED"
+			status := 400
+			if result.Busy {
+				code = "AGENT_SCHEDULE_ALREADY_RUNNING"
+				status = 409
+			}
+			return nil, apperrors.WithStatus(code, result.Message, status, result.Busy, map[string]any{"scheduleId": result.ScheduleID})
+		default:
+			return result, nil
 		}
-		_, _ = w.runs.Fail(outer.RunID, apperrors.WithStatus(code, result.Message, status, result.Busy, map[string]any{"scheduleId": result.ScheduleID}))
-	default:
-		_, _ = w.runs.Complete(outer.RunID, result)
+	})
+	if !actionRan {
+		message := "今日流程启动失败"
+		if execErr != nil {
+			message = execErr.Error()
+		}
+		return scheduler.DailyFlowResult{Success: false, Message: message, ScheduleID: scheduleID}
 	}
 	return result
 }
@@ -324,7 +332,9 @@ func newScheduler(cfg config.Config, logger *slog.Logger, runs *runapp.Service, 
 		WrapDailyFlow:      trackedFlowWrapper{runs: runs}.WrapDailyFlow,
 		OnProgress: func(progress map[string]any, _ []scheduler.ScheduleTaskResult) {
 			if current, ok := runs.Current(); ok {
-				_, _ = runs.UpdateProgress(current.RunID, progress, nil)
+				if scope, exists := runs.Scope(current.RunID); exists {
+					_, _ = scope.Progress(progress, nil)
+				}
 			}
 		},
 		ResolveStage: func(stage, clientType string) string {

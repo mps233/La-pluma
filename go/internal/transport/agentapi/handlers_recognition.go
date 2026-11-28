@@ -26,7 +26,7 @@ func (h *Handler) depotRecognition(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
-	run, replayed, err := h.executeTrackedResult(ctx, "depot_recognition", map[string]any{"action": "depot-recognition"}, map[string]any{"taskName": "仓库识别", "taskType": "statistics"}, idempotencyKey(r), func(ctx context.Context) (any, error) {
+	run, replayed, err := h.executeTrackedOperation(ctx, "depot_recognition", map[string]any{"action": "depot-recognition"}, map[string]any{"taskName": "仓库识别", "taskType": "statistics"}, idempotencyKey(r), func(ctx context.Context) (any, error) {
 		result, err := h.app.Recognition.RecognizeDepot(ctx)
 		if err != nil {
 			return nil, recognitionFailure(err, "AGENT_DEPOT_RECOGNITION_FAILED", "仓库识别失败")
@@ -49,7 +49,7 @@ func (h *Handler) operboxRecognition(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
-	run, replayed, err := h.executeTrackedResult(ctx, "operbox_recognition", map[string]any{"action": "operbox-recognition"}, map[string]any{"taskName": "干员识别", "taskType": "statistics"}, idempotencyKey(r), func(ctx context.Context) (any, error) {
+	run, replayed, err := h.executeTrackedOperation(ctx, "operbox_recognition", map[string]any{"action": "operbox-recognition"}, map[string]any{"taskName": "干员识别", "taskType": "statistics"}, idempotencyKey(r), func(ctx context.Context) (any, error) {
 		result, err := h.app.Recognition.RecognizeOperBox(ctx)
 		if err != nil {
 			return nil, recognitionFailure(err, "AGENT_OPERBOX_RECOGNITION_FAILED", "干员识别失败")
