@@ -530,7 +530,7 @@ deleted, verification, and follow-ups.
 - Follow-up: G6 (assets router) and C5 (client run projection) are the
   remaining P1 items; PD5 still needs a product decision.
 
-### Round 37 — assets router into transport (2026-11-28)
+### Round 37 — assets router into transport (2026-11-28, `25fb94d`)
 
 - G6: `infra/assets` owned the mux, path-value parsing, raw JSON errors, image
   cache headers, and WebP negotiation in addition to resolution and encoding,
