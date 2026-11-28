@@ -766,7 +766,7 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C7g splits the maaApi method groups and composes the object.
 
-### Round 53 — start composing maaApi from groups (2026-11-28)
+### Round 53 — start composing maaApi from groups (2026-11-28, `5d0686b`)
 
 - C7g (first slice): the version/config-directory and command-execution
   methods moved to `services/api/groups/system.ts` as `systemApi`; `maaApi`
