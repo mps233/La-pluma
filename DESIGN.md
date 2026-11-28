@@ -93,6 +93,7 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 - 顶栏主题胶囊使用 `GlassCard` 作为材质容器，内部保留三按钮和蓝色选中指示；GitHub、品牌、移动端主题触发器使用 `GlassButton`（GitHub 使用 `href`，品牌桌面保持裸链、移动端为 44px 圆钮）。
 - 移动端顶栏的品牌、主题、GitHub 圆形入口使用同一套 `GlassButton` 材质。
 - `prefers-reduced-transparency: reduce` 下由 `ios-theme.css` 把应用 chrome 退化为实色并关闭 backdrop-filter；`prefers-contrast: more` 通过应用类加强边框和文字，不依赖 registry 的内部 token。
+- `GlassLiveCardButton` 的 `live` 是逐帧重绘开关，默认关闭；只有背后确实有持续运动内容时才显式开启。静态 chrome 按钮使用默认的快照刷新，避免玻璃引擎在空闲时持续出帧。
 - 页面和组件不要新增手写玻璃或 Glasswork 类；需要新玻璃面时使用 `GlassCard`、`GlassButton`、`GlassSegmented`、`GlassNav`、`GlassMenu`、`GlassSwitch`。其中 `GlassNav` / `GlassMenu` 是 `client/src/components/LayoutGlassChrome.tsx` 里的应用适配器（基于 kit 的 ButtonGroup / DropdownMenu），不是 registry 直接导出的组件；页面仍通过 `Layout` 使用它们，不要另写导航或菜单。
 - 页面内分段控件统一使用 `GlassSegmented` 适配器（作业类型、肉鸽模式、日志内容、数据视图、养成方式、养成状态、配置分区），不再使用 `app-liquid-tab-pill` 胶囊或手写高亮层。预览卡直接使用 registry 的 `GlassTabs`（`client/src/components/liquid-glass/glass-tabs.tsx`，见 `PreviewModeControls`）；不要把这个例外扩散到其他页面。作业类型 wrapper 通过 `data-theme` 继承明暗主题（`system` 时交给媒体查询）；页面级轨道由 `.lg-segmented` 适配器铺满容器。
 - 移动端底部导航使用 `GlassNav`（控制台、自动化、作业、配置四个 Tab）+ 独立圆形 `GlassMenu`（更多）；「更多」不是第五个 Tab，点击后从按钮向左上展开工作区菜单，当前溢出页面在菜单中带勾选，溢出页面激活时按钮使用 accent 色。tabbar wrapper 绑定 `data-theme`，保留 `--la-pluma-tabbar-*` 高度与安全区 token，内容区留白和滚动遮罩继续使用这些 token。移动 tabbar 的 `GlassNav` 固定使用 `tinted` 玻璃：`clear` 会随滚动逐帧重绘并抓取页面背景，`tinted` 是固定磨砂体，滚动时不再重绘。适配器默认仍是 `clear`，由调用处显式选择材质；不要在页面里另写媒体查询切换。

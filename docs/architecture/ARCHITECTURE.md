@@ -85,6 +85,9 @@ transport → app → infra / domain
   components stay out of the barrel: `Modal`/`ConfirmDialog` and `StatusMark`
   are imported from their files, and framer-motion is not a named manual
   chunk, so the entry preload stays animation-free.
+- Per-frame glass repaint is opt-in (`GlassLiveCardButton live`). Static
+  chrome keeps the snapshot refresh, so the shared glass engine can idle
+  instead of waking every frame.
 - The glass registry is vendored verbatim from upstream
   `bilalgursen/liquid-glass` at `f697b08` (Search 2.1.1); app imports go
   through `components/glass`. The desktop sidebar search is the official
