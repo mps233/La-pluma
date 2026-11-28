@@ -1063,3 +1063,29 @@ deleted, verification, and follow-ups.
   (545 tests / 85 files), and production build.
 - Follow-up: PF3–PF6 in `TASKS.md` (WebRTC preview, glass popups, unused run
   logs, CSS pruning).
+
+### Round 68 — tree-shake the glass menu out of the entry (2026-11-28, `8b4a28d`)
+
+- PF4 (implemented): glass and common component modules are marked
+  side-effect-free in the Vite build, the common barrel no longer exports
+  `CheckboxField`/`GlassSelectWithFill`/`SelectField`, and `LayoutGlassChrome`
+  renders a same-style trigger that lazy-loads `GlassMenuImpl` on hover or
+  activation. The real menu opens with focus on the first item; Escape returns
+  focus to the trigger.
+- Bundle: entry JS 564.3 → 237.4 KB raw (180.0 → 73.1 KB gzip). The full
+  initial preloaded JS+CSS payload falls from ~286 KB to ~244 KB gzip because
+  the entry's shared glass chunks are smaller; the PWA precache drops from
+  1,047.5 KiB to 728.8 KiB. The menu chunk is 33.2 KB raw / 11.3 KB gzip and is
+  not precached.
+- The glass form fields and menu foundations are absent from the entry graph;
+  only the core `GlassCard`/`GlassButton`/segmented chunks remain preloaded.
+- Verified against the production preview build: the dashboard renders, the
+  overflow menu opens from the placeholder on the first click, focus enters
+  the menu, and Escape closes it and restores trigger focus. Screenshots cover
+  the menu closed/open in light/dark at 390×844 and the Automation page in
+  light/dark at 1440×900. Client lint, type-check, full suite (547 tests / 86
+  files), and the production build pass.
+- PF3 is recorded as blocked in `TASKS.md`: the App-level
+  `PreviewSessionProvider` owns the only WebRTC session and quality-restart
+  logic, so moving the preview entry requires a session-engine split.
+- Follow-up: PF5/PF6, and a decision on the PF3 session refactor.
