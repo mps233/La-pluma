@@ -25,13 +25,12 @@ import {
   Select,
   Checkbox,
   Switch,
-  Modal,
-  ConfirmDialog,
   EmptyState,
   Loading,
   CjkText,
   TruncatedText,
 } from '../common'
+import { ConfirmDialog, Modal } from '../common/Modal'
 import { formatDateTimeCompact, formatRemainingDuration } from '../../utils/format'
 import { getApiErrorMessage } from '../../utils/errorMessage'
 import { useMasteryStore } from '@/state'

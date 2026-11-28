@@ -26,6 +26,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | Client lint does not exceed the current warning count | `--max-warnings 1` in `client/package.json` | `npm run lint --prefix client` |
 | Strict TypeScript, including `noUnusedLocals` and `noUnusedParameters` | `tsc --noEmit` | `npm run type-check --prefix client` |
 | Pages are code-split and PWA/page caching configuration is covered | `vite.config.test.ts` | `npm run test --prefix client` |
+| The entry preload excludes the animation vendor: framer-motion is never a named manual chunk | `vite.config.test.ts` (entry chunk policy) | `npm run test --prefix client` |
 
 ## Not yet enforceable
 

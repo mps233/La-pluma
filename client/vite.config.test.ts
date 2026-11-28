@@ -7,6 +7,7 @@ import {
   createDevServiceWorkerCleanupScript,
   createNavigateFallbackDenylist,
   createPageCachePattern,
+  createViteConfig,
   createWebManifest,
   createWorkboxConfig,
   normalizeBasePath,
@@ -70,6 +71,18 @@ const createMockResponse = () => {
   }
   return { headers, response, end }
 }
+
+describe('entry chunk policy', () => {
+  it('does not name a framer-motion chunk', () => {
+    const output = createViteConfig('/').build?.rollupOptions?.output
+    const resolved = Array.isArray(output) ? output[0] : output
+    const manualChunks = (resolved as { manualChunks?: (id: string) => string | undefined } | undefined)?.manualChunks
+    if (typeof manualChunks !== 'function') throw new Error('manualChunks missing')
+
+    expect(manualChunks('/repo/node_modules/framer-motion/dist/es/index.mjs')).toBeUndefined()
+    expect(manualChunks('/repo/node_modules/react/index.js')).toBe('react-vendor')
+  })
+})
 
 describe('PWA base path configuration', () => {
   const matchesWorkboxRegExpRoute = (pattern: RegExp, input: string, origin = 'https://la-pluma.test') => {

@@ -28,11 +28,11 @@ import {
   Select,
   Input,
   Loading,
-  ConfirmDialog,
   SmoothPanel,
   Switch,
   SwipeModePager,
 } from './common'
+import { ConfirmDialog } from './common/Modal'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { summarizeMaaCliMessage, summarizeMaaCliSummaryBlock } from '../utils/maaLogSummary'
 import { keepNumberWithUnit } from '../utils/typography'

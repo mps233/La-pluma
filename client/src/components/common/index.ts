@@ -18,10 +18,12 @@ export { default as Switch } from './Switch.tsx'
 export { CheckboxField, GlassSelectWithFill, SelectField } from './fields.tsx'
 
 // 反馈组件
-export { Modal, ConfirmDialog } from './Modal.tsx'
+// Modal stays out of this barrel: it carries the animation library and every
+// current consumer is a lazy page or dialog. Import it from './Modal' directly.
 export { default as Loading } from './Loading.tsx'
 export { default as EmptyState } from './EmptyState.tsx'
-export { default as StatusMark } from './StatusMark.tsx'
+// StatusMark is combat-only; importing it from here would pull its animation
+// library into every chunk that uses this barrel.
 export { default as ActivityIndicator } from './ActivityIndicator.tsx'
 export { default as Tooltip } from './Tooltip.tsx'
 export { GlassLiveCardButton } from './GlassLiveCardButton.tsx'

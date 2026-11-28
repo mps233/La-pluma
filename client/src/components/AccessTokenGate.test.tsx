@@ -18,7 +18,7 @@ describe('AccessTokenGate', () => {
 
     fireEvent(window, new Event(AUTH_REQUIRED_EVENT))
 
-    const dialog = screen.getByRole('alertdialog', { name: '需要访问令牌' })
+    const dialog = await screen.findByRole('alertdialog', { name: '需要访问令牌' })
     expect(dialog.textContent).toContain('需要访问令牌')
 
     const input = screen.getByLabelText('访问令牌') as HTMLInputElement

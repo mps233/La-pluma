@@ -311,7 +311,8 @@ export const createViteConfig = (basePath: string): UserConfig => ({
       output: {
         manualChunks(id: string) {
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react-vendor'
-          if (/node_modules\/(framer-motion|motion-dom|motion-utils)\//.test(id)) return 'motion-vendor'
+          // Do not name a framer-motion chunk here: every consumer is a lazy
+          // page, and a named manual chunk is pulled into the entry preload.
           return undefined
         }
       }

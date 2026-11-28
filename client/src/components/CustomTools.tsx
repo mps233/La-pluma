@@ -11,7 +11,8 @@ import {
 } from 'lucide-react'
 import { maaApi } from '../services/api'
 import { useStatusStore } from '@/state'
-import { Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Loading, PageHeader, Switch, CjkText } from './common'
+import { Button, Card, CardContent, EmptyState, Input, Loading, PageHeader, Switch, CjkText } from './common'
+import { ConfirmDialog } from './common/Modal'
 import { keepNumberWithUnit } from '../utils/typography'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 

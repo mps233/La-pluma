@@ -1,84 +1,50 @@
-import { useEffect, useState } from 'react'
-import { KeyRound } from 'lucide-react'
-import { Button, Input, Modal } from './common'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { isDesktopRuntime } from '@/desktop/bridge'
-import {
-  AUTH_REQUIRED_EVENT,
-  readAccessToken,
-  writeAccessToken,
-} from '@/utils/accessToken'
+import { AUTH_REQUIRED_EVENT } from '@/utils/accessToken'
+
+// The dialog pulls in the shared modal animation library. Keep the listener
+// tiny and load the dialog only after a 401 asks for a token.
+const AccessTokenModal = lazy(() => import('./AccessTokenModal'))
+
+const EXIT_MS = 260
 
 export default function AccessTokenGate() {
   const [open, setOpen] = useState(false)
-  const [value, setValue] = useState('')
-  const [error, setError] = useState('')
+  const [mounted, setMounted] = useState(false)
+  const [instance, setInstance] = useState(0)
+  const closeTimer = useRef<number | null>(null)
 
   useEffect(() => {
     if (isDesktopRuntime()) return undefined
     const handleAuthRequired = () => {
-      setValue(readAccessToken())
-      setError('')
+      if (closeTimer.current !== null) {
+        window.clearTimeout(closeTimer.current)
+        closeTimer.current = null
+      }
+      setInstance(value => value + 1)
+      setMounted(true)
       setOpen(true)
     }
     window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired)
-    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired)
+    return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired)
+      if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
+    }
   }, [])
 
-  if (isDesktopRuntime()) return null
+  if (isDesktopRuntime() || !mounted) return null
 
-  const save = () => {
-    if (!value.trim()) {
-      setError('请输入访问令牌')
-      return
-    }
-    const token = writeAccessToken(value)
-    if (!token) {
-      setError('访问令牌格式无效')
-      return
-    }
+  const close = () => {
     setOpen(false)
-    window.location.reload()
+    closeTimer.current = window.setTimeout(() => {
+      closeTimer.current = null
+      setMounted(false)
+    }, EXIT_MS)
   }
 
   return (
-    <Modal
-      isOpen={open}
-      onClose={() => setOpen(false)}
-      title="需要访问令牌"
-      size="sm"
-      role="alertdialog"
-      footer={(
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="ghost" onClick={() => setOpen(false)}>
-            暂时关闭
-          </Button>
-          <Button onClick={save} icon={<KeyRound size={16} aria-hidden="true" />}>
-            保存并重试
-          </Button>
-        </div>
-      )}
-    >
-      <div className="space-y-4">
-        <p className="text-sm text-secondary">
-          此服务要求访问令牌。输入管理员提供的令牌后，即可加载数据并连接实时预览。
-        </p>
-        <Input
-          label="访问令牌"
-          type="password"
-          value={value}
-          onChange={(next) => {
-            setValue(next)
-            setError('')
-          }}
-          placeholder="请输入访问令牌"
-          hint="令牌只保存在本机浏览器。"
-          error={error}
-          autoFocus
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') save()
-          }}
-        />
-      </div>
-    </Modal>
+    <Suspense fallback={null}>
+      <AccessTokenModal key={instance} isOpen={open} onClose={close} />
+    </Suspense>
   )
 }

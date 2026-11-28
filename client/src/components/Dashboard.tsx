@@ -1,5 +1,5 @@
 import { getErrorMessage } from '@/utils/errorMessage'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Compass, Cpu, HardDrive, Database, PackageOpen, Play, ServerOff, Target, Thermometer, WifiOff } from 'lucide-react'
 import { getOpenTodayStages, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
@@ -12,7 +12,6 @@ import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/state'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
 import DashboardPreviewEntry from './DashboardPreviewEntry'
-import OnboardingDialog from './OnboardingDialog'
 import { formatActivitySubtitle } from '../utils/activitySummary'
 import { keepNumberWithUnit } from '../utils/typography'
 import { formatExecutionSummary, getExecutionLastTask } from '../utils/executionSummary'
@@ -34,6 +33,10 @@ import {
   normalizeActivityCompletion,
   toOptionalTimestamp,
 } from '../utils/dashboardData'
+
+// The first-visit guide is not part of the dashboard's initial paint. Load it
+// on demand so its modal animation library stays out of the entry chunk.
+const OnboardingDialog = lazy(() => import('./OnboardingDialog'))
 
 const sectionTitleClass = 'app-card-title text-base font-bold text-primary'
 const labelClass = 'text-secondary'
@@ -283,7 +286,13 @@ export default function Dashboard() {
   const [quickStartMessage, setQuickStartMessage] = useState('')
   const [quickStartMessageType, setQuickStartMessageType] = useState<StatusMessageType>('default')
   const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding())
-  const openOnboarding = useCallback(() => setOnboardingOpen(true), [])
+  // Keep the guide mounted after its first open so its close animation can
+  // finish, but never load it for users who already dismissed it.
+  const [onboardingLoaded, setOnboardingLoaded] = useState(onboardingOpen)
+  const openOnboarding = useCallback(() => {
+    setOnboardingLoaded(true)
+    setOnboardingOpen(true)
+  }, [])
   const closeOnboarding = useCallback(() => {
     markOnboardingSeen()
     setOnboardingOpen(false)
@@ -632,7 +641,11 @@ export default function Dashboard() {
             </div>
           }
         />
-        <OnboardingDialog isOpen={onboardingOpen} onClose={closeOnboarding} />
+        {onboardingLoaded && (
+          <Suspense fallback={null}>
+            <OnboardingDialog isOpen={onboardingOpen} onClose={closeOnboarding} />
+          </Suspense>
+        )}
 
         {(serviceStatus === 'offline' || serviceStatus === 'unavailable') && (
           <SmoothPanel

@@ -81,7 +81,10 @@ transport → app → infra / domain
 - Pages are lazy-loaded by `utils/pagePreload`; page-only CSS lives in
   `styles/pages/*.css` and loads with the route.
 - `components/common/` holds shared primitives exported from the barrel;
-  page-specific visual compositions stay with their page.
+  page-specific visual compositions stay with their page. Heavy page-only
+  components stay out of the barrel: `Modal`/`ConfirmDialog` and `StatusMark`
+  are imported from their files, and framer-motion is not a named manual
+  chunk, so the entry preload stays animation-free.
 - `components/glass/` is the only application-facing Liquid Glass surface.
 - `services/api/client.ts` owns the base URL, auth headers, and raw `fetch`;
   `services/api.ts` is a facade over `services/api/maa.ts` (which composes the
@@ -103,7 +106,9 @@ depends on them.
    their own workflow flags, and `useTaskRestoreMonitor` still writes the
    running flag alongside the projection (PD3).
 3. `client/src/components/common` exports only part of its usable primitives,
-   so some consumers still deep-import. Page skeletons live next to their
-   pages; form controls use the shared vitest glass harness.
+   so some consumers still deep-import. `Modal`/`ConfirmDialog` and
+   `StatusMark` are intentionally deep imports so their animation dependency
+   stays in lazy chunks. Page skeletons live next to their pages; form
+   controls use the shared vitest glass harness.
 4. `agentapi` exercises ~45 of 107 routes; the remaining mutation/side-effect
    routes are covered indirectly by their service tests.

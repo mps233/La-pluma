@@ -78,6 +78,19 @@ vi.mock('./DashboardSkeleton', () => ({
     return <div>loading</div>
   },
 }))
+vi.mock('./common/Modal', () => ({
+  Modal: ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose: () => void; title?: string; children: React.ReactNode }) => (
+    isOpen
+      ? (
+        <div role="dialog" aria-label={title}>
+          <button type="button" aria-label="关闭对话框" onClick={onClose}>关闭</button>
+          {children}
+        </div>
+      )
+      : null
+  ),
+  ConfirmDialog: () => null,
+}))
 vi.mock('./common', () => ({
   PageHeader: ({ title, actions }: { title: string; actions?: React.ReactNode }) => <header><h1>{title}</h1>{actions}</header>,
   ActivityIndicator: () => null,
@@ -622,18 +635,19 @@ describe('Dashboard onboarding', () => {
   it('shows the onboarding dialog on the first dashboard visit', async () => {
     await renderDashboard()
 
-    expect(getOnboardingDialog()).not.toBeNull()
+    await waitFor(() => expect(getOnboardingDialog()).not.toBeNull())
     expect(getOnboardingDialog()?.getAttribute('aria-label')).toBe('新手引导')
     expect(getOnboardingDialog()?.textContent).toContain('创建第一个自动化任务')
   })
 
   it('writes onboarding-seen-at when the dialog is closed', async () => {
     await renderDashboard()
+    await waitFor(() => expect(getOnboardingDialog()).not.toBeNull())
     expect(window.localStorage.getItem('onboarding-seen-at')).toBeNull()
 
     await userEvent.setup().click(within(getOnboardingDialog()!).getByRole('button', { name: '关闭对话框' }))
 
-    expect(getOnboardingDialog()).toBeNull()
+    await waitFor(() => expect(getOnboardingDialog()).toBeNull())
     const seenAt = Number(window.localStorage.getItem('onboarding-seen-at'))
     expect(seenAt).toBeGreaterThan(0)
   })
@@ -659,7 +673,7 @@ describe('Dashboard onboarding', () => {
     expect(entry).not.toBeNull()
     await userEvent.setup().click(entry!)
 
-    expect(getOnboardingDialog()).not.toBeNull()
+    await waitFor(() => expect(getOnboardingDialog()).not.toBeNull())
     expect(getOnboardingDialog()?.getAttribute('aria-label')).toBe('新手引导')
   })
 })

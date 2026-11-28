@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { ArrowRight, Bot, Download, KeyRound, Monitor } from 'lucide-react'
-import { Button, CjkText, Modal } from './common'
+import { Button, CjkText } from './common'
+import { Modal } from './common/Modal'
 import { isDesktopRuntime } from '@/desktop/bridge'
 import { useUIStore } from '@/state'
 import { notifyAuthRequired } from '@/utils/accessToken'
