@@ -1014,3 +1014,29 @@ deleted, verification, and follow-ups.
   suite (539 tests / 81 files).
 - Follow-up: PF1 (Automation/Config still mount the glass switch on page
   load) and PF2–PF6 in `TASKS.md`.
+
+### Round 66 — gate the glass renderer behind first interaction (2026-11-28, `d197ded`)
+
+- PF1b (implemented): `useGlassCanvas` no longer imports the three.js runtime
+  on mount. A control loads it on its first `pointerdown`, `focusin`, or
+  `keydown`; Switch and CheckboxField paint solid token-based fallbacks until
+  then. The first control that loads the runtime broadcasts readiness, so
+  every mounted canvas upgrades together instead of leaving a page with a
+  mix of glass and fallback.
+- The vendored canvas hook is a documented local patch in
+  `components/glass/README.md`; the solid fallback contract is recorded in
+  `DESIGN.md`. Tests cover the fallback DOM, the no-load-before-interaction
+  behavior, and the one-load-upgrades-all fan-out.
+- Runtime checks with headless Chrome: Automation, Config, and Combat make no
+  `glass/runtime` or `three` request after 5 s of idle. A focus or pointerdown
+  loads the runtime once; all 3 Automation switches, both Config switches, and
+  all 4 Combat checkboxes become ready. The fallback's computed opacity goes
+  from 1 to 0 when the canvas reports `data-glass-ready`.
+- Visual check: Automation at 1440×900 in light/dark and 390×844 light,
+  Config at 1440×900 light, and the Combat advanced-settings checkboxes at
+  1440×900 light/dark. Fallback and glass states keep the same track, knob,
+  checked fill, and check mark.
+- Verified: client lint (0 errors, 1 existing warning), type-check, full
+  suite (543 tests / 83 files), and production build.
+- Follow-up: PF2–PF6 in `TASKS.md` (island, WebRTC preview, glass popups,
+  unused run logs, CSS pruning).
