@@ -1040,3 +1040,26 @@ deleted, verification, and follow-ups.
   suite (543 tests / 83 files), and production build.
 - Follow-up: PF2–PF6 in `TASKS.md` (island, WebRTC preview, glass popups,
   unused run logs, CSS pruning).
+
+### Round 67 — lazy-load the dynamic island subsystem (2026-11-28, `e2a29f9`)
+
+- PF2 (implemented): the island provider, surface, `RunIsland`,
+  `MaaUpdateIsland`, `MasteryIsland`, `SanityBatteryIsland`, the islandcn
+  visuals, and hugeicons now live in one `IslandLayer` chunk. `IslandHost`
+  mounts it after the first animation frame; the layer is absolutely
+  positioned, so the deferral causes no layout shift. `App` and `Layout` no
+  longer import the island library or the activity adapters.
+- Bundle: entry JS 760.6 → 564.3 KB raw (250.5 → 180.0 KB gzip). The island
+  chunk is 191.1 KB raw / 61.0 KB gzip and is not precached; the PWA precache
+  drops from 1,240.15 KiB to 1,047.52 KiB. Island and hugeicons sources are
+  absent from the entry sourcemap.
+- Runtime check: at 250 ms the island layer is absent; by 1.5 s it is mounted
+  and shows the sanity pill. Desktop light/dark screenshots keep the header
+  and page layout unchanged; the phone stage remains `display: none`, as
+  before.
+- Added `IslandHost.test.tsx` (mounts after the first frame) and
+  `islandBoundary.test.ts` (App/Layout keep no island imports). Verified:
+  client lint (0 errors, 1 existing warning), type-check, full suite
+  (545 tests / 85 files), and production build.
+- Follow-up: PF3–PF6 in `TASKS.md` (WebRTC preview, glass popups, unused run
+  logs, CSS pruning).
