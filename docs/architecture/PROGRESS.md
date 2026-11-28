@@ -951,7 +951,7 @@ deleted, verification, and follow-ups.
   and replace the literals still inside component rules.
 - Verified: client production build (type-check included).
 
-### Round 63 — complete the token layers (2026-11-28)
+### Round 63 — complete the token layers (2026-11-28, `cc49db6`)
 
 - PD2 phase 4: added a self-contained `--la-base-*` primitive palette to
   `index.css` and rewired its fallback semantic tokens. Every remaining
