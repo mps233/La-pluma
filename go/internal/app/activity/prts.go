@@ -57,12 +57,12 @@ func NewPRTSClient(options PRTSOptions) *prtsClient {
 
 func (c *prtsClient) BaseURL() string { return c.client.BaseURL() }
 
-// retryPolicy preserves the activity search cadence (250 ms × attempt).
+// retryPolicy uses the shared canonical cadence (500 ms × attempt).
 func (c *prtsClient) retryPolicy() prtsinfra.RetryPolicy {
 	return prtsinfra.RetryPolicy{
 		Attempts: c.attempts,
 		Delay: func(attempt int) time.Duration {
-			return time.Duration(250*(attempt+1)) * time.Millisecond
+			return time.Duration(500*(attempt+1)) * time.Millisecond
 		},
 	}
 }

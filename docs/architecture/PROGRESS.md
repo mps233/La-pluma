@@ -890,3 +890,26 @@ deleted, verification, and follow-ups.
   exception).
 - Verified: reverted files match HEAD; no production change this round.
 - Follow-up: PD8; all other actionable tasks are complete.
+
+### Round 60 — resolve the blocked decisions (2026-11-28)
+
+- PD5 (implemented): activity now retries at 500 ms × attempt, matching
+  copilot; both use three attempts. ADR-0003.
+- PD3 (rejected): page run state stays a projection/local hybrid. The
+  projection owns server-run identity and cross-page state; pages keep flags
+  for their own in-flight request and client workflows. C5b is closed without
+  changing polling. ADR-0004.
+- PD6 (accepted): the CustomTools 40-hue palette is user content, not theme
+  color; it stays in the color allowlist as a documented exception. ADR-0005.
+- PD7 (accepted): DESIGN's `GlassNav`/`GlassMenu` refer to the app adapters in
+  `LayoutGlassChrome.tsx`; documented there and in DESIGN. ADR-0006.
+- PD8 (accepted, C9 rejected): page-prefixed base rules stay in `index.css`;
+  the earlier logs trial matched the live page but left skeletons unstyled,
+  which `DESIGN.md` already forbids. ADR-0007.
+- Updated `DESIGN.md` (adapter note, palette exception, skeleton import path)
+  and the architecture deviation list. Remaining blocked items are PD1
+  (workflow edits) and PD2 (token-layer visual system).
+- Verified: full Go test suite (745 tests / 53 packages), vet, gofmt. Client
+  changes are documentation-only this round.
+- Follow-up: PD1 needs an explicit workflow request; PD2 needs a rendered
+  design pass.

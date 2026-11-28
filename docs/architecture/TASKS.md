@@ -21,11 +21,6 @@ without re-investigation.
 | --- | --- | --- |
 | PD1 | Add client verify/gofmt/race jobs to `.github/workflows` | `AGENTS.md` forbids workflow edits without an explicit request; record and wait |
 | PD2 | Implement the primitive/semantic/component token layers from `DESIGN.md` | Visual system change; needs rendered light/dark/mobile verification |
-| PD3 | Make the global run projection the only owner of page run state (includes C5b: migrate `AutomationTasks`/`DataStatistics` and retire the restore monitor's running writer) | Changes polling and keep-alive semantics; needs product confirmation |
-| PD5 | Choose one PRTS retry contract (activity starts at attempt 0, copilot at 1) | Transport is now shared in `internal/infra/prts`; activity keeps 250 ms × attempt and copilot 500 ms × attempt. Pick the canonical schedule before changing either. |
-| PD6 | Replace the 40-hue CustomTools tool palette with design tokens | The palette is a user-selectable feature (40 colours); narrowing it is a product/design decision, so the file stays in the color allowlist |
-| PD7 | Reconcile `DESIGN.md` references to `GlassNav`/`GlassMenu` with the actual Layout composition (`DESIGN.md:89,700-712`) | Decide implement vs document; needs a design call |
-| PD8 | Decide where skeleton styles live before moving page CSS out of `index.css` (C9) | Page skeletons reuse the page structural classes and render before the lazy route CSS loads, so moving those base rules into route CSS leaves the loading state unstyled |
 
 ## Completed
 
@@ -79,7 +74,10 @@ without re-investigation.
 - C7e: `maaApi` and its DTOs moved to `services/api/maa.ts`; `services/api.ts` is a 63-line facade (Round 51).
 - C7f: shared API DTOs moved to `services/api/types.ts`; `maa.ts` imports them and the facade re-exports them (Round 52).
 - C7g: all remaining `maaApi` groups moved to `services/api/groups/*`; `maa.ts` composes them (Round 54). C7 is complete.
-- C8: all JS hex/RGB literals migrated to theme tokens (including status pulse RGB per theme); CustomTools' user palette is PD6 (Round 55).
+- C8: all JS hex/RGB literals migrated to theme tokens (including status pulse RGB per theme); CustomTools' user palette is a documented user-content exception (ADR-0005, Round 55).
 - G13: terminal persistence failures now fail the request instead of being discarded (`Execute`/`Settle`/accepted-stop release), with tests (Round 56).
 - C10c: the jsdom-only native branches are gone from `fields.tsx`; a vitest setup harness renders accessible native Glass Select/Checkbox controls (Round 58).
 - T5: `testdata/base-path-fixtures.json` is consumed by both the Go config test and the Vite config test (Round 57).
+- PD5: PRTS retries use the canonical 500 ms × attempt cadence for activity and copilot (ADR-0003, Round 60).
+- PD3: page run state stays a projection/local hybrid; C5b is rejected (ADR-0004, Round 60).
+- PD6/PD7/PD8: CustomTools palette is user content; GlassNav/GlassMenu are documented adapters; page base CSS stays global and C9 is rejected (ADR-0005/0006/0007, Round 60).

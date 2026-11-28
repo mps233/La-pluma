@@ -92,7 +92,7 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 - 顶栏主题胶囊使用 `GlassCard` 作为材质容器，内部保留三按钮和蓝色选中指示；GitHub、品牌、移动端主题触发器使用 `GlassButton`（GitHub 使用 `href`，品牌桌面保持裸链、移动端为 44px 圆钮）。
 - 移动端顶栏的品牌、主题、GitHub 圆形入口使用同一套 `GlassButton` 材质。
 - `prefers-reduced-transparency: reduce` 下由 `ios-theme.css` 把应用 chrome 退化为实色并关闭 backdrop-filter；`prefers-contrast: more` 通过应用类加强边框和文字，不依赖 registry 的内部 token。
-- 页面和组件不要新增手写玻璃或 Glasswork 类；需要新玻璃面时使用 `GlassCard`、`GlassButton`、`GlassSegmented`、`GlassNav`、`GlassMenu`、`GlassSwitch`。
+- 页面和组件不要新增手写玻璃或 Glasswork 类；需要新玻璃面时使用 `GlassCard`、`GlassButton`、`GlassSegmented`、`GlassNav`、`GlassMenu`、`GlassSwitch`。其中 `GlassNav` / `GlassMenu` 是 `client/src/components/LayoutGlassChrome.tsx` 里的应用适配器（基于 kit 的 ButtonGroup / DropdownMenu），不是 registry 直接导出的组件；页面仍通过 `Layout` 使用它们，不要另写导航或菜单。
 - 页面内分段控件统一使用 `GlassSegmented` 适配器（作业类型、肉鸽模式、日志内容、数据视图、养成方式、养成状态、配置分区），不再使用 `app-liquid-tab-pill` 胶囊或手写高亮层。预览卡直接使用 registry 的 `GlassTabs`（`client/src/components/liquid-glass/glass-tabs.tsx`，见 `PreviewModeControls`）；不要把这个例外扩散到其他页面。作业类型 wrapper 通过 `data-theme` 继承明暗主题（`system` 时交给媒体查询）；页面级轨道由 `.lg-segmented` 适配器铺满容器。
 - 移动端底部导航使用 `GlassNav`（控制台、自动化、作业、配置四个 Tab）+ 独立圆形 `GlassMenu`（更多）；「更多」不是第五个 Tab，点击后从按钮向左上展开工作区菜单，当前溢出页面在菜单中带勾选，溢出页面激活时按钮使用 accent 色。tabbar wrapper 绑定 `data-theme`，保留 `--la-pluma-tabbar-*` 高度与安全区 token，内容区留白和滚动遮罩继续使用这些 token。移动 tabbar 的 `GlassNav` 固定使用 `tinted` 玻璃：`clear` 会随滚动逐帧重绘并抓取页面背景，`tinted` 是固定磨砂体，滚动时不再重绘。适配器默认仍是 `clear`，由调用处显式选择材质；不要在页面里另写媒体查询切换。
 - 移动 tabbar 的选中态是一块滑动胶囊（`.la-pluma-tabbar-indicator`，320ms ease-out；`prefers-reduced-motion` 下立即跳转），当前 Tab 不再各自绘制底色。重复点击当前 Tab 让页面平滑回到顶部。页面下滚 8px 后 tabbar 收起为屏幕中央的 40px 胶囊（独立安装 44px），上滚 8px、距顶 48px 内、点按胶囊或键盘聚焦时展开；收起后只有胶囊接收点击。折叠逻辑在 `useTabBarFold`，CSS 只读取 `data-folded`，不要在页面里另写滚动监听。
@@ -238,7 +238,7 @@ macOS 27（Golden Gate）的方向是 edge-to-edge 侧栏、滚动折射和更�
 
 当前主题的 accent 是 iOS 系统蓝：浅色 `--app-accent` #007aff / `--app-accent-strong` #005ecb，深色 #0a84ff / #64b5ff；它承担交互色和品牌强调的文字/填充（`brand-text` / `brand-action`），但品牌本身由「品牌识别」的记号、氛围和语气承担。`index.css` 里的 teal 是基础/回退值。需要品牌文字时用 `--app-accent-strong`，需要品牌填充时用 `--app-accent-action`；不要把浅色 hex 硬编码到深色页面。
 
-不要新增页面级 `from-violet-*`、`text-orange-*`、`bg-cyan-*` 这类随手写的颜色主题。需要新语义时，先在 `ios-theme.css` 和 `index.css` 增加 token 或语义类。
+不要新增页面级 `from-violet-*`、`text-orange-*`、`bg-cyan-*` 这类随手写的颜色主题。需要新语义时，先在 `ios-theme.css` 和 `index.css` 增加 token 或语义类。自定义工具图标允许用户从 40 色板选择内容色：这是用户内容，不属于品牌/状态色，不得用于 chrome、正文、状态或表面（ADR-0005）。
 
 彩色、半透明或渐变背景上的文字必须按渲染结果满足 WCAG AA（正文 4.5:1，大字号 3:1），并在浅色和深色两套主题下分别核对：
 
@@ -697,7 +697,7 @@ iOS 风格三档 `Button` 高度由 `Button` 的 `size` 统一管理，经 `app-
 | 表单 | `Input`、`Select`、`Checkbox`、`Switch`；多行文本用带 `app-input control-surface !h-auto !min-h-28 resize-y px-3 py-2` 的原生 `textarea` |
 | 空状态 | `EmptyState`，只用于确实没有数据 |
 | 不可逆操作确认 | `ConfirmDialog` |
-| 局部加载 | `Loading`；懒加载路由用 `PageSkeleton`；控制台骨架从 `@/components/common/Loading` 直接导入 |
+| 局部加载 | `Loading`；懒加载路由用 `PageSkeleton`（`components/PageSkeleton.tsx`）；控制台骨架为 `components/DashboardSkeleton.tsx` |
 | 任务状态环 | `StatusMark`（从 `@/components/common` 导出） |
 | 动态分段标签 | `GlassSegmented`（来自 `@/components/glass` 适配器；作业类型、肉鸽模式、日志、数据、养成、配置共用）；预览卡例外直接使用 registry 的 `GlassTabs` |
 | 覆盖层 | 先看「模式库 / 覆盖层」；移动端更多菜单由 `Layout` 的 `GlassMenu` 提供，不是公共组件 |

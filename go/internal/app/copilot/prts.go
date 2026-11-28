@@ -91,7 +91,7 @@ func NewPRTSClient(options PRTSClientOptions) *PRTSClient {
 
 func (c *PRTSClient) BaseURL() string { return c.client.BaseURL() }
 
-// retryPolicy preserves the copilot cadence (500 ms × attempt).
+// retryPolicy uses the shared canonical cadence (500 ms × attempt).
 func (c *PRTSClient) retryPolicy() prtsinfra.RetryPolicy {
 	return prtsinfra.RetryPolicy{
 		Attempts: c.attempts,
