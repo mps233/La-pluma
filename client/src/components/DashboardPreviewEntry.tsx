@@ -166,7 +166,9 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
                     <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />
                   </button>
                 )}
-                <PreviewAutoStartToggle />
+                {/* The glass switch pulls the WebGL renderer; keep it out of
+                    the default dashboard until preview is actually enabled. */}
+                {mode !== 'off' && <PreviewAutoStartToggle />}
               </div>
             </div>
 

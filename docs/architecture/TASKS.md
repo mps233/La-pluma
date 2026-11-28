@@ -14,7 +14,7 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
-| PF1 | P1 | Client bundle | Load the Liquid Glass three.js renderer only when a canvas is visible and the browser is idle; keep a CSS fallback until then. | The `runtime` chunk is 857 KB raw / 236 KB gzip. `useGlassCanvas` imports it unconditionally on mount, and the dashboard preview switch mounts on first paint. |
+| PF1 | P1 | Client bundle | Gate the glass renderer on the pages that still mount canvas controls (Automation/Config): load it only when a canvas is visible and the browser is idle, with a CSS fallback. | The `runtime` chunk is 857 KB raw / 236 KB gzip. PF1a removed the dashboard trigger; switches on Automation/Config still mount it on page load. |
 | PF2 | P1 | Client bundle | Mount the Dynamic Island (and its hugeicons dependency) after first paint or when a run becomes active. | `src/lib/island` contributes ~97 KB of generated entry code; `@hugeicons/core-free-icons` (~35 KB generated) is used only by `islandcn/glyphs`. |
 | PF3 | P2 | Client bundle | Load the WebRTC preview entry on demand instead of importing it from the dashboard. | `useScrcpyWebRTC` (18.8 KB generated) and `DashboardPreviewEntry` (5.3 KB) are in the entry; preview is closed by default. |
 | PF4 | P2 | Client bundle | Split glass popups, menus, and selects out of the entry; they render only after interaction. | `glass-popup.tsx` (26.5 KB generated), menu/select `@ui-sdk` modules, and the related popup foundation are in the entry. |
@@ -93,3 +93,4 @@ without re-investigation.
 - PD1: `go-verify.yml` now runs gofmt, lifecycle race tests, and the client verify suite with `contents: read` only (Round 61).
 - PD2: primitive/semantic/component token layers completed for both theme files, with a boundary test that rejects colour literals outside primitive definitions (ADR-0008/0009/0010, Rounds 61–63).
 - PF0: framer-motion left the entry preload. The onboarding guide and access-token dialog are lazy, Modal/StatusMark are direct imports instead of barrel exports, and framer-motion is no longer a named manual chunk. Initial JS fell by ~49 KB gzip and the PWA precache by ~140 KiB (Round 64).
+- PF1a: the preview auto-start glass switch mounts only after preview is enabled; the default dashboard no longer requests the three.js `runtime` chunk (Round 65).

@@ -116,6 +116,13 @@ describe('DashboardPreviewEntry', () => {
     expect(group.lastElementChild?.textContent).toBe('自动恢复')
   })
 
+  it('does not mount the glass auto-start toggle while preview is off', () => {
+    preview.mode = 'off'
+    const { container } = render(<DashboardPreviewEntry />)
+
+    expect(container.textContent).not.toContain('自动恢复')
+  })
+
   it('activates the border beam only during WebRTC connection', () => {
     preview.isConnecting = true
     const { container, rerender } = render(<DashboardPreviewEntry key="connecting" />)
