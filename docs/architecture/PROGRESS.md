@@ -708,6 +708,19 @@ deleted, verification, and follow-ups.
   (535 tests / 80 files), and production build.
 - Follow-up: C7b splits the endpoint methods into domain modules.
 
+### Round 48 — split the endpoint tail into domain modules (2026-11-28)
+
+- C7b: the mastery, Skland, copilot-search, and drops endpoints were the last
+  standalone block in `services/api.ts`, each repeating URL construction and
+  response parsing.
+- Moved them to `services/api/mastery.ts`, `skland.ts`, `copilotSearch.ts`,
+  and `drops.ts`; `api.ts` re-exports every function so page imports and test
+  mocks keep working. Removed the now-unused type imports from the facade.
+- Verified: client type-check, boundary test, lint at the ratchet, full suite
+  (535 tests / 80 files), and production build.
+- Follow-up: C7c moves the `maaApi` object, training/notification endpoints,
+  and shared local types.
+
 
 
 

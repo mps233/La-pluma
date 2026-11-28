@@ -15,7 +15,7 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
-| C7b | P2 | client | Split the remaining `services/api.ts` endpoints into domain modules; unify `maaApi` and standalone exports | `services/api/client.ts` now owns base URL/fetch/auth; `api.ts` still holds the endpoint methods and 37 standalone exports |
+| C7c | P2 | client | Split the remaining `maaApi` object, training/notification endpoints, and local types out of `services/api.ts` | `mastery`/`skland`/`copilotSearch`/`drops` moved to `services/api/*` and re-exported; `api.ts` still holds the maaApi object and the training/notification surface |
 | C10c | P3 | client | Remove the jsdom-only DOM branches in `fields.tsx` | `SelectField`/`CheckboxField` render native controls when `import.meta.env.MODE === 'test'`; tests must drive the glass controls or a shared a11y harness instead. The page skeletons are already page-adjacent (C10b) |
 | C8 | P2 | client | Token/color migration for the remaining literals; shift `statusMessage` pulse RGB to the effective iOS theme | Nine files remain in the `themeColorBoundary` allowlist; ~8 production hex sites; visual verification required |
 | C9 | P3 | client | Move page-prefixed CSS out of `index.css` into route CSS | 13 class names defined twice; visual verification required |
@@ -77,3 +77,4 @@ without re-investigation.
 - C11a: AutomationTasks schedule-time parsing/normalization moved to `utils/automationSchedule.ts` with tests (Round 45).
 - C11b: Dashboard payload guards/completion normalization/usage classes moved to `utils/dashboardData.ts` with tests (Round 46).
 - C7a: HTTP base URL/fetch/auth moved to `services/api/client.ts`; `api.ts` re-exports it and the boundary test allows the new module (Round 47).
+- C7b: mastery, skland, copilot-search, and drops endpoints moved to `services/api/*` and re-exported from `api.ts` (Round 48).
