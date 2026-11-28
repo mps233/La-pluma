@@ -32,7 +32,7 @@ describe('common form controls', () => {
   })
 
   it('associates select guidance while preserving an explicit id', () => {
-    const { container } = render(
+    render(
       <Select
         id="billing-cycle"
         label="计费周期"
@@ -51,7 +51,6 @@ describe('common form controls', () => {
     expect(select.classList.contains('app-native-control')).toBe(true)
     expect(select.classList.contains('control-surface')).toBe(true)
     expect(select.classList.contains('app-select-control')).toBe(true)
-    expect(container.querySelector('.app-select-shell .app-select-trailing-icon')?.getAttribute('aria-hidden')).toBe('true')
   })
 
   it('reserves leading space when an input has an icon', () => {

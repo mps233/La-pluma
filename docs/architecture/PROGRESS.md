@@ -811,7 +811,7 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: P3 pool remains (G13, C9, C10c, T5); PD6/PD7 wait for decisions.
 
-### Round 56 — surface terminal persistence failures (2026-11-28)
+### Round 56 — surface terminal persistence failures (2026-11-28, `c3feec1`)
 
 - G13: `Scope.Execute` and `Settle` discarded a failed terminal write and
   returned the action error, and the accepted-stop path ignored a failed
@@ -842,3 +842,30 @@ deleted, verification, and follow-ups.
 
 
 
+
+### Round 57 — share base-path fixtures (2026-11-28, `2cd8d7f`)
+
+- T5: the Go server and the Vite build each normalized a configured deployment
+  path with their own inline test cases.
+- Added `testdata/base-path-fixtures.json`; both `config_test.go` and
+  `vite.config.test.ts` read the same cases (empty/root, leading slash, trailing
+  slash, whitespace, internal double slash).
+- Verified: Go config test, Vite config test, full Go suite, and the client
+  build.
+- Follow-up: C10c and C9 remained.
+
+### Round 58 — remove the jsdom-only form branches (2026-11-28)
+
+- C10c: `fields.tsx` rendered native select/checkbox DOM only when
+  `import.meta.env.MODE === 'test'`, so production and tests exercised
+  different component trees.
+- Added a vitest setup harness that replaces `GlassSelect`,
+  `GlassSelectWithFill`, and `GlassCheckbox` with accessible native controls
+  carrying the same value/checked contracts and native control classes. Removed
+  both test branches from `fields.tsx`; the real component path now runs in
+  tests.
+- Updated the two tests that asserted the deleted wrapper/trailing-icon DOM and
+  removed the now-redundant per-test AutomationTasks glass mock.
+- Verified: client type-check, lint at the ratchet, full suite (535 tests / 80
+  files), and production build.
+- Follow-up: C9 (page CSS split) is the last actionable task.

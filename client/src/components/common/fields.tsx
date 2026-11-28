@@ -1,5 +1,4 @@
 import { useEffect, useRef, type ComponentProps } from 'react'
-import { ChevronDown } from 'lucide-react'
 
 import { GlassCheckbox as KitCheckbox, GlassSelect as KitSelect, type GlassSelectOption } from '@/components/glass'
 
@@ -59,34 +58,6 @@ export function SelectField({
     if (invalid) trigger.setAttribute('aria-invalid', 'true')
     if (errorMessage) trigger.setAttribute('aria-errormessage', errorMessage)
   }, [id, label, describedBy, invalid, errorMessage])
-
-  if (import.meta.env.MODE === 'test') {
-    return (
-      <div className={`app-select-shell relative ${className}`.trim()}>
-        <select
-          id={id}
-          name={name}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          aria-label={label}
-          aria-describedby={describedBy}
-          aria-invalid={invalid || undefined}
-          aria-errormessage={errorMessage}
-          className="input app-input app-native-control control-surface app-select-control min-h-11"
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value} disabled={option.disabled}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <span className={`app-select-trailing-icon ${disabled ? 'is-disabled' : ''}`} aria-hidden="true">
-          <ChevronDown className="h-4 w-4" strokeWidth={1.9} />
-        </span>
-      </div>
-    )
-  }
 
   const placeholderOption = options.find((option) => String(option.value) === '')
   const selectOptions: GlassSelectOption[] = options
@@ -167,21 +138,6 @@ export function CheckboxField({
     if (id) control.id = id
     if (label) control.setAttribute('aria-label', label)
   }, [id, label])
-
-  if (import.meta.env.MODE === 'test') {
-    return (
-      <input
-        id={id}
-        name={name}
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        disabled={disabled}
-        aria-label={label}
-        className={`custom-checkbox cursor-pointer ${className}`.trim()}
-      />
-    )
-  }
 
   return (
     <span ref={hostRef} className={`glass-checkbox-field inline-flex ${className}`.trim()}>

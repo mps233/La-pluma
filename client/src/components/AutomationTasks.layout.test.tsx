@@ -25,38 +25,6 @@ const mocks = vi.hoisted(() => ({
   scrollIntoView: vi.fn(),
 }))
 
-// The kit's Select opens a top-layer popover that jsdom cannot present. The
-// browser verification covers the real component; here a native select keeps
-// the page's option mapping and add-task wiring under test.
-vi.mock('@/components/glass', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/components/glass')>()
-  const React = await import('react')
-  type Option = { value: string; label: ReactNode }
-  const MockGlassSelect = ({ label, options, onValueChange, placeholder, disabled }: {
-    label?: ReactNode
-    options?: Option[]
-    onValueChange?: (value: string | null) => void
-    placeholder?: string
-    disabled?: boolean
-  }) => React.createElement(
-    'label',
-    null,
-    React.createElement('span', { className: 'sr-only' }, label),
-    React.createElement(
-      'select',
-      {
-        'aria-label': '添加任务',
-        disabled,
-        defaultValue: '',
-        onChange: (event: React.ChangeEvent<HTMLSelectElement>) => onValueChange?.(event.target.value || null),
-      },
-      React.createElement('option', { value: '' }, placeholder),
-      (options ?? []).map(option => React.createElement('option', { key: option.value, value: option.value }, option.label)),
-    ),
-  )
-  return { ...actual, GlassSelect: MockGlassSelect }
-})
-
 vi.mock('framer-motion', async () => {
   const React = await import('react')
   type MotionTestProps = Record<string, unknown> & { children?: ReactNode }

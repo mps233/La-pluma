@@ -103,8 +103,8 @@ depends on them.
    their own workflow flags, and `useTaskRestoreMonitor` still writes the
    running flag alongside the projection (PD3).
 3. `client/src/components/common` exports only part of its usable primitives,
-   so some consumers still deep-import; `fields.tsx` keeps jsdom-only native
-   control branches (C10c). Page skeletons live next to their pages.
+   so some consumers still deep-import. Page skeletons live next to their
+   pages; form controls use the shared vitest glass harness.
 4. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
    aspirational; page CSS still uses literals (C9), and the CustomTools palette
    keeps its user-selectable hues (PD6).

@@ -14,9 +14,7 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
-| C10c | P3 | client | Remove the jsdom-only DOM branches in `fields.tsx` | `SelectField`/`CheckboxField` render native controls when `import.meta.env.MODE === 'test'`; tests must drive the glass controls or a shared a11y harness instead. The page skeletons are already page-adjacent (C10b) |
 | C9 | P3 | client | Move page-prefixed CSS out of `index.css` into route CSS | 13 class names defined twice; visual verification required |
-| T5 | P3 | toolchain | Shared base-path normalization fixtures consumed by Go and Vite tests | duplicated normalization in `config.go:88-103` and `vite.config.ts:14-20` |
 
 ## Blocked / pending decision
 
@@ -83,3 +81,5 @@ without re-investigation.
 - C7g: all remaining `maaApi` groups moved to `services/api/groups/*`; `maa.ts` composes them (Round 54). C7 is complete.
 - C8: all JS hex/RGB literals migrated to theme tokens (including status pulse RGB per theme); CustomTools' user palette is PD6 (Round 55).
 - G13: terminal persistence failures now fail the request instead of being discarded (`Execute`/`Settle`/accepted-stop release), with tests (Round 56).
+- C10c: the jsdom-only native branches are gone from `fields.tsx`; a vitest setup harness renders accessible native Glass Select/Checkbox controls (Round 58).
+- T5: `testdata/base-path-fixtures.json` is consumed by both the Go config test and the Vite config test (Round 57).
