@@ -178,3 +178,15 @@ build-args: |
 - [GitHub Actions 文档](https://docs.github.com/en/actions)
 - [Docker Hub](https://hub.docker.com/)
 - [Docker Buildx](https://docs.docker.com/buildx/working-with-buildx/)
+
+## 代码校验（go-verify）
+
+`go-verify.yml` 在 push / PR（涉及 `go/`、`client/` 或该 workflow）时执行：
+
+- `go-test`：`go build`、`gofmt -l` 必须为空、`go vet`、`go test`。
+- `go-race`：对 run 生命周期相关包（`agentrun`、`maa`、`app`、`scheduler`、`agentapi`）跑 `go test -race`。
+- `client-verify`：Node 22，`npm ci` 后执行 `npm run verify`（lint、测试、类型检查与构建）。
+- `go-cross-build`：linux/windows/darwin 交叉编译。
+- `go-docker`：构建 Go Docker 镜像。
+
+所有 job 只需要 `contents: read`，不读取 secrets；发布仍由 `docker-publish.yml` 在 main/tag 上执行。

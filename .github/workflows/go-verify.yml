@@ -27,8 +27,9 @@ concurrency:
 
 jobs:
   go-test:
-    name: Go build, vet and tests
+    name: Go build, format, vet and tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,6 +46,10 @@ jobs:
         working-directory: go
         run: go build ./...
 
+      - name: Format check
+        working-directory: go
+        run: test -z "$(gofmt -l .)"
+
       - name: Vet
         working-directory: go
         run: go vet ./...
@@ -52,6 +57,55 @@ jobs:
       - name: Test
         working-directory: go
         run: go test ./...
+
+  go-race:
+    name: Go race tests (run lifecycle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Race tests
+        working-directory: go
+        run: |
+          go test -race \
+            ./internal/app/agentrun \
+            ./internal/app/maa \
+            ./internal/app \
+            ./internal/app/scheduler \
+            ./internal/transport/agentapi
+
+  client-verify:
+    name: Client lint, types, tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Verify client
+        run: npm run verify --prefix client
 
   go-cross-build:
     name: Go cross build (${{ matrix.goos }}/${{ matrix.goarch }})
