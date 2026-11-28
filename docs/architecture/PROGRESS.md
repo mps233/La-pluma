@@ -1157,3 +1157,21 @@ deleted, verification, and follow-ups.
   Automation/Config controls and the direct glass menu render normally.
   Client lint, type-check, full suite (539 tests / 83 files), and production
   build pass.
+
+### Round 72 — stop live glass repaint on static chrome (2026-11-28, `19bd22c`)
+
+- CDP trace of 8 s idle dashboard: 1,318 `FireAnimationFrame`, 2,636
+  `engine.ts` `frame` calls, and 86,905 forced style/layout updates. Hiding
+  all glass hosts reduced all three to zero; hiding individual hosts did not.
+- Root cause: `GlassLiveCardButton` defaulted to `live={!coarsePointer}` on
+  desktop. The brand, GitHub, and dashboard-entry buttons are static chrome,
+  but `live` means "repaint every frame", so the shared glass engine never
+  idled. The vendored kit itself was not at fault.
+- Fix: `live` is now an opt-in prop (default false); static chrome keeps the
+  kit's normal snapshot refresh. Added a regression test for the prop.
+- Result: the same idle page now records 0 rAF. Dashboard screenshots in
+  light/dark at 1440×900 and light at 390×844 look unchanged, and the glass
+  remains on the brand/GitHub buttons.
+- Verified: client lint, type-check, full suite (540 tests / 84 files), and
+  production build (16 precache entries / 752.28 KiB). No kit files changed;
+  no push.
