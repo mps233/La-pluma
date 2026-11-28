@@ -468,7 +468,7 @@ deleted, verification, and follow-ups.
 - Follow-up: G1b remains `training` (absence-aware semantics); G1c holds the
   mixed domain/coercion files.
 
-### Round 34 — finish the G1b readers with training (2026-11-28)
+### Round 34 — finish the G1b readers with training (2026-11-28, `b76f6b5`)
 
 - `training` carried its own finite-number, numeric-only, string, and truthy
   helpers. Its nil semantics (absent property is not finite) now match
