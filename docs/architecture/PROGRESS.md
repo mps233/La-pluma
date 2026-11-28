@@ -745,7 +745,7 @@ deleted, verification, and follow-ups.
   ratchet, full suite (535 tests / 80 files), and production build.
 - Follow-up: C7e composes `maaApi` from domain modules.
 
-### Round 51 — move maaApi behind the API facade (2026-11-28)
+### Round 51 — move maaApi behind the API facade (2026-11-28, `86e2d34`)
 
 - C7e: after the endpoint modules moved out, `services/api.ts` still carried
   the 600-line `maaApi` object and all of its DTOs.
