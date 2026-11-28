@@ -721,6 +721,18 @@ deleted, verification, and follow-ups.
 - Follow-up: C7c moves the `maaApi` object, training/notification endpoints,
   and shared local types.
 
+### Round 49 — split the notification API (2026-11-28)
+
+- C7c: notification config types, the clone helper, the shared cache, and
+  `notificationsApi` lived inside `services/api.ts` next to every other
+  endpoint.
+- Moved them to `services/api/notifications.ts`; the facade re-exports the
+  types and API object so `NotificationSettings` and its tests keep importing
+  from `@/services/api`.
+- Verified: notification settings test, boundary test, type-check, lint at the
+  ratchet, full suite (535 tests / 80 files), and production build.
+- Follow-up: C7d moves the training endpoints and the `maaApi` object.
+
 
 
 
