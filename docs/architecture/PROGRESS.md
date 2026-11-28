@@ -854,7 +854,7 @@ deleted, verification, and follow-ups.
   build.
 - Follow-up: C10c and C9 remained.
 
-### Round 58 — remove the jsdom-only form branches (2026-11-28)
+### Round 58 — remove the jsdom-only form branches (2026-11-28, `a8faaa5`)
 
 - C10c: `fields.tsx` rendered native select/checkbox DOM only when
   `import.meta.env.MODE === 'test'`, so production and tests exercised
