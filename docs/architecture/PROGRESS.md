@@ -1133,3 +1133,27 @@ deleted, verification, and follow-ups.
 - Follow-up: shared backdrop snapshots / a shared overlay canvas would reduce
   runtime snapshot and compositing work without changing steady-state visuals;
   profile with a real GPU trace before attempting it.
+
+### Round 71 — strict upstream glass 2.1.1 and official search (2026-11-28, `14185ea`)
+
+- Vendored the registry verbatim from `bilalgursen/liquid-glass` at
+  `f697b08` (Search 2.1.1): new `glass-search.tsx` plus the engine/layer
+  support for its droplets, outline, and shadow variants.
+- Removed every local glass behavior patch: pointermove wake suppression,
+  `data-glass-plain`, interaction-gated three.js in `useGlassCanvas`,
+  deferred layer/lens engine loading, the popup-anchor/GlassStyles splits, the
+  lazy `GlassMenu`, and the app solid fallbacks for Switch/Checkbox. The glass
+  controls, menu, pointer behavior, and engine now follow upstream directly.
+- Replaced the sidebar `GlassInput` filter with the official `GlassSearch`
+  over one workspace layer. Typing opens the component's own results list;
+  choosing a result navigates to that tab. The sidebar nav is no longer
+  filtered in place, and the old “没有匹配” empty state/clear action is gone.
+- Performance cost of strict parity: first-paint preloads rise from ~202 to
+  ~293 KB gzip, entry JS from 70.2 to 79.9 KB gzip, and the PWA precache from
+  721.6 to 752.3 KiB. The prior glass performance items (PF1b/PF4/PF4b/PF4c)
+  are recorded as reverted in `TASKS.md`.
+- Verified the production preview: official search renders in light/dark,
+  results appear and a selection navigates to 数据, and the field clears.
+  Automation/Config controls and the direct glass menu render normally.
+  Client lint, type-check, full suite (539 tests / 83 files), and production
+  build pass.
