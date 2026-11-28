@@ -733,7 +733,7 @@ deleted, verification, and follow-ups.
   ratchet, full suite (535 tests / 80 files), and production build.
 - Follow-up: C7d moves the training endpoints and the `maaApi` object.
 
-### Round 50 — split the training API (2026-11-28)
+### Round 50 — split the training API (2026-11-28, `2b57ee6`)
 
 - C7d: the training/operbox endpoint functions and their request/response
   types were still defined in `services/api.ts`.
