@@ -82,6 +82,17 @@ describe('entry chunk policy', () => {
     expect(manualChunks('/repo/node_modules/framer-motion/dist/es/index.mjs')).toBeUndefined()
     expect(manualChunks('/repo/node_modules/react/index.js')).toBe('react-vendor')
   })
+
+  it('marks glass and common modules side-effect-free for tree-shaking', () => {
+    const treeshake = createViteConfig('/').build?.rollupOptions?.treeshake
+    const moduleSideEffects = (treeshake as { moduleSideEffects?: (id: string) => boolean } | undefined)?.moduleSideEffects
+    if (typeof moduleSideEffects !== 'function') throw new Error('moduleSideEffects missing')
+
+    expect(moduleSideEffects('/repo/src/components/liquid-glass/glass-popup.tsx')).toBe(false)
+    expect(moduleSideEffects('/repo/src/components/glass/index.ts')).toBe(false)
+    expect(moduleSideEffects('/repo/src/components/common/Input.tsx')).toBe(false)
+    expect(moduleSideEffects('/repo/src/main.tsx')).toBe(true)
+  })
 })
 
 describe('PWA base path configuration', () => {

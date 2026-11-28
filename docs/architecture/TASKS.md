@@ -14,8 +14,6 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
-| PF3 | P2 | Client bundle | Load the WebRTC preview entry on demand instead of importing it from the dashboard. | `useScrcpyWebRTC` (18.8 KB generated) and `DashboardPreviewEntry` (5.3 KB) are in the entry; preview is closed by default. |
-| PF4 | P2 | Client bundle | Split glass popups, menus, and selects out of the entry; they render only after interaction. | `glass-popup.tsx` (26.5 KB generated), menu/select `@ui-sdk` modules, and the related popup foundation are in the entry. |
 | PF5 | P3 | Agent API | Drop the unused `recentLogs` field from `/runs/current` and `/status`, or make it opt-in. | The client requests `?lines=1` and never reads the field; other callers can receive up to 80 lines of up to 4000 chars. |
 | PF6 | P3 | Client CSS | Prune the remaining global handwritten CSS after the route split. | Entry CSS is 259 KB raw / 40.8 KB gzip. |
 
@@ -28,6 +26,7 @@ without re-investigation.
 
 | ID | Decision | Why blocked |
 | --- | --- | --- |
+| PF3 | How to move the WebRTC preview out of the entry without losing the shared connection | The App-level `PreviewSessionProvider` owns the only WebRTC session and restarts it on quality changes. A lazy preview entry either duplicates that session or needs a session-engine split; measured entry cost is ~24 KB generated. |
 
 ## Completed
 
@@ -94,3 +93,4 @@ without re-investigation.
 - PF1a: the preview auto-start glass switch mounts only after preview is enabled; the default dashboard no longer requests the three.js `runtime` chunk (Round 65).
 - PF1b: the glass renderer is interaction-gated. Switch and CheckboxField paint solid fallbacks; the first interaction loads three.js once and upgrades every mounted canvas. Automation, Config, Combat, and the other control pages no longer request the runtime on load (Round 66).
 - PF2: the Dynamic Island provider, surface, four activity adapters, islandcn visuals, and hugeicons now live behind one lazy `IslandLayer` chunk mounted after the first frame. The entry fell by ~196 KB raw / ~70 KB gzip; the PWA precache fell from 1,240 KiB to 1,048 KiB (Round 67).
+- PF4: the glass menu is behind a lazy `GlassMenu` boundary, the common barrel no longer exports the glass form fields, and glass/common modules are marked side-effect-free. Initial preloaded JS+CSS fell from ~286 KB to ~244 KB gzip; the PWA precache fell to 729 KiB; the menu chunk loads on interaction (Round 68).

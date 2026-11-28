@@ -308,6 +308,14 @@ export const createViteConfig = (basePath: string): UserConfig => ({
   ],
   build: {
     rollupOptions: {
+      // The glass registry is a barrel of pure components. Mark its modules
+      // side-effect-free so unused exports (menus, popups, selects) are
+      // dropped from the entry instead of riding along with a GlassButton.
+      treeshake: {
+        moduleSideEffects(id: string) {
+          return !/\/src\/components\/(?:liquid-glass|glass|common)\//.test(id)
+        },
+      },
       output: {
         manualChunks(id: string) {
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react-vendor'

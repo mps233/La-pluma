@@ -15,7 +15,8 @@ export { default as SwipeModePager } from './SwipeModePager.tsx'
 export { default as Button, IconButton } from './Button.tsx'
 export { default as Input, Select, Checkbox } from './Input.tsx'
 export { default as Switch } from './Switch.tsx'
-export { CheckboxField, GlassSelectWithFill, SelectField } from './fields.tsx'
+// Glass form fields pull the select/popup kit. Import them from './fields'
+// directly so the entry barrel does not carry the popup foundation.
 
 // 反馈组件
 // Modal stays out of this barrel: it carries the animation library and every

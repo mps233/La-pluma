@@ -42,6 +42,7 @@ vi.mock('framer-motion', async () => {
 })
 
 vi.mock('./ThemeToggle', () => ({ default: () => <button type="button">主题</button> }))
+vi.mock('./IslandHost', () => ({ default: () => null }))
 vi.mock('@/services/operatorQuotes', () => ({
   DEFAULT_OPERATOR_QUOTE: {
     operatorId: 'char_002_amiya',
@@ -423,10 +424,12 @@ describe('top-level application navigation', () => {
     const trigger = mobileMoreTrigger()
     trigger.focus()
 
-    await user.click(trigger)
+    fireEvent.click(trigger)
 
     const anchor = container.querySelector<HTMLElement>('.la-pluma-tabbar-more-anchor')!
+    await waitFor(() => expect(anchor.querySelector('[role="menu"]')).not.toBeNull())
     const menu = anchor.querySelector<HTMLElement>('[role="menu"]')
+    const liveTrigger = mobileMoreTrigger()
     expect(menu?.getAttribute('aria-label')).toBe('更多工作区')
     // UI SDK's menu part fixes the item role to menuitem; the adapter still
     // supplies aria-checked and the visual check for the radio-style entries.
@@ -438,7 +441,7 @@ describe('top-level application navigation', () => {
       expect.stringContaining('日志'),
       expect.stringContaining('数据'),
     ])
-    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    expect(liveTrigger.getAttribute('aria-expanded')).toBe('true')
     expect(menu?.contains(document.activeElement)).toBe(true)
     expect(anchor.classList.contains('is-active')).toBe(false)
 
@@ -451,11 +454,13 @@ describe('top-level application navigation', () => {
     })
 
     expect(anchor.classList.contains('is-active')).toBe(true)
-    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(mobileMoreTrigger().getAttribute('aria-expanded')).toBe('false')
 
-    await user.click(trigger)
+    const settledTrigger = mobileMoreTrigger()
+    await user.click(settledTrigger)
+    await waitFor(() => expect(anchor.querySelector('[role="menu"]')).not.toBeNull())
     await user.keyboard('{Escape}')
-    expect(trigger.getAttribute('aria-expanded')).toBe('false')
-    expect(document.activeElement).toBe(trigger)
+    expect(settledTrigger.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(settledTrigger)
   })
 })

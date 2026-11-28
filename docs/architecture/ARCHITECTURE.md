@@ -89,6 +89,10 @@ transport → app → infra / domain
   three.js renderer is triggered by the first interaction; one load upgrades
   every mounted canvas. The 857 KB renderer chunk therefore stays off the
   initial page load on Automation, Config, and the other control pages.
+- The glass menu kit lives behind `LayoutGlassChrome`'s lazy `GlassMenu`
+  boundary (placeholder trigger first, full `GlassMenuImpl` on hover/click).
+  `vite.config.ts` marks glass and common modules side-effect-free so unused
+  menu/select/popup exports tree-shake out of the entry.
 - The Dynamic Island subsystem (provider, surface, activity adapters,
   islandcn visuals, and hugeicons) mounts behind one lazy `IslandLayer` chunk
   after the first frame. `App`/`Layout` keep no island imports; the layer is

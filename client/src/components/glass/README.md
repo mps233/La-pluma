@@ -13,6 +13,13 @@ documented patches and must be preserved when upgrading.
   `common/fields.tsx` paint solid fallbacks until that happens. Reapply this
   patch when merging a new kit release.
 
+## Entry boundary
+
+`LayoutGlassChrome` renders a same-style trigger and lazy-loads
+`GlassMenuImpl` on hover or activation, so the popup/menu foundation stays out
+of the entry. The build marks `components/glass` and `components/common`
+modules side-effect-free; keep them free of top-level side effects.
+
 ## Rules
 
 - Application, common, and page components import glass primitives from

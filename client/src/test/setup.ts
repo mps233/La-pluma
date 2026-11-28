@@ -2,6 +2,15 @@ import { configure } from '@testing-library/react'
 import React from 'react'
 import { vi } from 'vitest'
 
+// jsdom has no layout, so the UI SDK menu's initial-focus scroll would throw.
+if (typeof HTMLElement !== 'undefined' && !HTMLElement.prototype.scrollIntoView) {
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    writable: true,
+    value: () => undefined,
+  })
+}
+
 // The Liquid Glass select and checkbox draw through three.js and the UI SDK's
 // top-layer popover, neither of which jsdom can present. Render accessible
 // native controls with the same value/checked contract so application code
