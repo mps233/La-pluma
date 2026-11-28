@@ -766,6 +766,17 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C7g splits the maaApi method groups and composes the object.
 
+### Round 53 — start composing maaApi from groups (2026-11-28)
+
+- C7g (first slice): the version/config-directory and command-execution
+  methods moved to `services/api/groups/system.ts` as `systemApi`; `maaApi`
+  now spreads it and keeps the remaining groups.
+- Moved the group's DTO imports with it and removed them from `maa.ts`.
+- Verified: client type-check, lint at the ratchet, full suite (535 tests / 80
+  files), and production build.
+- Follow-up: move logs/config/connections/activity/schedule/updates/user
+  config/data/copilot/custom-tools/WebRTC groups the same way.
+
 
 
 
