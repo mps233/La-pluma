@@ -650,7 +650,7 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C10b, then C7/C11/C8.
 
-### Round 44 — page skeletons next to their pages (2026-11-28)
+### Round 44 — page skeletons next to their pages (2026-11-28, `4c4da1b`)
 
 - C10b: the remaining seven page skeletons lived in `common/Loading.tsx`
   together with the spinner.
