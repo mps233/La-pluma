@@ -507,7 +507,7 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite (709 tests / 49 packages), vet, gofmt.
 - Follow-up: G2 (one PRTS client) is the next P1.
 
-### Round 36 — one PRTS transport (2026-11-28)
+### Round 36 — one PRTS transport (2026-11-28, `4071678`)
 
 - G2: activity and copilot each carried HTTP request construction, a
   per-attempt timeout, status handling, JSON decoding, and a retry loop with a
