@@ -19,8 +19,7 @@ without re-investigation.
 
 | ID | Decision | Why blocked |
 | --- | --- | --- |
-| PD1 | Add client verify/gofmt/race jobs to `.github/workflows` | `AGENTS.md` forbids workflow edits without an explicit request; record and wait |
-| PD2 | Implement the primitive/semantic/component token layers from `DESIGN.md` | Visual system change; needs rendered light/dark/mobile verification |
+| PD2 | Finish the primitive/semantic/component token layers from `DESIGN.md` | Accent/status primitives landed (ADR-0008); surfaces, neutrals, spacing/radius, component tokens, and the `index.css` fallback still need a rendered light/dark/mobile pass |
 
 ## Completed
 
@@ -81,3 +80,4 @@ without re-investigation.
 - PD5: PRTS retries use the canonical 500 ms × attempt cadence for activity and copilot (ADR-0003, Round 60).
 - PD3: page run state stays a projection/local hybrid; C5b is rejected (ADR-0004, Round 60).
 - PD6/PD7/PD8: CustomTools palette is user content; GlassNav/GlassMenu are documented adapters; page base CSS stays global and C9 is rejected (ADR-0005/0006/0007, Round 60).
+- PD1: `go-verify.yml` now runs gofmt, lifecycle race tests, and the client verify suite with `contents: read` only (Round 61).

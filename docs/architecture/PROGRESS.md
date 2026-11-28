@@ -913,3 +913,20 @@ deleted, verification, and follow-ups.
   changes are documentation-only this round.
 - Follow-up: PD1 needs an explicit workflow request; PD2 needs a rendered
   design pass.
+
+### Round 61 — CI guards and token-layer start (2026-11-28)
+
+- PD1: `go-verify.yml` gained a `gofmt -l` guard, a run-lifecycle `go test -race` job, and a client-verify job (Node 22, `npm ci` + `npm run verify`). The publish workflow is untouched; every job keeps `contents: read` and no secrets.
+- PD2 phase 1: `ios-theme.css` now declares a `--la-*` primitive palette for
+  blue/green/orange/amber/red/indigo, and the accent/success/warning/danger/
+  info semantic tokens reference it. Alpha variants use `color-mix` against the
+  same primitive; values are unchanged.
+- Visual verification: isolated backend + Vite + headless Chrome; the
+  dashboard at 1440×900 and 390×844 in light/dark matched the pre-change
+  screenshots pixel-for-pixel in static regions (sidebar, buttons, surfaces),
+  with only the dynamic clock/status quote differing.
+- Remaining PD2 phases: surface/neutral primitives, spacing/radius primitives,
+  component tokens (`--app-button-primary-bg`, `--app-card-radius`), and the
+  `index.css` fallback layer.
+- Verified: client production build (type-check included); CSS-only change.
+- Follow-up: PD2 remainder and PD1 CI rollout observation.

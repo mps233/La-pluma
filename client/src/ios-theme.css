@@ -1,5 +1,32 @@
 /* La Pluma's Liquid Glass-inspired material and application chrome (iOS/macOS 27 refinements). */
 
+
+/* Primitive palette: the only layer that writes colour literals. Semantic
+   tokens below reference these values (ADR-0008). */
+:root {
+  --la-blue-400: #64b5ff;
+  --la-blue-450: #0a84ff;
+  --la-blue-500: #007aff;
+  --la-blue-550: #0066cc;
+  --la-blue-600: #005ecb;
+  --la-green-500: #34c759;
+  --la-green-550: #30d158;
+  --la-green-650: #1f7a36;
+  --la-green-700: #1c7331;
+  --la-orange-400: #ff9f0a;
+  --la-orange-500: #ff9500;
+  --la-amber-800: #92400e;
+  --la-red-300: #ff6961;
+  --la-red-450: #ff453a;
+  --la-red-500: #ff3b30;
+  --la-red-600: #d70015;
+  --la-red-700: #b42318;
+  --la-indigo-300: #a5a3ff;
+  --la-indigo-450: #5e5ce6;
+  --la-indigo-500: #5856d6;
+  --la-indigo-600: #3f3dc4;
+}
+
 :root {
   --app-chrome-page-bg: #f2f2f7;
   --app-chrome-bg: rgba(255, 255, 255, 0.72);
@@ -22,23 +49,23 @@
   --app-text: #1c1c1e;
   --app-text-muted: #5e5e63;
   --app-text-soft: #636368;
-  --app-accent: #007aff;
-  --app-accent-strong: #005ecb;
-  --app-accent-action: #0066cc;
-  --app-accent-soft: rgba(0, 122, 255, 0.12);
-  --app-success: #34c759;
-  --app-success-text: #1c7331;
-  --app-success-action: #1f7a36;
+  --app-accent: var(--la-blue-500);
+  --app-accent-strong: var(--la-blue-600);
+  --app-accent-action: var(--la-blue-550);
+  --app-accent-soft: color-mix(in srgb, var(--la-blue-500) 12%, transparent);
+  --app-success: var(--la-green-500);
+  --app-success-text: var(--la-green-700);
+  --app-success-action: var(--la-green-650);
   --app-success-rgb: 52, 199, 89;
-  --app-warning: #ff9500;
-  --app-warning-text: #92400e;
+  --app-warning: var(--la-orange-500);
+  --app-warning-text: var(--la-amber-800);
   --app-warning-rgb: 255, 149, 0;
-  --app-danger: #ff3b30;
-  --app-danger-text: #b42318;
-  --app-danger-action: #d70015;
+  --app-danger: var(--la-red-500);
+  --app-danger-text: var(--la-red-700);
+  --app-danger-action: var(--la-red-600);
   --app-danger-rgb: 255, 59, 48;
-  --app-info: #5856d6;
-  --app-info-text: #3f3dc4;
+  --app-info: var(--la-indigo-500);
+  --app-info-text: var(--la-indigo-600);
   --app-info-rgb: 88, 86, 214;
   --app-text-soft-rgb: 99, 99, 104;
   --app-on-accent: #ffffff;
@@ -158,23 +185,23 @@ html.dark,
   --app-text: #edf3f8;
   --app-text-muted: #9aa8b5;
   --app-text-soft: #82909e;
-  --app-accent: #0a84ff;
-  --app-accent-strong: #64b5ff;
-  --app-accent-action: #0066cc;
-  --app-accent-soft: rgba(10, 132, 255, 0.2);
-  --app-success: #30d158;
-  --app-success-text: #30d158;
-  --app-success-action: #1f7a36;
+  --app-accent: var(--la-blue-450);
+  --app-accent-strong: var(--la-blue-400);
+  --app-accent-action: var(--la-blue-550);
+  --app-accent-soft: color-mix(in srgb, var(--la-blue-450) 20%, transparent);
+  --app-success: var(--la-green-550);
+  --app-success-text: var(--la-green-550);
+  --app-success-action: var(--la-green-650);
   --app-success-rgb: 48, 209, 88;
-  --app-warning: #ff9f0a;
-  --app-warning-text: #ff9f0a;
+  --app-warning: var(--la-orange-400);
+  --app-warning-text: var(--la-orange-400);
   --app-warning-rgb: 255, 159, 10;
-  --app-danger: #ff453a;
-  --app-danger-text: #ff6961;
-  --app-danger-action: #d70015;
+  --app-danger: var(--la-red-450);
+  --app-danger-text: var(--la-red-300);
+  --app-danger-action: var(--la-red-600);
   --app-danger-rgb: 255, 69, 58;
-  --app-info: #5e5ce6;
-  --app-info-text: #a5a3ff;
+  --app-info: var(--la-indigo-450);
+  --app-info-text: var(--la-indigo-300);
   --app-info-rgb: 94, 92, 230;
   --app-text-soft-rgb: 130, 144, 158;
   --app-on-accent: #ffffff;

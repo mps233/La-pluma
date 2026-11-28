@@ -120,3 +120,21 @@ C9 is rejected rather than half-migrated.
 Consequences: `index.css` stays larger, but loading states and cross-page
 components keep their styles. Revisit only if skeletons become
 self-contained or get their own eagerly loaded stylesheet.
+
+## ADR-0008: Primitive colour tokens, phase 1
+
+Status: accepted (2026-11-28), starts PD2
+
+Context: `ios-theme.css` is the effective theme layer but wrote semantic
+colour values as literals; `DESIGN.md` requires primitives to be the only
+layer with colour literals and semantic tokens to reference them.
+
+Decision: add a `--la-*` primitive palette (blue/green/orange/amber/red/
+indigo) and rewire the accent, success, warning, danger, and info semantic
+tokens to it. Values are unchanged; alpha variants use `color-mix` against the
+same primitive. Surfaces, neutrals, spacing/radius primitives, component
+tokens, and the `index.css` fallback layer remain follow-up phases.
+
+Consequences: accent/status tokens now have one literal owner. The rendered
+dashboard matched the pre-change screenshots pixel-for-pixel except dynamic
+timestamps and status text (light/dark, desktop/mobile).
