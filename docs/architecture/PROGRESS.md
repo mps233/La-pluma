@@ -1110,3 +1110,26 @@ deleted, verification, and follow-ups.
 - Follow-up: PF3 (blocked on the preview-session refactor), PF5/PF6. The
   remaining no-visual-change glass work is engine lazy-upgrade (transient CSS
   fallback) and shared snapshot/canvas runtime work.
+
+### Round 70 — defer the glass engine past first paint (2026-11-28, `119c5a4`)
+
+- PF4c (implemented): `GlassButton`, `GlassCard`, `GlassActionButton`,
+  `GlassButtonGroup`, and `GlassTabs` now render through deferred layer/lens
+  wrappers. The kit's CSS fallback paints first; the shared engine and its
+  page-snapshot machinery load after the first frame or the first interaction,
+  then upgrade the hosts to the existing glass. `GlassStyles`/`GLASS_CSS`
+  moved to a light module so badges, lenses, and popup anchors do not pull the
+  engine.
+- First-paint preloads fall from ~235 to ~202 KB gzip; entry JS falls from
+  73.1 to 70.2 KB gzip. The engine (58.4 KB raw) and layer/lens chunks are no
+  longer preloaded. PWA precache is 721.6 KiB.
+- Production preview: on a cold cache the engine was ready within ~180 ms and
+  the steady-state screenshots matched the previous build; the CSS fallback
+  only covers the first frames (and slow-network waits). The overflow menu,
+  button groups, and tab lenses are unchanged once the engine is up.
+- Added `glassEngineBoundary.test.ts` so hosts cannot drift back to static
+  engine imports. Verified: client lint, type-check, full suite
+  (549 tests / 88 files), and production build.
+- Follow-up: shared backdrop snapshots / a shared overlay canvas would reduce
+  runtime snapshot and compositing work without changing steady-state visuals;
+  profile with a real GPU trace before attempting it.
