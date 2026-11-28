@@ -596,6 +596,19 @@ deleted, verification, and follow-ups.
 - Follow-up: the Go pool is now G12/G13/G5/G10; client risk work remains in
   C7/C10/C11/C8/C9.
 
+### Round 40 — one HTTP client factory (2026-11-28)
+
+- G5: nine production sites built `&http.Client` with per-site timeouts, so a
+  transport or proxy change would have to find them all.
+- Added `internal/infra/httpclient` (`New(timeout)`, `Default`) and migrated
+  gamedata, PRTS, activity, skland, and notifications. Retry policy stays with
+  the endpoint owner; PRTS remains the only retrying transport.
+- Added `TestHTTPClientsComeFromTheFactory`, which rejects direct
+  `&http.Client{` construction outside the factory.
+- Verified: full Go test suite (717 tests / 52 packages), vet, gofmt.
+- Follow-up: G10 (bootstrap dedupe) and G12 (route coverage) are the remaining
+  Go P2 items.
+
 
 
 

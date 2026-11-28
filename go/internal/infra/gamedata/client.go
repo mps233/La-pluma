@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mps233/la-pluma/go/internal/infra/httpclient"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 )
 
@@ -65,7 +66,7 @@ func NewClient(options ClientOptions) *Client {
 	}
 	client := options.HTTPClient
 	if client == nil {
-		client = &http.Client{Timeout: timeout}
+		client = httpclient.New(timeout)
 	}
 	now := options.Now
 	if now == nil {

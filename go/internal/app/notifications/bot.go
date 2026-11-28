@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/infra/httpclient"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
@@ -149,7 +150,7 @@ func NewBot(options BotOptions) *Bot {
 	}
 	httpClient := options.HTTPClient
 	if httpClient == nil {
-		httpClient = &http.Client{}
+		httpClient = httpclient.Default()
 	}
 	telegramBase := strings.TrimSpace(options.TelegramAPIBaseURL)
 	if telegramBase == "" {

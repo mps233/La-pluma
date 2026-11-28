@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mps233/la-pluma/go/internal/infra/httpclient"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
@@ -27,7 +28,7 @@ type telegramClient struct {
 
 func newTelegramClient(client *http.Client, baseURL string) *telegramClient {
 	if client == nil {
-		client = &http.Client{Timeout: 30 * time.Second}
+		client = httpclient.New(30 * time.Second)
 	}
 	return &telegramClient{http: client, baseURL: strings.TrimRight(baseURL, "/")}
 }

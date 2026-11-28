@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/infra/httpclient"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
@@ -92,7 +93,7 @@ func New(options Options) *Service {
 	}
 	httpClient := options.HTTPClient
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 30 * time.Second}
+		httpClient = httpclient.New(30 * time.Second)
 	}
 	baseURL := strings.TrimSpace(options.TelegramAPIBaseURL)
 	if baseURL == "" {

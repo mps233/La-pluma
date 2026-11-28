@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/mps233/la-pluma/go/internal/infra/httpclient"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"io"
 	"log/slog"
@@ -96,7 +98,7 @@ func NewFallbackService(options FallbackOptions) *FallbackService {
 	}
 	client := options.HTTPClient
 	if client == nil {
-		client = &http.Client{}
+		client = httpclient.Default()
 	}
 	return &FallbackService{
 		baseURL:    baseURL,

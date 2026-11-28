@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mps233/la-pluma/go/internal/infra/httpclient"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 )
 
@@ -32,7 +33,7 @@ func NewClient(baseURL, cred, token string, httpClient *http.Client) *Client {
 		baseURL = defaultBaseURL
 	}
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 20 * time.Second}
+		httpClient = httpclient.New(20 * time.Second)
 	}
 	return &Client{HTTP: httpClient, BaseURL: strings.TrimRight(baseURL, "/"), Cred: cred, Token: token}
 }

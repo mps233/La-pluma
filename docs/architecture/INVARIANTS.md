@@ -18,6 +18,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | The `internal/app` and `internal/infra` layers own no HTTP handlers (`ServeHTTP`/`http.Handler`) | `TestHTTPHandlersStayInTransport` | `cd go && go test ./internal/archguard` |
 | Agent API endpoint files stay split by domain (≤ 800 production lines per file) | `TestAgentAPIFilesStaySmall` | `cd go && go test ./internal/archguard` |
 | Agent run state transitions have one writer (`agentrun.Scope`); transport and services may only read runs or act through the scope | `TestRunLifecycleStaysInAgentRunScope` | `cd go && go test ./internal/archguard` |
+| HTTP clients are constructed by `internal/infra/httpclient`; no call site builds `&http.Client` directly | `TestHTTPClientsComeFromTheFactory` | `cd go && go test ./internal/archguard` |
 | Raw `fetch(` appears only in `services/api.ts`; everything else uses `fetchWithAuth`/`maaApi` | `services/apiBoundary.test.ts` | `npm run test --prefix client` |
 | New TS/TSX files contain no hex/rgb/hsl color literals outside the documented migration allowlist and vendored kits | `styles/themeColorBoundary.test.ts` | `npm run test --prefix client` |
 | Client lint does not exceed the current warning count | `--max-warnings 1` in `client/package.json` | `npm run lint --prefix client` |

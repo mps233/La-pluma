@@ -250,6 +250,45 @@ func TestLayersAreKnown(t *testing.T) {
 	}
 }
 
+// TestHTTPClientsComeFromTheFactory keeps client construction in
+// infra/httpclient so timeouts and transport defaults have one owner.
+func TestHTTPClientsComeFromTheFactory(t *testing.T) {
+	root := moduleRoot(t)
+	allowed := filepath.Join("internal", "infra", "httpclient")
+	for _, top := range []string{"internal", "cmd"} {
+		base := filepath.Join(root, top)
+		if _, err := os.Stat(base); err != nil {
+			continue
+		}
+		err := filepath.WalkDir(base, func(path string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			if strings.HasPrefix(rel, allowed+string(filepath.Separator)) {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if strings.Contains(string(data), "&http.Client{") {
+				t.Errorf("%s builds an http.Client directly; use internal/infra/httpclient", filepath.ToSlash(rel))
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", top, err)
+		}
+	}
+}
+
 // TestRunLifecycleStaysInAgentRunScope keeps one writer for run state. Services
 // and transport read runs through Get/Current/List and act through
 // agentrun.Scope; a second exported transition method would reopen the drift

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mps233/la-pluma/go/internal/infra/httpclient"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
@@ -54,7 +55,7 @@ func New(options Options) *Client {
 	}
 	client := options.HTTPClient
 	if client == nil {
-		client = &http.Client{}
+		client = httpclient.Default()
 	}
 	timeout := options.Timeout
 	if timeout <= 0 {

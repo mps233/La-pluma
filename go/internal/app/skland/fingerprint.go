@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mps233/la-pluma/go/internal/infra/httpclient"
 )
 
 // sensebotDeviceID ports ArkMowers/arknights-mower's SecuritySm.get_d_id
@@ -28,7 +30,7 @@ import (
 // endpoints. The protocol is third-party and may change without notice.
 func sensebotDeviceID(ctx context.Context, httpClient *http.Client) (string, error) {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 20 * time.Second}
+		httpClient = httpclient.New(20 * time.Second)
 	}
 	uid := newUUID()
 	priID := md5Hex(uid)[:16]

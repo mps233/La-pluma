@@ -3,12 +3,12 @@ package activity
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/infra/httpclient"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 )
 
@@ -109,7 +109,7 @@ func NewWithOptions(options Options) *Service {
 	}
 	httpClient := options.HTTPClient
 	if httpClient == nil {
-		httpClient = &http.Client{}
+		httpClient = httpclient.Default()
 	}
 
 	stageActivityPath := options.StageActivityPath
