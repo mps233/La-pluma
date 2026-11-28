@@ -609,7 +609,7 @@ deleted, verification, and follow-ups.
 - Follow-up: G10 (bootstrap dedupe) and G12 (route coverage) are the remaining
   Go P2 items.
 
-### Round 41 — one HTTP bootstrap for both entries (2026-11-28)
+### Round 41 — one HTTP bootstrap for both entries (2026-11-28, `9ab8549`)
 
 - G10: `cmd/server` and the MyGo desktop entry each constructed the signaling
   server and the same four handler mounts; only the desktop auth token
