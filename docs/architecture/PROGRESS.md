@@ -777,6 +777,18 @@ deleted, verification, and follow-ups.
 - Follow-up: move logs/config/connections/activity/schedule/updates/user
   config/data/copilot/custom-tools/WebRTC groups the same way.
 
+### Round 54 — finish the maaApi group split (2026-11-28)
+
+- C7g: moved the remaining `maaApi` groups to `services/api/groups/`:
+  `logs`, `config` (including user config), `connections` (device/WebRTC/
+  clipboard/screen), `activity`, `schedule`, `updates`, and `data`
+  (recognition/copilot/custom tools).
+- `services/api/maa.ts` is now a 30-line composition of the group objects;
+  the facade and all `@/services/api` imports are unchanged.
+- Verified: client type-check, lint at the ratchet, full suite (535 tests / 80
+  files), and production build.
+- Follow-up: C8 (color tokens) is the last P2 item.
+
 
 
 

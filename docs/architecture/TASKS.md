@@ -82,3 +82,4 @@ without re-investigation.
 - C7d: training endpoints and their types moved to `services/api/training.ts` and re-exported (Round 50).
 - C7e: `maaApi` and its DTOs moved to `services/api/maa.ts`; `services/api.ts` is a 63-line facade (Round 51).
 - C7f: shared API DTOs moved to `services/api/types.ts`; `maa.ts` imports them and the facade re-exports them (Round 52).
+- C7g: all remaining `maaApi` groups moved to `services/api/groups/*`; `maa.ts` composes them (Round 54). C7 is complete.
