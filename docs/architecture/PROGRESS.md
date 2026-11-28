@@ -573,6 +573,29 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C5b; the remaining P2/P3 pool is unchanged.
 
+### Round 39 — finish the jsval migration (2026-11-28)
+
+- G1c: `mastery`, `scheduler`, `updates`, `app/run_resume`, `agentapi`, and
+  `quotes` still carried the last coercion bodies. Mapped each helper onto
+  `jsval` and deleted the bodies:
+  - mastery: `numberValue` → `FiniteNumberOrNull`, `stringify` →
+    `StringOrNullish`; `asRecord`/`asArray`/`integerValue` and the fallback
+    helper are thin adapters now.
+  - scheduler: deleted `truthy`/`jsString`/`numericValue`; kept
+    `configuredNumber` (a blank string means "not configured", unlike
+    `Number("")`), with field accessors delegating to `Text`/`Record`.
+  - updates/quotes: deleted their `truthy`, `textValue`, and `jsString`
+    copies; `recordValue`/`stringValue`/`orDefault` delegate.
+  - `run_resume`: `numberValue` → `jsval.Numeric`; this also makes the resumer
+    read the persisted `json.Number` progress instead of silently ignoring it.
+  - agentapi: deleted `numberValue`/`scalarText`/`anySlice`; `stringField`,
+    `mapField`, `intField`, and `intSlice` delegate to jsval.
+- C5b (the remaining page-state derivation) moved under PD3: its last step
+  changes restore/polling semantics and needs the product decision.
+- Verified: full Go test suite (716 tests / 51 packages), vet, gofmt.
+- Follow-up: the Go pool is now G12/G13/G5/G10; client risk work remains in
+  C7/C10/C11/C8/C9.
+
 
 
 

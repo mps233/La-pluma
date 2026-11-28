@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 type executionStatus struct {
@@ -274,7 +275,7 @@ func (s *Service) SetupAutoUpdate(config map[string]any, clientType string) Setu
 	}
 	s.stopScheduleJobs(AutoUpdateScheduleID)
 
-	enabled := truthy(config["enabled"])
+	enabled := jsval.Truthy(config["enabled"])
 	clock := stringField(config, "time")
 	if !enabled || clock == "" {
 		return SetupAutoUpdateResult{Success: false, Message: "自动更新未启用"}
@@ -363,7 +364,7 @@ func (s *Service) RestoreFromMaps(automationConfig, autoUpdateConfig map[string]
 
 func (s *Service) restoreAutomation(automationConfig map[string]any) RestoreEntry {
 	schedule := mapField(automationConfig, "schedule")
-	if !truthy(schedule["enabled"]) {
+	if !jsval.Truthy(schedule["enabled"]) {
 		return RestoreEntry{}
 	}
 	times := stringSlice(schedule["times"])
@@ -386,7 +387,7 @@ func (s *Service) restoreAutomation(automationConfig map[string]any) RestoreEntr
 }
 
 func (s *Service) restoreAutoUpdate(autoUpdateConfig map[string]any) RestoreEntry {
-	if !truthy(autoUpdateConfig["enabled"]) {
+	if !jsval.Truthy(autoUpdateConfig["enabled"]) {
 		return RestoreEntry{}
 	}
 	clientType := firstNonEmptyString(autoUpdateConfig["clientType"])

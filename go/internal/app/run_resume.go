@@ -9,6 +9,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // scheduleResumeOperations are the Run operations that run a saved task flow.
@@ -134,7 +135,7 @@ func nextResumeStep(candidate runapp.ResumeCandidate, totalSteps int) (int, bool
 	completed := terminalResultCount(candidate.TaskResults)
 	next := completed
 	if progress, ok := candidate.Progress.(map[string]any); ok {
-		if step, ok := numberValue(progress["currentStep"]); ok && step > 0 {
+		if step, ok := jsval.Numeric(progress["currentStep"]); ok && step > 0 {
 			inProgress := int(step) - 1
 			if inProgress > next {
 				next = inProgress
@@ -211,21 +212,6 @@ func resultState(entry map[string]any) string {
 		return state
 	}
 	return ""
-}
-
-func numberValue(value any) (float64, bool) {
-	switch typed := value.(type) {
-	case float64:
-		return typed, true
-	case float32:
-		return float64(typed), true
-	case int:
-		return float64(typed), true
-	case int64:
-		return float64(typed), true
-	default:
-		return 0, false
-	}
 }
 
 func (a *App) startResumedFlow(candidate runapp.ResumeCandidate, plan scheduleResumePlan) (domainrun.DTO, error) {

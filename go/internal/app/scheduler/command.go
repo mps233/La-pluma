@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // NormalizedFightStage is a stage/times pair after normalization. Times keeps
@@ -51,7 +53,7 @@ func taskID(task map[string]any) string {
 	if value, ok := task["id"].(string); ok {
 		return value
 	}
-	return jsString(task["id"])
+	return jsval.StringOrNullish(task["id"])
 }
 
 func taskName(task map[string]any) string {
@@ -110,8 +112,8 @@ func normalizeFightStageEntries(task map[string]any) []NormalizedFightStage {
 			stage = strings.TrimSpace(stageValue)
 			timesValue := typed["times"]
 			timesRaw = timesValue
-			if timesValue != nil && jsString(timesValue) != "" {
-				times = strings.TrimSpace(jsString(timesValue))
+			if timesValue != nil && jsval.StringOrNullish(timesValue) != "" {
+				times = strings.TrimSpace(jsval.StringOrNullish(timesValue))
 			}
 		default:
 			continue
@@ -128,8 +130,8 @@ func fightStageList(task map[string]any) string {
 	stages := normalizeFightStageEntries(task)
 	parts := make([]string, 0, len(stages))
 	for _, stage := range stages {
-		if truthy(stage.TimesRaw) {
-			parts = append(parts, stage.Stage+":"+jsString(stage.TimesRaw))
+		if jsval.Truthy(stage.TimesRaw) {
+			parts = append(parts, stage.Stage+":"+jsval.StringOrNullish(stage.TimesRaw))
 		} else {
 			parts = append(parts, stage.Stage)
 		}
@@ -148,8 +150,8 @@ func buildDynamicFightTaskConfig(task map[string]any, defaults ConnectionDefault
 	if medicineExpireDays == 0 {
 		medicineExpireDays, _ = numberField(params, "medicine_expire_days")
 	}
-	server := strings.TrimSpace(jsString(params["server"]))
-	series, hasSeries := numberValue(params["series"])
+	server := strings.TrimSpace(jsval.StringOrNullish(params["server"]))
+	series, hasSeries := configuredNumber(params["series"])
 	if !hasSeries {
 		series = 1
 	}
@@ -174,26 +176,26 @@ func buildDynamicFightTaskConfig(task map[string]any, defaults ConnectionDefault
 	}
 
 	commonParams := map[string]any{}
-	if value := params["medicine"]; value != nil && jsString(value) != "" {
-		if number, ok := numberValue(value); ok {
+	if value := params["medicine"]; value != nil && jsval.StringOrNullish(value) != "" {
+		if number, ok := configuredNumber(value); ok {
 			commonParams["medicine"] = number
 		}
 	}
-	if value := params["expiringMedicine"]; value != nil && jsString(value) != "" && !(medicineExpireDays > 0) {
-		if number, ok := numberValue(value); ok {
+	if value := params["expiringMedicine"]; value != nil && jsval.StringOrNullish(value) != "" && !(medicineExpireDays > 0) {
+		if number, ok := configuredNumber(value); ok {
 			commonParams["expiring_medicine"] = number
 		}
 	}
 	if medicineExpireDays > 0 {
 		commonParams["medicine_expire_days"] = medicineExpireDays
 	}
-	if value := params["stone"]; value != nil && jsString(value) != "" {
-		if number, ok := numberValue(value); ok {
+	if value := params["stone"]; value != nil && jsval.StringOrNullish(value) != "" {
+		if number, ok := configuredNumber(value); ok {
 			commonParams["stone"] = number
 		}
 	}
-	if value := params["series"]; value != nil && jsString(value) != "" {
-		if number, ok := numberValue(value); ok {
+	if value := params["series"]; value != nil && jsval.StringOrNullish(value) != "" {
+		if number, ok := configuredNumber(value); ok {
 			commonParams["series"] = number
 		}
 	}
@@ -228,7 +230,7 @@ func buildDynamicFightTaskConfig(task map[string]any, defaults ConnectionDefault
 		stageParams := copyMap(commonParams)
 		stageParams["stage"] = stage.Stage
 		if stage.Times != "" {
-			if number, ok := numberValue(stage.Times); ok {
+			if number, ok := configuredNumber(stage.Times); ok {
 				stageParams["times"] = number
 			}
 		}
@@ -286,7 +288,7 @@ func BuildScheduledTaskCommand(task map[string]any, defaults ConnectionDefaults)
 			if recruitmentTime := mapField(params, "recruitment_time"); recruitmentTime != nil {
 				converted := make(map[string]any, len(recruitmentTime))
 				for level, minutes := range recruitmentTime {
-					if number, ok := numberValue(minutes); ok {
+					if number, ok := configuredNumber(minutes); ok {
 						converted[level] = number
 					}
 				}
@@ -313,7 +315,7 @@ func BuildScheduledTaskCommand(task map[string]any, defaults ConnectionDefaults)
 		if name := stringField(task, "name"); name != "" {
 			config["name"] = name
 		}
-		if condition, ok := task["condition"]; ok && truthy(condition) {
+		if condition, ok := task["condition"]; ok && jsval.Truthy(condition) {
 			config["condition"] = condition
 		}
 		if variants, ok := task["variants"].([]any); ok {
@@ -391,21 +393,21 @@ func BuildScheduledTaskCommand(task map[string]any, defaults ConnectionDefaults)
 		if stages := fightStageList(task); stages != "" {
 			args = append(args, stages)
 		}
-		if value := params["medicine"]; value != nil && jsString(value) != "" {
-			args = append(args, "-m", jsString(value))
+		if value := params["medicine"]; value != nil && jsval.StringOrNullish(value) != "" {
+			args = append(args, "-m", jsval.StringOrNullish(value))
 		}
-		if value := params["expiringMedicine"]; value != nil && jsString(value) != "" {
-			args = append(args, "--expiring-medicine", jsString(value))
+		if value := params["expiringMedicine"]; value != nil && jsval.StringOrNullish(value) != "" {
+			args = append(args, "--expiring-medicine", jsval.StringOrNullish(value))
 		}
-		if value := params["stone"]; value != nil && jsString(value) != "" {
-			args = append(args, "--stone", jsString(value))
+		if value := params["stone"]; value != nil && jsval.StringOrNullish(value) != "" {
+			args = append(args, "--stone", jsval.StringOrNullish(value))
 		}
-		if value := params["series"]; value != nil && jsString(value) != "" {
+		if value := params["series"]; value != nil && jsval.StringOrNullish(value) != "" {
 			// The Node check compares against the string '1'; numeric 1 is
 			// still emitted there, so preserve that behavior.
 			text, isString := value.(string)
 			if !isString || text != "1" {
-				args = append(args, "--series="+jsString(value))
+				args = append(args, "--series="+jsval.StringOrNullish(value))
 			}
 		}
 		dropTargets, valid := parseDropTargetEntries(params["drops"])
@@ -418,16 +420,16 @@ func BuildScheduledTaskCommand(task map[string]any, defaults ConnectionDefaults)
 		if clientType := stringField(params, "clientType"); clientType != "" {
 			args = append(args, "--client-type", clientType)
 		}
-		if truthy(params["DrGrandet"]) {
+		if jsval.Truthy(params["DrGrandet"]) {
 			args = append(args, "--dr-grandet")
 		}
-		if truthy(params["report_to_penguin"]) {
+		if jsval.Truthy(params["report_to_penguin"]) {
 			args = append(args, "--report-to-penguin")
 			if id := strings.TrimSpace(stringField(params, "penguin_id")); id != "" {
 				args = append(args, "--penguin-id", id)
 			}
 		}
-		if truthy(params["report_to_yituliu"]) {
+		if jsval.Truthy(params["report_to_yituliu"]) {
 			args = append(args, "--report-to-yituliu")
 			if id := strings.TrimSpace(stringField(params, "yituliu_id")); id != "" {
 				args = append(args, "--yituliu-id", id)
@@ -441,7 +443,7 @@ func BuildScheduledTaskCommand(task map[string]any, defaults ConnectionDefaults)
 }
 
 func taskIDValue(task map[string]any) string {
-	return jsString(task["id"])
+	return jsval.StringOrNullish(task["id"])
 }
 
 // normalizeTaskParams mirrors the per-key conversion in
@@ -498,9 +500,9 @@ func normalizeTaskParams(params map[string]any, taskType string) map[string]any 
 				normalized[key] = typed
 			}
 		default:
-			if number, ok := numericValue(value); ok {
+			if number, ok := jsval.Numeric(value); ok {
 				normalized[key] = number
-			} else if truthy(value) {
+			} else if jsval.Truthy(value) {
 				normalized[key] = value
 			}
 		}

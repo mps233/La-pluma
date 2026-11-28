@@ -3,7 +3,6 @@ package updates
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -16,6 +15,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -556,10 +556,10 @@ func ParseAutoUpdateConfig(config map[string]any) AutoUpdateConfig {
 		config = map[string]any{}
 	}
 	return AutoUpdateConfig{
-		Enabled:    truthy(config["enabled"]),
+		Enabled:    jsval.Truthy(config["enabled"]),
 		Time:       textValue(config["time"]),
-		UpdateCore: truthy(config["updateCore"]),
-		UpdateCLI:  truthy(config["updateCli"]),
+		UpdateCore: jsval.Truthy(config["updateCore"]),
+		UpdateCLI:  jsval.Truthy(config["updateCli"]),
 	}
 }
 
@@ -694,37 +694,8 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func truthy(value any) bool {
-	switch typed := value.(type) {
-	case nil:
-		return false
-	case bool:
-		return typed
-	case string:
-		return typed != ""
-	case float64:
-		return typed != 0
-	case int:
-		return typed != 0
-	case int64:
-		return typed != 0
-	case uint64:
-		return typed != 0
-	case json.Number:
-		number, err := typed.Float64()
-		return err != nil || number != 0
-	default:
-		// Maps, slices and other objects are truthy in JavaScript.
-		return true
-	}
-}
-
 func textValue(value any) string {
-	text, ok := value.(string)
-	if !ok {
-		return ""
-	}
-	return text
+	return jsval.Text(value)
 }
 
 func defaultPlatform() string {

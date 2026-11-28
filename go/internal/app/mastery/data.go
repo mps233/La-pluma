@@ -16,6 +16,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/domain/snapshot"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // DataOptions configures the mastery data service.
@@ -156,7 +157,7 @@ func NormalizeMasteryData(raw any) *MasteryDataFile {
 			if !ok {
 				continue
 			}
-			index, ok := numberValue(skill["index"])
+			index, ok := jsval.FiniteNumberOrNull(skill["index"])
 			if !ok || index < 1 {
 				continue
 			}
@@ -166,7 +167,7 @@ func NormalizeMasteryData(raw any) *MasteryDataFile {
 				if !ok {
 					continue
 				}
-				levelNumber, ok := numberValue(level["level"])
+				levelNumber, ok := jsval.FiniteNumberOrNull(level["level"])
 				if !ok || levelNumber < 1 {
 					continue
 				}
@@ -176,16 +177,16 @@ func NormalizeMasteryData(raw any) *MasteryDataFile {
 					if !ok || material["id"] == nil {
 						continue
 					}
-					count, ok := numberValue(material["count"])
+					count, ok := jsval.FiniteNumberOrNull(material["count"])
 					if !ok || count <= 0 {
 						continue
 					}
 					name, ok := material["name"].(string)
 					if !ok || name == "" {
-						name = stringify(material["id"])
+						name = jsval.StringOrNullish(material["id"])
 					}
 					materials = append(materials, MasteryMaterial{
-						ID:    stringify(material["id"]),
+						ID:    jsval.StringOrNullish(material["id"]),
 						Name:  name,
 						Count: count,
 					})
@@ -196,7 +197,7 @@ func NormalizeMasteryData(raw any) *MasteryDataFile {
 					if phase, ok := unlock["phase"].(string); ok {
 						normalizedUnlock.Phase = &phase
 					}
-					if rawLevel, ok := numberValue(unlock["level"]); ok {
+					if rawLevel, ok := jsval.FiniteNumberOrNull(unlock["level"]); ok {
 						if _, present := unlock["level"]; present {
 							normalizedUnlock.Level = &rawLevel
 						}
@@ -261,7 +262,7 @@ func optionalString(value string, ok bool) *string {
 }
 
 func finiteNumber(value any) float64 {
-	parsed, ok := numberValue(value)
+	parsed, ok := jsval.FiniteNumberOrNull(value)
 	if !ok {
 		return 0
 	}
@@ -365,7 +366,7 @@ func normalizeOperBoxOperator(value any) (operBoxOperator, bool) {
 	if name, ok := record["name"].(string); ok {
 		operator.Name = name
 	}
-	if rarity, ok := numberValue(record["rarity"]); ok {
+	if rarity, ok := jsval.FiniteNumberOrNull(record["rarity"]); ok {
 		if _, present := record["rarity"]; present {
 			operator.Rarity = &rarity
 		}
@@ -374,12 +375,12 @@ func normalizeOperBoxOperator(value any) (operBoxOperator, bool) {
 	ownFalse := hasOwn && ownRaw == false
 	operator.OwnTrue = hasOwn && ownRaw == true
 	operator.OwnNotFalse = !ownFalse
-	if elite, ok := numberValue(record["elite"]); ok {
+	if elite, ok := jsval.FiniteNumberOrNull(record["elite"]); ok {
 		if _, present := record["elite"]; present {
 			operator.Elite = &elite
 		}
 	}
-	if level, ok := numberValue(record["level"]); ok {
+	if level, ok := jsval.FiniteNumberOrNull(record["level"]); ok {
 		if _, present := record["level"]; present {
 			operator.Level = &level
 		}

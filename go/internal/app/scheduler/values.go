@@ -1,15 +1,15 @@
 package scheduler
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/mps233/la-pluma/go/internal/util/timefmt"
-	"math"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
+	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
 var dropTargetPattern = regexp.MustCompile(`^([A-Za-z0-9_-]+)\s*=\s*(\d+)$`)
@@ -23,28 +23,21 @@ var commaSeparatedArrayKeys = map[string]struct{}{
 }
 
 func asMap(value any) map[string]any {
-	if record, ok := value.(map[string]any); ok {
-		return record
-	}
-	return nil
+	return jsval.Record(value)
 }
 
 func mapField(source map[string]any, key string) map[string]any {
 	if source == nil {
 		return nil
 	}
-	return asMap(source[key])
+	return jsval.Record(source[key])
 }
 
 func stringField(source map[string]any, key string) string {
 	if source == nil {
 		return ""
 	}
-	value, ok := source[key].(string)
-	if !ok {
-		return ""
-	}
-	return value
+	return jsval.Text(source[key])
 }
 
 func boolField(source map[string]any, key string) bool {
@@ -59,38 +52,7 @@ func numberField(source map[string]any, key string) (float64, bool) {
 	if source == nil {
 		return 0, false
 	}
-	return numberValue(source[key])
-}
-
-// truthy approximates JavaScript truthiness for JSON-decoded values.
-func truthy(value any) bool {
-	switch typed := value.(type) {
-	case nil:
-		return false
-	case bool:
-		return typed
-	case string:
-		return typed != ""
-	case float64:
-		return typed != 0 && !math.IsNaN(typed)
-	case float32:
-		return typed != 0 && !math.IsNaN(float64(typed))
-	case int:
-		return typed != 0
-	case int64:
-		return typed != 0
-	case json.Number:
-		number, err := typed.Float64()
-		return err == nil && number != 0 && !math.IsNaN(number)
-	case []any:
-		return true
-	case []string:
-		return true
-	case map[string]any:
-		return true
-	default:
-		return true
-	}
+	return configuredNumber(source[key])
 }
 
 // explicitlyDisabled mirrors task.enabled !== false: anything except the
@@ -102,72 +64,21 @@ func explicitlyDisabled(task map[string]any) bool {
 
 // taskEnabled mirrors task.enabled in execution and plan filters.
 func taskEnabled(task map[string]any) bool {
-	return truthy(task["enabled"])
+	return jsval.Truthy(task["enabled"])
 }
 
-func numberValue(value any) (float64, bool) {
-	switch typed := value.(type) {
-	case float64:
-		return typed, true
-	case float32:
-		return float64(typed), true
-	case int:
-		return float64(typed), true
-	case int64:
-		return float64(typed), true
-	case json.Number:
-		number, err := typed.Float64()
-		return number, err == nil
-	case string:
-		trimmed := strings.TrimSpace(typed)
-		if trimmed == "" {
-			return 0, false
-		}
-		number, err := strconv.ParseFloat(trimmed, 64)
-		return number, err == nil
-	default:
+// numberValue treats a blank string as absent rather than Number("") == 0;
+// scheduler parameters use "" to mean "not configured".
+func configuredNumber(value any) (float64, bool) {
+	if text, ok := value.(string); ok && strings.TrimSpace(text) == "" {
 		return 0, false
 	}
-}
-
-func numericValue(value any) (float64, bool) {
-	switch typed := value.(type) {
-	case float64, float32, int, int64, json.Number:
-		return numberValue(typed)
-	default:
-		return 0, false
-	}
-}
-
-func jsString(value any) string {
-	switch typed := value.(type) {
-	case nil:
-		return ""
-	case string:
-		return typed
-	case bool:
-		if typed {
-			return "true"
-		}
-		return "false"
-	case float64:
-		return strconv.FormatFloat(typed, 'f', -1, 64)
-	case float32:
-		return strconv.FormatFloat(float64(typed), 'f', -1, 32)
-	case int:
-		return strconv.Itoa(typed)
-	case int64:
-		return strconv.FormatInt(typed, 10)
-	case json.Number:
-		return typed.String()
-	default:
-		return fmt.Sprintf("%v", value)
-	}
+	return jsval.FiniteNumber(value)
 }
 
 func firstNonEmptyString(values ...any) string {
 	for _, value := range values {
-		if text, ok := value.(string); ok && text != "" {
+		if text, ok := jsval.TextOK(value); ok && text != "" {
 			return text
 		}
 	}
@@ -201,7 +112,7 @@ func parseDropTargetEntries(value any) ([]string, bool) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			rawEntries = append(rawEntries, key+"="+jsString(typed[key]))
+			rawEntries = append(rawEntries, key+"="+jsval.StringOrNullish(typed[key]))
 		}
 	case string:
 		for _, entry := range strings.Split(typed, ",") {
@@ -211,7 +122,7 @@ func parseDropTargetEntries(value any) ([]string, bool) {
 			}
 		}
 	default:
-		for _, entry := range strings.Split(jsString(value), ",") {
+		for _, entry := range strings.Split(jsval.StringOrNullish(value), ",") {
 			entry = strings.TrimSpace(entry)
 			if entry != "" {
 				rawEntries = append(rawEntries, entry)

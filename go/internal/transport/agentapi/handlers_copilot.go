@@ -15,6 +15,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/transport/httpx"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func (h *Handler) getCopilot(w http.ResponseWriter, r *http.Request) {
@@ -375,7 +376,7 @@ func (h *Handler) startManualCopilotSet(w http.ResponseWriter, r *http.Request) 
 	injectConnectionOptions(options, connection)
 	setID := r.PathValue("id")
 	raid := firstNonEmpty(stringField(body, "raid"), "normal")
-	selectedIndexes := anySlice(body["selectedIndexes"])
+	selectedIndexes := jsval.Array(body["selectedIndexes"])
 	// Manual start is intentionally not idempotent: no idempotency key is
 	// attached, so Open never replays and every start creates a new run.
 	scope, _, err := h.app.Runs.Open(runapp.Request{

@@ -60,7 +60,7 @@ transport → app → infra / domain
 | Data directory and env-derived paths | `internal/config` | `Paths` also owns the on-disk file and directory names; `Tuning` owns optional runtime knobs |
 | User configs, MAA profiles, `cli.toml` | `internal/app/config` | JSON + TOML; atomic writes via `jsonstore` |
 | JSON persistence and atomic file replace | `internal/util/jsonstore` | `Read`/`Write`/`WriteRaw` |
-| JS value coercion for upstream JSON | `internal/util/jsval` | `Record`/`Array`/`Text`/`TextOK`/`String`/`StringJSON`/`Number`/`FiniteNumber`/`FiniteNumberOrNull`/`Numeric`/`Truthy`; remaining packages tracked in G1c |
+| JS value coercion for upstream JSON | `internal/util/jsval` | `Record`/`Array`/`Text`/`TextOK`/`String`/`StringJSON`/`Number`/`FiniteNumber`/`FiniteNumberOrNull`/`Numeric`/`Truthy`; all application readers migrate through it |
 | API timestamp format | `internal/util/timefmt` | One millis layout + UTC formatter; offset/date layouts |
 | Public Agent API contract | `internal/contract` | Manifest and OpenAPI derive from one registry |
 | PRTS HTTP transport | `internal/infra/prts` | Request construction, timeout, status, JSON decode, retry loop; callers own envelope parsing and retry policy |
@@ -93,14 +93,12 @@ depends on them.
 
 1. `operbox.json` / `depot.json` and the `user-configs` path are composed in
    multiple packages without one typed owner.
-2. JS-coercion helpers still exist in `mastery`, `scheduler`, `updates`,
-   `run_resume`, and `agentapi` (G1c).
-3. The client derives Combat/Roguelike run state from the global projection
+2. The client derives Combat/Roguelike run state from the global projection
    but still keeps submit-in-flight flags; Automation/DataStatistics keep
-   their own workflow flags (C5b), and `useTaskRestoreMonitor` still writes the
-   running flag alongside the projection.
-4. `client/src/components/common` exports only part of its usable primitives,
+   their own workflow flags, and `useTaskRestoreMonitor` still writes the
+   running flag alongside the projection (PD3).
+3. `client/src/components/common` exports only part of its usable primitives,
    so some consumers still deep-import; page skeletons live in `Loading.tsx`.
-5. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
+4. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
    aspirational; page CSS and some JS colors still use literals.
-6. `internal/app/logs` has no tests; `agentapi` exercises ~17% of its routes.
+5. `internal/app/logs` has no tests; `agentapi` exercises ~17% of its routes.

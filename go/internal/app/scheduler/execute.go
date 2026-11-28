@@ -478,7 +478,7 @@ func (s *Service) recordDrops(summary *TaskSummary, scheduleID string) {
 		return
 	}
 	times := float64(1)
-	if number, ok := numberValue(summary.Times); ok && number > 1 {
+	if number, ok := configuredNumber(summary.Times); ok && number > 1 {
 		times = number
 	}
 	items := make([]any, 0, len(summary.DropItems))
@@ -487,11 +487,11 @@ func (s *Service) recordDrops(summary *TaskSummary, scheduleID string) {
 	}
 	sanity := math.Max(0, summary.Sanity)
 	medicine := float64(0)
-	if number, ok := numberValue(summary.Medicine); ok {
+	if number, ok := configuredNumber(summary.Medicine); ok {
 		medicine = math.Max(0, number)
 	}
 	stone := float64(0)
-	if number, ok := numberValue(summary.Stone); ok {
+	if number, ok := configuredNumber(summary.Stone); ok {
 		stone = math.Max(0, number)
 	}
 	payload := map[string]any{

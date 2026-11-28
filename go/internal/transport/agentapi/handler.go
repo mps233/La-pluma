@@ -18,6 +18,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	"github.com/mps233/la-pluma/go/internal/transport/httpx"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const apiVersion = "2026-07-12"
@@ -315,45 +316,12 @@ func normalizeFightStages(body map[string]any) []fightStage {
 			}
 			times := ""
 			if value, ok := typed["times"]; ok && value != nil {
-				times = scalarText(value)
+				times = jsval.StringJSON(value)
 			}
 			stages = append(stages, fightStage{Stage: stage, Times: times})
 		}
 	}
 	return stages
-}
-
-func scalarText(value any) string {
-	switch typed := value.(type) {
-	case string:
-		return typed
-	case float64:
-		return strconv.FormatFloat(typed, 'f', -1, 64)
-	case json.Number:
-		return typed.String()
-	default:
-		return fmt.Sprint(value)
-	}
-}
-
-func numberValue(value any) (float64, bool) {
-	switch typed := value.(type) {
-	case float64:
-		return typed, true
-	case float32:
-		return float64(typed), true
-	case int:
-		return float64(typed), true
-	case int64:
-		return float64(typed), true
-	case json.Number:
-		parsed, err := typed.Float64()
-		return parsed, err == nil
-	case string:
-		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
-		return parsed, err == nil
-	}
-	return 0, false
 }
 
 var activityStageAliasPattern = regexp.MustCompile(`(?i)^hd-(\d+)$`)
@@ -402,7 +370,7 @@ func normalizeTaskArgs(value any) ([]string, error) {
 	}
 	args := make([]string, 0, len(array))
 	for _, item := range array {
-		args = append(args, scalarText(item))
+		args = append(args, jsval.StringJSON(item))
 	}
 	return args, nil
 }
@@ -416,7 +384,7 @@ func normalizeFightDrops(value any) (map[string]any, error) {
 	result := map[string]any{}
 	if record, ok := value.(map[string]any); ok {
 		for itemID, rawCount := range record {
-			count, valid := numberValue(rawCount)
+			count, valid := jsval.FiniteNumber(rawCount)
 			if !fightDropIDPattern.MatchString(itemID) || !valid || count <= 0 {
 				return nil, apperrors.Validation("AGENT_VALIDATION_DROPS_INVALID", "掉落目标格式应为物品 ID=数量，多个目标用逗号分隔", nil)
 			}
@@ -441,7 +409,7 @@ func normalizeFightDrops(value any) (map[string]any, error) {
 			return nil, apperrors.Validation("AGENT_VALIDATION_DROPS_INVALID", "掉落目标格式应为物品 ID=数量，多个目标用逗号分隔", nil)
 		}
 		itemID := strings.TrimSpace(parts[0])
-		count, valid := numberValue(strings.TrimSpace(parts[1]))
+		count, valid := jsval.FiniteNumber(strings.TrimSpace(parts[1]))
 		if !fightDropIDPattern.MatchString(itemID) || !valid || count <= 0 {
 			return nil, apperrors.Validation("AGENT_VALIDATION_DROPS_INVALID", "掉落目标格式应为物品 ID=数量，多个目标用逗号分隔", nil)
 		}
@@ -466,7 +434,7 @@ func buildDynamicFightTask(body map[string]any, stages []fightStage, connection 
 		if !exists || raw == nil || raw == "" {
 			continue
 		}
-		if number, ok := numberValue(raw); ok {
+		if number, ok := jsval.FiniteNumber(raw); ok {
 			common[mapping.to] = number
 		}
 	}
@@ -505,7 +473,7 @@ func buildDynamicFightTask(body map[string]any, stages []fightStage, connection 
 			params[key] = value
 		}
 		if stage.Times != "" {
-			if number, ok := numberValue(stage.Times); ok {
+			if number, ok := jsval.FiniteNumber(stage.Times); ok {
 				params["times"] = number
 			}
 		}
@@ -652,12 +620,11 @@ const (
 )
 
 func stringField(record map[string]any, key string) string {
-	value, _ := record[key].(string)
-	return value
+	return jsval.Text(record[key])
 }
 
 func mapField(value any) map[string]any {
-	if record, ok := value.(map[string]any); ok {
+	if record := jsval.Record(value); record != nil {
 		return record
 	}
 	return map[string]any{}
@@ -675,30 +642,19 @@ func injectConnectionOptions(options map[string]any, connection appconfig.Resolv
 }
 
 func intSlice(value any) []int {
-	array, _ := value.([]any)
+	array := jsval.Array(value)
 	out := make([]int, 0, len(array))
 	for _, item := range array {
-		switch typed := item.(type) {
-		case float64:
-			out = append(out, int(typed))
-		case int:
-			out = append(out, typed)
+		if parsed, ok := jsval.Numeric(item); ok {
+			out = append(out, int(parsed))
 		}
 	}
 	return out
 }
 
-func anySlice(value any) []any {
-	array, _ := value.([]any)
-	return array
-}
-
 func intField(record map[string]any, key string) int {
-	switch value := record[key].(type) {
-	case float64:
+	if value, ok := jsval.Numeric(record[key]); ok {
 		return int(value)
-	case int:
-		return value
 	}
 	return 0
 }

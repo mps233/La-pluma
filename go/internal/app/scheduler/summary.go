@@ -9,6 +9,7 @@ import (
 
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 var (
@@ -199,7 +200,7 @@ func GetFightReportResults(task map[string]any, stage, stdout, stderr string) []
 	params := taskParams(task)
 	reports := make([]FightReportResult, 0, 2)
 	addReport := func(provider string, enabled any, failurePattern *regexp.Regexp, successMessage, failureMessage string) {
-		if !truthy(enabled) {
+		if !jsval.Truthy(enabled) {
 			return
 		}
 		failed := failurePattern.MatchString(stderr)
@@ -233,15 +234,15 @@ func buildFightAction(taskName, requestedStage string, summary *TaskSummary, out
 	duration := ""
 	if summary != nil {
 		stage = summary.Stage
-		if number, ok := numberValue(summary.Times); ok {
+		if number, ok := configuredNumber(summary.Times); ok {
 			times = math.Max(0, number)
 		}
 		dropCount = len(summary.DropItems)
 		drops = summary.Drops
-		if number, ok := numberValue(summary.Medicine); ok {
+		if number, ok := configuredNumber(summary.Medicine); ok {
 			medicine = math.Max(0, number)
 		}
-		if number, ok := numberValue(summary.Stone); ok {
+		if number, ok := configuredNumber(summary.Stone); ok {
 			stone = math.Max(0, number)
 		}
 		sanity = math.Max(0, summary.Sanity)
@@ -375,5 +376,5 @@ func errorOutput(err error) (stdout, stderr string) {
 	if !ok || appError.Details == nil {
 		return "", ""
 	}
-	return jsString(appError.Details["stdout"]), jsString(appError.Details["stderr"])
+	return jsval.StringOrNullish(appError.Details["stdout"]), jsval.StringOrNullish(appError.Details["stderr"])
 }

@@ -6,13 +6,11 @@
 package quotes
 
 import (
-	"encoding/json"
 	"log/slog"
 	"math"
 	"math/rand/v2"
 	"net/http"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +18,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const dataFileName = "operatorQuotes.json"
@@ -253,9 +252,9 @@ func NormalizeQuotes(value any) []OperatorQuote {
 		if !ok {
 			continue
 		}
-		operator := strings.TrimSpace(jsString(orDefault(record["operator"], "")))
-		operatorID := strings.TrimSpace(jsString(orDefault(record["operatorId"], OperatorIDs[operator])))
-		quote := strings.TrimSpace(jsString(orDefault(record["quote"], "")))
+		operator := strings.TrimSpace(jsval.StringJSON(orDefault(record["operator"], "")))
+		operatorID := strings.TrimSpace(jsval.StringJSON(orDefault(record["operatorId"], OperatorIDs[operator])))
+		quote := strings.TrimSpace(jsval.StringJSON(orDefault(record["quote"], "")))
 		if operator == "" || quote == "" {
 			continue
 		}
@@ -274,68 +273,8 @@ func cloneQuotes(quotes []OperatorQuote) []OperatorQuote {
 
 // orDefault applies JavaScript `value || fallback` truthiness.
 func orDefault(value, fallback any) any {
-	if truthy(value) {
+	if jsval.Truthy(value) {
 		return value
 	}
 	return fallback
-}
-
-func truthy(value any) bool {
-	switch typed := value.(type) {
-	case nil:
-		return false
-	case bool:
-		return typed
-	case string:
-		return typed != ""
-	case json.Number:
-		parsed, err := typed.Float64()
-		return err == nil && parsed != 0 && !math.IsNaN(parsed)
-	case float64:
-		return typed != 0 && !math.IsNaN(typed)
-	case float32:
-		return typed != 0 && !math.IsNaN(float64(typed))
-	case int:
-		return typed != 0
-	case int64:
-		return typed != 0
-	case uint64:
-		return typed != 0
-	default:
-		// Objects and arrays are truthy in JavaScript, even when empty.
-		return true
-	}
-}
-
-// jsString approximates JavaScript String(value) for the JSON value types
-// produced by encoding/json.
-func jsString(value any) string {
-	switch typed := value.(type) {
-	case nil:
-		return ""
-	case string:
-		return typed
-	case bool:
-		if typed {
-			return "true"
-		}
-		return "false"
-	case json.Number:
-		if parsed, err := typed.Float64(); err == nil {
-			return strconv.FormatFloat(parsed, 'g', -1, 64)
-		}
-		return typed.String()
-	case float64:
-		return strconv.FormatFloat(typed, 'g', -1, 64)
-	case map[string]any:
-		return "[object Object]"
-	case []any:
-		parts := make([]string, len(typed))
-		for index, item := range typed {
-			parts[index] = jsString(item)
-		}
-		return strings.Join(parts, ",")
-	default:
-		return ""
-	}
 }

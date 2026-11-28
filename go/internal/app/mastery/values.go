@@ -3,11 +3,11 @@ package mastery
 import (
 	"encoding/json"
 	"math"
-	"strconv"
 	"strings"
 	"time"
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
@@ -112,60 +112,17 @@ func parseTimestamp(value string) (time.Time, bool) {
 }
 
 func asRecord(value any) (map[string]any, bool) {
-	record, ok := value.(map[string]any)
-	return record, ok
+	record := jsval.Record(value)
+	return record, record != nil
 }
 
 func asArray(value any) ([]any, bool) {
-	array, ok := value.([]any)
-	return array, ok
-}
-
-// numberValue mimics Number(value) followed by Number.isFinite. It returns
-// (0, true) for null/undefined, matching numeric coercion in the Node service.
-func numberValue(value any) (float64, bool) {
-	switch typed := value.(type) {
-	case nil:
-		return 0, true
-	case json.Number:
-		parsed, err := strconv.ParseFloat(typed.String(), 64)
-		if err != nil {
-			return 0, false
-		}
-		return parsed, true
-	case float64:
-		return typed, !math.IsNaN(typed) && !math.IsInf(typed, 0)
-	case float32:
-		return float64(typed), true
-	case int:
-		return float64(typed), true
-	case int64:
-		return float64(typed), true
-	case int32:
-		return float64(typed), true
-	case uint64:
-		return float64(typed), true
-	case bool:
-		if typed {
-			return 1, true
-		}
-		return 0, true
-	case string:
-		trimmed := strings.TrimSpace(typed)
-		if trimmed == "" {
-			return 0, true
-		}
-		parsed, err := strconv.ParseFloat(trimmed, 64)
-		if err != nil {
-			return 0, false
-		}
-		return parsed, !math.IsNaN(parsed) && !math.IsInf(parsed, 0)
-	}
-	return 0, false
+	array := jsval.Array(value)
+	return array, array != nil
 }
 
 func numberOr(value any, fallback float64) float64 {
-	parsed, ok := numberValue(value)
+	parsed, ok := jsval.FiniteNumberOrNull(value)
 	if !ok {
 		return fallback
 	}
@@ -175,7 +132,7 @@ func numberOr(value any, fallback float64) float64 {
 // integerValue mirrors Number.isInteger. It accepts JSON numbers, strings and
 // float64 values that carry no fractional part.
 func integerValue(value any) (int, bool) {
-	parsed, ok := numberValue(value)
+	parsed, ok := jsval.FiniteNumberOrNull(value)
 	if !ok || parsed != math.Trunc(parsed) {
 		return 0, false
 	}
@@ -187,30 +144,6 @@ func integerValue(value any) (int, bool) {
 
 // stringify follows String(value) for material ids. JSON numbers keep their
 // textual representation rather than producing float formatting artifacts.
-func stringify(value any) string {
-	switch typed := value.(type) {
-	case nil:
-		return ""
-	case string:
-		return typed
-	case json.Number:
-		return typed.String()
-	case float64:
-		return strconv.FormatFloat(typed, 'f', -1, 64)
-	case bool:
-		if typed {
-			return "true"
-		}
-		return "false"
-	case int:
-		return strconv.Itoa(typed)
-	case int64:
-		return strconv.FormatInt(typed, 10)
-	default:
-		return ""
-	}
-}
-
 func boolNotFalse(value any) bool {
 	typed, ok := value.(bool)
 	return !ok || typed
@@ -246,7 +179,7 @@ func maxInt(left, right int) int {
 }
 
 // flexNumbers converts a JSON array with Array.prototype.map(Number)
-// semantics. Invalid entries are kept as null, like JSON.stringify(NaN).
+// semantics. Invalid entries are kept as null, like JSON.jsval.StringOrNullish(NaN).
 func flexNumbers(value any) []*float64 {
 	array, ok := asArray(value)
 	if !ok {
@@ -254,7 +187,7 @@ func flexNumbers(value any) []*float64 {
 	}
 	result := make([]*float64, 0, len(array))
 	for _, raw := range array {
-		parsed, valid := numberValue(raw)
+		parsed, valid := jsval.FiniteNumberOrNull(raw)
 		if !valid {
 			result = append(result, nil)
 			continue

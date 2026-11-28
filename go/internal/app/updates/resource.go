@@ -12,6 +12,7 @@ import (
 
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
@@ -181,15 +182,14 @@ func parseResourceTimestamp(value string) (time.Time, bool) {
 }
 
 func recordValue(value any) map[string]any {
-	record, ok := value.(map[string]any)
-	if !ok || record == nil {
-		return map[string]any{}
+	if record := jsval.Record(value); record != nil {
+		return record
 	}
-	return record
+	return map[string]any{}
 }
 
 func stringValue(value any) *string {
-	text, ok := value.(string)
+	text, ok := jsval.TextOK(value)
 	if !ok {
 		return nil
 	}
