@@ -72,7 +72,7 @@ vi.mock('./Icons', () => {
   const Icon = () => null
   return { default: new Proxy({}, { get: () => Icon }) }
 })
-vi.mock('./common/Loading', () => ({
+vi.mock('./DashboardSkeleton', () => ({
   DashboardSkeleton: () => {
     renderSpies.dashboardSkeleton()
     return <div>loading</div>

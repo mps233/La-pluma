@@ -7,7 +7,7 @@ import { PageHeader, Card, Button, SmoothPanel, CjkText, TruncatedText } from '.
 import { ActivityIndicator } from '@/components/common'
 import { GlassActionButton, GlassButton } from '@/components/glass'
 import { GlassLiveCardButton } from '@/components/common'
-import { DashboardSkeleton } from './common/Loading'
+import { DashboardSkeleton } from './DashboardSkeleton'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/state'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'

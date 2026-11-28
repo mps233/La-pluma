@@ -637,6 +637,19 @@ deleted, verification, and follow-ups.
 - Follow-up: the remaining pool is client-heavy (C7/C10/C11/C8, C9) plus G13
   and T5.
 
+### Round 43 — skeletons next to their pages, part one (2026-11-28)
+
+- C10a: `common/Loading.tsx` held both the spinner and every page skeleton,
+  including a dashboard block that needs the dashboard layout hook.
+- Extracted the shared `Skeleton` primitive and `PageHeaderSkeleton` into
+  `common/Skeleton.tsx`; moved `DashboardSkeleton` (with its summary cards)
+  next to `Dashboard.tsx` and updated the page/test imports.
+- `Loading.tsx` keeps the spinner and the remaining page skeletons; C10b moves
+  those and removes the `fields.tsx` test-only DOM branches.
+- Verified: client type-check, lint at the ratchet, full suite (525 tests / 78
+  files), and production build.
+- Follow-up: C10b, then C7/C11/C8.
+
 
 
 
