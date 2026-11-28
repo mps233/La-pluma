@@ -995,3 +995,22 @@ deleted, verification, and follow-ups.
   suite (537 tests / 81 files), production build, and the new config test.
 - Follow-up: PF1–PF6 in `TASKS.md` (three.js glass runtime, island,
   WebRTC preview, glass popups, unused run logs, CSS pruning).
+
+### Round 65 — keep the glass renderer off the default dashboard (2026-11-28, `970eab5`)
+
+- PF1a (implemented): `PreviewAutoStartToggle` now renders only when the
+  preview mode is not `off`. The default dashboard previously mounted the
+  glass switch, whose `useGlassCanvas` effect downloaded the three.js runtime
+  (857 KB raw / 236 KB gzip) immediately after first paint.
+- Added a regression test for both sides: preview `off` has no auto-start
+  toggle; preview `live` still keeps it after the reconnect control.
+- Runtime check with headless Chrome: the default dashboard makes no request
+  matching `glass/runtime` or `three`. The remaining canvas elements are the
+  2D ASCII backdrop, not the glass renderer.
+- Visual check: dashboard at 1440×900 and 390×844 in light/dark; the preview
+  header stays aligned with the status chip, and no toggle appears while
+  preview is off.
+- Verified: client lint (0 errors, 1 existing warning), type-check, full
+  suite (539 tests / 81 files).
+- Follow-up: PF1 (Automation/Config still mount the glass switch on page
+  load) and PF2–PF6 in `TASKS.md`.
