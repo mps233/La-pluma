@@ -27,11 +27,26 @@ import type {
 import { formatExecutionActionSummary } from '../utils/executionSummary'
 import { waitForTaskIdle } from '../utils/taskStatus'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
+import {
+  DEFAULT_SCHEDULE_ENTRIES,
+  activeScheduleTimes,
+  formatScheduleTime,
+  normalizeScheduleEntries,
+  parseScheduleTime,
+  readScheduleEntries,
+  type ScheduleTimeEntry,
+} from '../utils/automationSchedule'
 
-const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
-const normalizeScheduleTimes = (times: string[]) => (
-  [...new Set(times.filter(time => scheduleTimePattern.test(time)))]
-)
+function RunElapsed({ startedAt }: { startedAt: number }) {
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [startedAt])
+
+  return <>{formatClockDuration(now - startedAt)}</>
+}
 
 const toTextInputValue = (value: TaskParamValue): string | number => {
   const displayValue = typeof value === 'string' || typeof value === 'number' ? value : ''
@@ -46,92 +61,9 @@ const toStringArray = (value: TaskParamValue): string[] => (
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
 )
 
-interface ScheduleTimeEntry {
-  time: string
-  enabled: boolean
-}
-
-const DEFAULT_SCHEDULE_ENTRIES: ScheduleTimeEntry[] = [
-  { time: '08:00', enabled: true },
-  { time: '14:00', enabled: true },
-  { time: '20:00', enabled: true },
-]
 
 const STOP_CONFIRMATION_TIMEOUT_MS = 15_000
 const STOP_CONFIRMATION_MAX_ATTEMPTS = 2
-
-const formatScheduleTime = (hour: number, minute: number) => (
-  `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
-)
-
-function RunElapsed({ startedAt }: { startedAt: number }) {
-  const [now, setNow] = useState(() => Date.now())
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(timer)
-  }, [startedAt])
-
-  return <>{formatClockDuration(now - startedAt)}</>
-}
-
-const parseScheduleTime = (time: string) => {
-  const [hourText = '0', minuteText = '0'] = time.split(':')
-  const hour = Number(hourText)
-  const minute = Number(minuteText)
-  return {
-    hour: Number.isFinite(hour) ? Math.min(23, Math.max(0, hour)) : 0,
-    minute: Number.isFinite(minute) ? Math.min(59, Math.max(0, minute)) : 0,
-  }
-}
-
-const normalizeScheduleEntries = (entries: ScheduleTimeEntry[]) => {
-  const normalized: ScheduleTimeEntry[] = []
-  const seen = new Set<string>()
-
-  for (const entry of entries) {
-    if (!scheduleTimePattern.test(entry.time) || seen.has(entry.time)) continue
-    seen.add(entry.time)
-    normalized.push({ time: entry.time, enabled: entry.enabled !== false })
-  }
-
-  return normalized
-}
-
-const scheduleEntriesFromTimes = (times: string[]) => (
-  normalizeScheduleEntries(
-    normalizeScheduleTimes(times).map(time => ({ time, enabled: true })),
-  )
-)
-
-const activeScheduleTimes = (entries: ScheduleTimeEntry[]) => (
-  entries.filter(entry => entry.enabled).map(entry => entry.time)
-)
-
-const readScheduleEntries = (schedule: { times?: unknown, entries?: unknown } | null | undefined) => {
-  if (Array.isArray(schedule?.entries)) {
-    const fromEntries = normalizeScheduleEntries(
-      schedule.entries
-        .map((entry: unknown) => {
-          if (typeof entry === 'string') return { time: entry, enabled: true }
-          if (!entry || typeof entry !== 'object') return null
-          const record = entry as { time?: unknown, enabled?: unknown }
-          if (typeof record.time !== 'string') return null
-          return { time: record.time, enabled: record.enabled !== false }
-        })
-        .filter((entry): entry is ScheduleTimeEntry => Boolean(entry)),
-    )
-    if (fromEntries.length > 0) return fromEntries
-  }
-
-  if (Array.isArray(schedule?.times)) {
-    return scheduleEntriesFromTimes(
-      schedule.times.filter((time): time is string => typeof time === 'string'),
-    )
-  }
-
-  return []
-}
 
 const RECOVERY_STATUS_POLL_MS = 1000
 const RECOVERY_STATUS_TIMEOUT_MS = 30 * 60 * 1000

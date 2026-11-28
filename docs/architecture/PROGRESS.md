@@ -668,6 +668,19 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C7/C11/C8 remain, then C9/C10c.
 
+### Round 45 — extract AutomationTasks schedule helpers (2026-11-28)
+
+- C11a: `AutomationTasks.tsx` inlined the schedule-time grammar: validation,
+  dedupe, parse/clamp, entry normalization, legacy `times` fallback, and active
+  filtering.
+- Moved them to `utils/automationSchedule.ts` with unit tests for invalid
+  times, dedupe, clamping, legacy shapes, and enabled filtering. The page keeps
+  `RunElapsed` and the task-param adapters; only the schedule functions moved.
+- Verified: client type-check, lint at the ratchet, full suite (530 tests / 79
+  files; one unrelated timing flake on the first run passed on rerun), and
+  production build.
+- Follow-up: C11b (Dashboard helpers), then C7/C8.
+
 
 
 

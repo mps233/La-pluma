@@ -17,7 +17,7 @@ without re-investigation.
 | --- | --- | --- | --- | --- |
 | C7 | P2 | client | Split `services/api.ts` into `api/client.ts` + endpoint modules; unify `maaApi` and standalone exports | 1,305 lines, 89 calls, 37 standalone functions |
 | C10c | P3 | client | Remove the jsdom-only DOM branches in `fields.tsx` | `SelectField`/`CheckboxField` render native controls when `import.meta.env.MODE === 'test'`; tests must drive the glass controls or a shared a11y harness instead. The page skeletons are already page-adjacent (C10b) |
-| C11 | P2 | client | Extract pure helpers from giant pages | `AutomationTasks.tsx:29-150,283,1745-1785`; `Dashboard.tsx:146-300,348-378` |
+| C11b | P2 | client | Extract the remaining pure helpers from `Dashboard.tsx` | Schedule helpers moved out of AutomationTasks in C11a; Dashboard still owns request-shaping and flow-summary helpers (`Dashboard.tsx:146-300,348-378`) |
 | C8 | P2 | client | Token/color migration for the remaining literals; shift `statusMessage` pulse RGB to the effective iOS theme | Nine files remain in the `themeColorBoundary` allowlist; ~8 production hex sites; visual verification required |
 | C9 | P3 | client | Move page-prefixed CSS out of `index.css` into route CSS | 13 class names defined twice; visual verification required |
 | T5 | P3 | toolchain | Shared base-path normalization fixtures consumed by Go and Vite tests | duplicated normalization in `config.go:88-103` and `vite.config.ts:14-20` |
@@ -75,3 +75,4 @@ without re-investigation.
 - G12: agentapi route tests now cover ~45 of 107 routes, including config/profile CRUD, notification config, logs, drops, training, schedules, and snapshot data (Round 42).
 - C10a: shared `Skeleton`/`PageHeaderSkeleton` primitives and `DashboardSkeleton` moved next to their consumers; `Loading.tsx` shrank by the dashboard block (Round 43).
 - C10b: every page skeleton moved next to its page; `common/Loading.tsx` is only the spinner and `components/PageSkeleton.tsx` dispatches variants (Round 44).
+- C11a: AutomationTasks schedule-time parsing/normalization moved to `utils/automationSchedule.ts` with tests (Round 45).
