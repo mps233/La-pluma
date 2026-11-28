@@ -789,6 +789,28 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C8 (color tokens) is the last P2 item.
 
+### Round 55 — migrate JS color literals to theme tokens (2026-11-28)
+
+- C8: eight files still carried hex/RGB literals even though the themes expose
+  semantic tokens, and the status pulse used fixed light-theme RGB values in
+  dark mode.
+- Added `--app-on-accent` and per-theme `--app-*-rgb` / `--app-text-soft-rgb`
+  tokens to `index.css` and `ios-theme.css`; migrated the dashboard action
+  labels, preview buttons, focus ring, switch default, StatusMark defaults,
+  ASCII backdrop, `useThemeAccent`, and the browser theme-color meta to read
+  those tokens (the meta now follows the effective `--app-bg`).
+- The color-boundary allowlist now contains only `CustomTools.tsx`: its
+  40-hue palette is a user-selectable feature, so narrowing it is a design
+  decision recorded as PD6. T6 (GlassNav/GlassMenu design references) also
+  moved to PD7.
+- Visual verification: isolated backend (port 3010, temp data dir) + Vite
+  (5174), headless Chrome via CDP with seeded themes; checked the dashboard at
+  1440×900 and 390×844 in light and dark. Action text, status dots, preview
+  surfaces, and the island accent render correctly in both themes.
+- Verified: client type-check, lint at the ratchet, full suite (535 tests / 80
+  files), and production build.
+- Follow-up: P3 pool remains (G13, C9, C10c, T5); PD6/PD7 wait for decisions.
+
 
 
 

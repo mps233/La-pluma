@@ -106,6 +106,7 @@ depends on them.
    so some consumers still deep-import; `fields.tsx` keeps jsdom-only native
    control branches (C10c). Page skeletons live next to their pages.
 4. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
-   aspirational; page CSS and some JS colors still use literals.
+   aspirational; page CSS still uses literals (C9), and the CustomTools palette
+   keeps its user-selectable hues (PD6).
 5. `agentapi` exercises ~45 of 107 routes; the remaining mutation/side-effect
    routes are covered indirectly by their service tests.

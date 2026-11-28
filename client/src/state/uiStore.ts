@@ -98,9 +98,12 @@ export function applyThemePreference(theme: ThemeMode) {
   root.style.colorScheme = isDark ? 'dark' : 'light'
   // Both metas carry the app's chosen theme; the media attributes only decide
   // which one the browser reads, so a manual choice still wins over the OS.
-  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
-    meta.setAttribute('content', isDark ? '#101318' : '#f2f2f7')
-  })
+  const themeColor = window.getComputedStyle(root).getPropertyValue('--app-bg').trim()
+  if (themeColor) {
+    document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+      meta.setAttribute('content', themeColor)
+    })
+  }
 }
 
 export const useUIStore = create<UIState>()(

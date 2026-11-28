@@ -10,27 +10,27 @@ const STATUS_VISUAL_CONFIG: Record<StatusMessageType, StatusVisualConfig> = {
   success: {
     className: 'status-success',
     dotColor: 'var(--app-success)',
-    pulseRgb: '5, 150, 105',
+    pulseRgb: 'var(--app-success-rgb)',
   },
   error: {
     className: 'status-danger',
     dotColor: 'var(--app-danger)',
-    pulseRgb: '225, 29, 72',
+    pulseRgb: 'var(--app-danger-rgb)',
   },
   warning: {
     className: 'status-warning',
     dotColor: 'var(--app-warning)',
-    pulseRgb: '217, 119, 6',
+    pulseRgb: 'var(--app-warning-rgb)',
   },
   info: {
     className: 'status-info',
     dotColor: 'var(--app-info)',
-    pulseRgb: '37, 99, 235',
+    pulseRgb: 'var(--app-info-rgb)',
   },
   default: {
     className: 'status-neutral',
     dotColor: 'var(--app-text-soft)',
-    pulseRgb: '148, 163, 184',
+    pulseRgb: 'var(--app-text-soft-rgb)',
   },
 }
 

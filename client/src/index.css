@@ -65,13 +65,19 @@
     --app-success: #059669;
     --app-success-text: #047857;
     --app-success-action: #047857;
+    --app-success-rgb: 5, 150, 105;
     --app-warning: #d97706;
     --app-warning-text: #92400e;
+    --app-warning-rgb: 217, 119, 6;
     --app-danger: #e11d48;
     --app-danger-text: #be123c;
     --app-danger-action: #be123c;
+    --app-danger-rgb: 225, 29, 72;
     --app-info: #2563eb;
     --app-info-text: #1d4ed8;
+    --app-info-rgb: 37, 99, 235;
+    --app-text-soft-rgb: 95, 111, 128;
+    --app-on-accent: #ffffff;
     --app-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%235f6f80' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
     --app-radius-xs: 0.25rem;
     --app-radius-sm: 0.375rem;
@@ -124,13 +130,19 @@
     --app-success: #34d399;
     --app-success-text: #34d399;
     --app-success-action: #047857;
+    --app-success-rgb: 52, 211, 153;
     --app-warning: #fbbf24;
     --app-warning-text: #fbbf24;
+    --app-warning-rgb: 251, 191, 36;
     --app-danger: #fb7185;
     --app-danger-text: #fb7185;
     --app-danger-action: #be123c;
+    --app-danger-rgb: 251, 113, 133;
     --app-info: #60a5fa;
     --app-info-text: #93c5fd;
+    --app-info-rgb: 96, 165, 250;
+    --app-text-soft-rgb: 127, 141, 153;
+    --app-on-accent: #ffffff;
     --app-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239aa8b5' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
   }
 

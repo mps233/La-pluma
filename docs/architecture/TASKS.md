@@ -16,10 +16,8 @@ without re-investigation.
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
 | C10c | P3 | client | Remove the jsdom-only DOM branches in `fields.tsx` | `SelectField`/`CheckboxField` render native controls when `import.meta.env.MODE === 'test'`; tests must drive the glass controls or a shared a11y harness instead. The page skeletons are already page-adjacent (C10b) |
-| C8 | P2 | client | Token/color migration for the remaining literals; shift `statusMessage` pulse RGB to the effective iOS theme | Nine files remain in the `themeColorBoundary` allowlist; ~8 production hex sites; visual verification required |
 | C9 | P3 | client | Move page-prefixed CSS out of `index.css` into route CSS | 13 class names defined twice; visual verification required |
 | T5 | P3 | toolchain | Shared base-path normalization fixtures consumed by Go and Vite tests | duplicated normalization in `config.go:88-103` and `vite.config.ts:14-20` |
-| T6 | P3 | client | Reconcile DESIGN references to `GlassNav`/`GlassMenu` with the actual Layout composition | `DESIGN.md:89,700-712`; decide implement vs doc, needs design call |
 
 ## Blocked / pending decision
 
@@ -29,6 +27,8 @@ without re-investigation.
 | PD2 | Implement the primitive/semantic/component token layers from `DESIGN.md` | Visual system change; needs rendered light/dark/mobile verification |
 | PD3 | Make the global run projection the only owner of page run state (includes C5b: migrate `AutomationTasks`/`DataStatistics` and retire the restore monitor's running writer) | Changes polling and keep-alive semantics; needs product confirmation |
 | PD5 | Choose one PRTS retry contract (activity starts at attempt 0, copilot at 1) | Transport is now shared in `internal/infra/prts`; activity keeps 250 ms × attempt and copilot 500 ms × attempt. Pick the canonical schedule before changing either. |
+| PD6 | Replace the 40-hue CustomTools tool palette with design tokens | The palette is a user-selectable feature (40 colours); narrowing it is a product/design decision, so the file stays in the color allowlist |
+| PD7 | Reconcile `DESIGN.md` references to `GlassNav`/`GlassMenu` with the actual Layout composition (`DESIGN.md:89,700-712`) | Decide implement vs document; needs a design call |
 
 ## Completed
 
@@ -82,3 +82,4 @@ without re-investigation.
 - C7e: `maaApi` and its DTOs moved to `services/api/maa.ts`; `services/api.ts` is a 63-line facade (Round 51).
 - C7f: shared API DTOs moved to `services/api/types.ts`; `maa.ts` imports them and the facade re-exports them (Round 52).
 - C7g: all remaining `maaApi` groups moved to `services/api/groups/*`; `maa.ts` composes them (Round 54). C7 is complete.
+- C8: all JS hex/RGB literals migrated to theme tokens (including status pulse RGB per theme); CustomTools' user palette is PD6 (Round 55).

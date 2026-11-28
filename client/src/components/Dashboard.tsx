@@ -783,7 +783,7 @@ export default function Dashboard() {
                     onActionError={() => {}}
                     material="tinted"
                     size="md"
-                    style={{ height: 44, paddingLeft: 10, paddingRight: 65, backgroundColor: 'var(--app-accent-action)', color: '#fff' }}
+                    style={{ height: 44, paddingLeft: 10, paddingRight: 65, backgroundColor: 'var(--app-accent-action)', color: 'var(--app-on-accent)' }}
                     disabled={quickStartLoading || activityPreflightLoading || flowIsRunning || !automationAvailable}
                     data-status-key={quickStartLoading ? 'starting' : flowIsRunning ? 'running' : 'ready'}
                     className="dashboard-flow-primary-action dashboard-flow-action-button justify-center whitespace-nowrap"

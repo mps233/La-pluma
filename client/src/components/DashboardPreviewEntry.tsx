@@ -51,7 +51,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
             className="lg-host lg-button scrcpy-empty-action min-w-32 bg-[var(--app-accent-action)] text-white"
             // .lg-button sets color from --app-text at a specificity the utility
             // class cannot beat, so the accent fill needs its label declared inline.
-            style={{ height: 36, color: '#fff' }}
+            style={{ height: 36, color: 'var(--app-on-accent)' }}
             icon={<Play className="h-3.5 w-3.5" strokeWidth={1.8} />}
             iconPosition="start"
             onClick={() => setMode('live')}
@@ -89,7 +89,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
             size="sm"
             material="tinted"
             className="lg-host lg-button scrcpy-empty-action min-w-32 bg-[var(--app-accent-action)] text-white"
-            style={{ height: 36, color: '#fff' }}
+            style={{ height: 36, color: 'var(--app-on-accent)' }}
             icon={<RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />}
             iconPosition="start"
             onClick={reconnectPreview}

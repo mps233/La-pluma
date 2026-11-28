@@ -5,20 +5,14 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Brand and semantic colors must come from the tokens in index.css /
- * ios-theme.css. This is a ratchet: the files below already contain literals
- * that need a visual migration, but no new file may add one. Shrink the list
- * as pages move to semantic classes/tokens.
+ * ios-theme.css. This is a ratchet: files below still contain literals that
+ * need a product/design decision, but no other file may add one. Shrink the
+ * list as each file moves to semantic classes/tokens.
  */
 const legacyColorFiles = [
-  'components/Dashboard.tsx',
-  'components/DashboardPreviewEntry.tsx',
-  'components/backgrounds/AsciiFieldBackdrop.tsx',
-  'components/common/GlassLiveCardButton.tsx',
-  'components/common/StatusMark.tsx',
-  'components/common/Switch.tsx',
+  // A 40-hue user-selectable tool palette; replacing it changes a product
+  // feature, so it waits for PD6 rather than being silently narrowed.
   'components/CustomTools.tsx',
-  'hooks/useThemeAccent.ts',
-  'state/uiStore.ts',
 ]
 
 const sources = import.meta.glob('../**/*.{ts,tsx}', {

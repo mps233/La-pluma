@@ -24,7 +24,7 @@ export default function Switch({
   className = '',
 }: SwitchProps) {
   const hostRef = useRef<HTMLSpanElement>(null)
-  const [accent, setAccent] = useState('#007aff')
+  const [accent, setAccent] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     if (typeof window === 'undefined') return

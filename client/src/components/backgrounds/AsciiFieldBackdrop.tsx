@@ -2,10 +2,6 @@ import { useEffect, useMemo, useRef, useSyncExternalStore, type CSSProperties } 
 
 import './AsciiBackdrop.css'
 
-const LIGHT_ACCENT = '#007aff'
-const DARK_ACCENT = '#64b5ff'
-const LIGHT_BACKGROUND = '#f2f2f7'
-
 /** Faintest glyph first; the leading space is an empty cell. */
 const GLYPHS = ' .:-=+*#%@'
 /** Cell size in CSS px. The glyphs are read as texture, not as text. */
@@ -139,13 +135,13 @@ export default function AsciiFieldBackdrop({
 
   const theme = useMemo(() => {
     if (typeof window === 'undefined') {
-      return { accent: LIGHT_ACCENT, background: LIGHT_BACKGROUND }
+      return { accent: 'currentColor', background: 'transparent' }
     }
     const styles = window.getComputedStyle(document.documentElement)
-    const read = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback
+    const read = (name: string) => styles.getPropertyValue(name).trim()
     return {
-      accent: read(dark ? '--app-accent-strong' : '--app-accent', dark ? DARK_ACCENT : LIGHT_ACCENT),
-      background: read('--app-bg', LIGHT_BACKGROUND),
+      accent: read(dark ? '--app-accent-strong' : '--app-accent') || 'currentColor',
+      background: read('--app-bg') || 'transparent',
     }
   }, [dark])
 

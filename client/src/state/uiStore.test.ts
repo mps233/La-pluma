@@ -29,6 +29,7 @@ describe('UI navigation and theme state', () => {
     ].join('')
     document.documentElement.classList.remove('dark')
     document.documentElement.style.colorScheme = ''
+    document.documentElement.style.removeProperty('--app-bg')
     delete document.documentElement.dataset.theme
   })
 
@@ -45,6 +46,7 @@ describe('UI navigation and theme state', () => {
 
   it('keeps class, color-scheme, and browser chrome in sync for system theme', () => {
     systemDark = true
+    document.documentElement.style.setProperty('--app-bg', '#101318')
     applyThemePreference('system')
     expect(document.documentElement.classList.contains('dark')).toBe(true)
     expect(document.documentElement.dataset.theme).toBe('dark')
@@ -54,6 +56,7 @@ describe('UI navigation and theme state', () => {
     expect(darkColors).toEqual(['#101318', '#101318'])
 
     systemDark = false
+    document.documentElement.style.setProperty('--app-bg', '#f2f2f7')
     useUIStore.getState().setTheme('system')
     expect(document.documentElement.classList.contains('dark')).toBe(false)
     expect(document.documentElement.dataset.theme).toBe('light')

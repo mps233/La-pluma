@@ -24,7 +24,7 @@ export const GlassLiveCardButton = forwardRef<HTMLButtonElement, GlassLiveCardBu
   function GlassLiveCardButton({ icon, children, className = '', href, target, rel, type = 'button', ...rest }, ref) {
     const coarsePointer = useCoarsePointer()
     const material = coarsePointer ? 'tinted' : 'clear'
-    const controlClass = `lg-button inline-flex items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap select-none outline-none focus-visible:ring-2 focus-visible:ring-[#3291FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${className}`.trim()
+    const controlClass = `lg-button inline-flex items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap select-none outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${className}`.trim()
     const content = (
       <>
         {icon ? <span className="lg-button__icon inline-flex shrink-0 items-center justify-center">{icon}</span> : null}
