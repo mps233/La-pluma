@@ -13,6 +13,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -456,14 +457,14 @@ func (s *Service) GetTrainingQueue() (TrainingQueueResult, error) {
 				currentElite = *ownedOperator.Elite
 			}
 		} else {
-			if value, ok := toFiniteNumber(item.CurrentElite); ok && value > 0 {
+			if value, ok := jsval.FiniteNumber(item.CurrentElite); ok && value > 0 {
 				currentElite = value
 			}
 		}
 		if currentElite < 0 {
 			currentElite = 0
 		}
-		if value, numeric := jsonNumberValue(item.CurrentElite); !numeric || value != currentElite {
+		if value, numeric := jsval.Numeric(item.CurrentElite); !numeric || value != currentElite {
 			item.CurrentElite = currentElite
 			changed = true
 		}

@@ -468,6 +468,23 @@ deleted, verification, and follow-ups.
 - Follow-up: G1b remains `training` (absence-aware semantics); G1c holds the
   mixed domain/coercion files.
 
+### Round 34 — finish the G1b readers with training (2026-11-28)
+
+- `training` carried its own finite-number, numeric-only, string, and truthy
+  helpers. Its nil semantics (absent property is not finite) now match
+  `jsval.FiniteNumber`, so the four bodies were deleted outright:
+  `toFiniteNumber` → `FiniteNumber`, `jsonNumberValue` → `Numeric`,
+  `jsStringApprox` → `StringOrNullish`, `isTruthy` → `Truthy`;
+  `settingString` now uses `TextOK`.
+- Kept three documented domain adapters: `asRecord` (also accepts the
+  `TrainingSettings` map type), `asArray`, and `numberOr` (finite number with
+  a caller fallback).
+- Behavior notes: float32 NaN is no longer numeric/truthy (JavaScript NaN is
+  falsy), and small/large floats now use JavaScript formatting; training
+  values are small integers, so rendered strings are unchanged.
+- Verified: full Go test suite (705 tests / 49 packages), vet, gofmt.
+- Follow-up: G1c holds the last mixed domain/coercion files.
+
 
 
 

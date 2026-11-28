@@ -11,6 +11,7 @@ import (
 	"golang.org/x/text/language"
 
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
@@ -148,7 +149,7 @@ func normalizeOperatorMaterialData(id string, entry map[string]any) *operatorMat
 	if name, ok := entry["name"].(string); ok {
 		data.Name = name
 	}
-	if rarity, ok := toFiniteNumber(entry["rarity"]); ok {
+	if rarity, ok := jsval.FiniteNumber(entry["rarity"]); ok {
 		data.Rarity = rarity
 	}
 	if profession, ok := entry["profession"].(string); ok {
@@ -165,7 +166,7 @@ func normalizeEliteMaterials(value any) *EliteMaterials {
 		return nil
 	}
 	result := &EliteMaterials{}
-	if lmd, ok := toFiniteNumber(record["lmd"]); ok {
+	if lmd, ok := jsval.FiniteNumber(record["lmd"]); ok {
 		result.LMD = &lmd
 	}
 	result.Materials = normalizeMaterialRequirements(record["materials"])
@@ -192,7 +193,7 @@ func normalizeMaterialRequirements(value any) *[]MaterialRequirement {
 		if typed, ok := record["name"].(string); ok {
 			name = typed
 		}
-		count, _ := toFiniteNumber(record["count"])
+		count, _ := jsval.FiniteNumber(record["count"])
 		normalized = append(normalized, MaterialRequirement{ID: id, Name: name, Count: count})
 	}
 	return &normalized
@@ -205,7 +206,7 @@ func normalizeID(value any) string {
 	if value == nil {
 		return ""
 	}
-	return jsStringApprox(value)
+	return jsval.StringOrNullish(value)
 }
 
 func (s *Service) loadOperBox() operBoxData {
@@ -242,7 +243,7 @@ func (s *Service) loadOperBox() operBoxData {
 			if name, ok := entry["name"].(string); ok {
 				catalog.Name = name
 			}
-			if rarity, ok := toFiniteNumber(entry["rarity"]); ok {
+			if rarity, ok := jsval.FiniteNumber(entry["rarity"]); ok {
 				catalog.Rarity = &rarity
 			}
 			catalog.Own = entry["own"] == true
@@ -267,19 +268,19 @@ func normalizeOperBoxOperators(array []any) []operBoxOperator {
 		if name, ok := entry["name"].(string); ok {
 			operator.Name = name
 		}
-		if rarity, ok := toFiniteNumber(entry["rarity"]); ok {
+		if rarity, ok := jsval.FiniteNumber(entry["rarity"]); ok {
 			operator.Rarity = &rarity
 		}
 		if profession, ok := entry["profession"].(string); ok {
 			operator.Profession = &profession
 		}
-		if elite, ok := toFiniteNumber(entry["elite"]); ok {
+		if elite, ok := jsval.FiniteNumber(entry["elite"]); ok {
 			operator.Elite = &elite
 		}
-		if level, ok := toFiniteNumber(entry["level"]); ok {
+		if level, ok := jsval.FiniteNumber(entry["level"]); ok {
 			operator.Level = &level
 		}
-		if potential, ok := toFiniteNumber(entry["potential"]); ok {
+		if potential, ok := jsval.FiniteNumber(entry["potential"]); ok {
 			operator.Potential = &potential
 		}
 		operator.Own = entry["own"] == true
@@ -309,7 +310,7 @@ func (s *Service) loadDepot() depotData {
 			if id == "" {
 				continue
 			}
-			count, _ := toFiniteNumber(entry["count"])
+			count, _ := jsval.FiniteNumber(entry["count"])
 			result.Items[id] = count
 		}
 	}
@@ -440,7 +441,7 @@ func (s *Service) loadMaterialsDatabase() *materialDatabase {
 			if formula, ok := asRecord(item["formula"]); ok && len(formula) > 0 {
 				recipe := &materialRecipe{Materials: make(map[string]float64, len(formula))}
 				for subID, rawCount := range formula {
-					count, _ := toFiniteNumber(rawCount)
+					count, _ := jsval.FiniteNumber(rawCount)
 					recipe.Materials[subID] = count
 					recipe.Order = append(recipe.Order, subID)
 				}
@@ -479,7 +480,7 @@ func (s *Service) isResourceCollectionOpen(clientType string, now time.Time) boo
 	}
 	clientKey := normalizeActivityClientType(clientType)
 	clientValue := root[clientKey]
-	if !isTruthy(clientValue) {
+	if !jsval.Truthy(clientValue) {
 		clientValue = root["Official"]
 	}
 	clientData, ok := asRecord(clientValue)
@@ -533,7 +534,7 @@ func parseStageActivityTime(value any, timeZone any) (int64, bool) {
 		return 0, false
 	}
 	offsetHours := 8.0
-	if parsed, ok := toFiniteNumber(timeZone); ok {
+	if parsed, ok := jsval.FiniteNumber(timeZone); ok {
 		offsetHours = parsed
 	}
 	year := mustInt(match[1])

@@ -12,6 +12,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func testLogger() *slog.Logger {
@@ -208,7 +209,7 @@ func TestGetTrainingQueueEmpty(t *testing.T) {
 	if result.Settings["autoSwitch"] != true || result.Settings["notifyOnComplete"] != true {
 		t.Fatalf("unexpected default settings: %#v", result.Settings)
 	}
-	medicine, ok := toFiniteNumber(result.Settings["useMedicine"])
+	medicine, ok := jsval.FiniteNumber(result.Settings["useMedicine"])
 	if !ok || medicine != 0 {
 		t.Fatalf("unexpected useMedicine: %#v", result.Settings["useMedicine"])
 	}
@@ -589,7 +590,7 @@ func TestUpdateSettings(t *testing.T) {
 	if settings["autoAddRecognizedSixStars"] != false {
 		t.Fatalf("unknown setting was not preserved: %#v", settings)
 	}
-	if medicine, _ := toFiniteNumber(settings["useMedicine"]); medicine != 3 {
+	if medicine, _ := jsval.FiniteNumber(settings["useMedicine"]); medicine != 3 {
 		t.Fatalf("unexpected useMedicine: %#v", settings["useMedicine"])
 	}
 	if settings["autoSwitch"] != true {
@@ -765,7 +766,7 @@ func TestApplyPlanCreatesFightTask(t *testing.T) {
 		t.Fatalf("unexpected fight task: %v", fight)
 	}
 	params := fight["params"].(map[string]any)
-	if medicine, _ := toFiniteNumber(params["medicine"]); medicine != 1 {
+	if medicine, _ := jsval.FiniteNumber(params["medicine"]); medicine != 1 {
 		t.Fatalf("unexpected medicine: %v", params["medicine"])
 	}
 	if params["stage"] != "1-7" {

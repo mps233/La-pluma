@@ -7,6 +7,7 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // ApplyPlanToTasks copies the applicable smart stages into the fight task in
@@ -76,8 +77,8 @@ func (s *Service) ApplyPlanToTasks(plan TrainingPlan, settings map[string]any) (
 	normalStages := make([]any, 0)
 	for _, raw := range existingStages {
 		record, isRecord := asRecord(raw)
-		pinned := isRecord && isTruthy(record["pinned"])
-		smart := isRecord && isTruthy(record["smart"])
+		pinned := isRecord && jsval.Truthy(record["pinned"])
+		smart := isRecord && jsval.Truthy(record["smart"])
 		switch {
 		case pinned:
 			pinnedStages = append(pinnedStages, raw)
@@ -101,7 +102,7 @@ func (s *Service) ApplyPlanToTasks(plan TrainingPlan, settings map[string]any) (
 		}
 		smartStages = append(smartStages, map[string]any{
 			"stage":             stage.Stage,
-			"times":             jsStringApprox(times),
+			"times":             jsval.StringOrNullish(times),
 			"smart":             true,
 			"trainingOperators": trainingOperatorNames,
 		})
@@ -110,12 +111,12 @@ func (s *Service) ApplyPlanToTasks(plan TrainingPlan, settings map[string]any) (
 	if fallbackStage, ok := settingString(effectiveSettings, "fallbackStage"); ok {
 		if trimmed := strings.TrimSpace(fallbackStage); trimmed != "" {
 			fallbackTimes := effectiveSettings["fallbackTimes"]
-			if !isTruthy(fallbackTimes) {
+			if !jsval.Truthy(fallbackTimes) {
 				fallbackTimes = float64(999)
 			}
 			smartStages = append(smartStages, map[string]any{
 				"stage":             trimmed,
-				"times":             jsStringApprox(fallbackTimes),
+				"times":             jsval.StringOrNullish(fallbackTimes),
 				"smart":             true,
 				"trainingOperators": trainingOperatorNames,
 			})
@@ -135,7 +136,7 @@ func (s *Service) ApplyPlanToTasks(plan TrainingPlan, settings map[string]any) (
 	nextParams["medicine"] = settingOrZero(effectiveSettings, "useMedicine")
 	nextParams["expiringMedicine"] = 0
 	nextParams["stone"] = settingOrZero(effectiveSettings, "useStone")
-	if series, exists := currentParams["series"]; exists && isTruthy(series) {
+	if series, exists := currentParams["series"]; exists && jsval.Truthy(series) {
 		nextParams["series"] = series
 	} else {
 		nextParams["series"] = 0
@@ -223,7 +224,7 @@ func (s *Service) clearSmartTrainingStages() error {
 			continue
 		}
 		stagesValue, exists := params["stages"]
-		if !exists || !isTruthy(stagesValue) {
+		if !exists || !jsval.Truthy(stagesValue) {
 			continue
 		}
 		existing, ok := asArray(stagesValue)
@@ -233,7 +234,7 @@ func (s *Service) clearSmartTrainingStages() error {
 		remaining := make([]any, 0, len(existing))
 		for _, stageRaw := range existing {
 			stage, isRecord := asRecord(stageRaw)
-			if isRecord && isTruthy(stage["smart"]) {
+			if isRecord && jsval.Truthy(stage["smart"]) {
 				continue
 			}
 			remaining = append(remaining, stageRaw)
@@ -321,7 +322,7 @@ func configHasSmartStages(config map[string]any) bool {
 		stages, _ := asArray(params["stages"])
 		for _, stageRaw := range stages {
 			stage, ok := asRecord(stageRaw)
-			if ok && isTruthy(stage["smart"]) {
+			if ok && jsval.Truthy(stage["smart"]) {
 				return true
 			}
 		}

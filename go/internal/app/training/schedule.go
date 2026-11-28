@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // STAGE_CODE_MAP converts database stage codes to MAA-recognisable names.
@@ -90,10 +92,10 @@ var (
 
 // convertStageCode mirrors operatorTrainingService.convertStageCode.
 func convertStageCode(stageCode any) string {
-	if !isTruthy(stageCode) {
+	if !jsval.Truthy(stageCode) {
 		return ""
 	}
-	code := jsStringApprox(stageCode)
+	code := jsval.StringOrNullish(stageCode)
 	if maStagePattern.MatchString(code) {
 		return code
 	}
