@@ -31,6 +31,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | The glass renderer is only created after the first interaction, and one load upgrades every mounted canvas | `controls/glass/useGlassCanvas.test.tsx` | `npm run test --prefix client` |
 | The island provider, surface, activity adapters, and icon package stay behind the lazy `IslandLayer` boundary | `components/islandBoundary.test.ts` + `IslandHost.test.tsx` | `npm run test --prefix client` |
 | The glass menu kit stays behind the lazy `GlassMenu` boundary; glass/common modules are side-effect-free for tree-shaking | `components/glassMenuBoundary.test.ts` + `vite.config.test.ts` | `npm run test --prefix client` |
+| Glass button groups use the lightweight popup anchor; the heavy popup surface stays behind menus/selects | `components/glassPopupBoundary.test.ts` | `npm run test --prefix client` |
 
 ## Not yet enforceable
 

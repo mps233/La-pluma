@@ -89,6 +89,8 @@ transport → app → infra / domain
   three.js renderer is triggered by the first interaction; one load upgrades
   every mounted canvas. The 857 KB renderer chunk therefore stays off the
   initial page load on Automation, Config, and the other control pages.
+- Glass button groups use the lightweight `glass-popup-anchor` context/anchor;
+  the heavy popup surface stays behind menus, selects, and popovers.
 - The glass menu kit lives behind `LayoutGlassChrome`'s lazy `GlassMenu`
   boundary (placeholder trigger first, full `GlassMenuImpl` on hover/click).
   `vite.config.ts` marks glass and common modules side-effect-free so unused

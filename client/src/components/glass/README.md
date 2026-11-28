@@ -15,6 +15,9 @@ documented patches and must be preserved when upgrading.
 
 ## Entry boundary
 
+`GlassButtonGroup` imports only `glass-popup-anchor` (context and anchor
+canvas); the popup surface/engine stays with menus and selects.
+
 `LayoutGlassChrome` renders a same-style trigger and lazy-loads
 `GlassMenuImpl` on hover or activation, so the popup/menu foundation stays out
 of the entry. The build marks `components/glass` and `components/common`

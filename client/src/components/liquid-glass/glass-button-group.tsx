@@ -35,7 +35,7 @@ import {
 } from 'react'
 
 import { GlassLayer, type GlassMaterial } from './glass-layer'
-import { GlassPopupAnchor, GlassPopupContext } from './glass-popup'
+import { GlassPopupAnchor, GlassPopupContext } from './glass-popup-anchor'
 
 export type GlassButtonGroupSize = 'sm' | 'md' | 'lg'
 export type GlassButtonGroupOrientation = 'horizontal' | 'vertical'
