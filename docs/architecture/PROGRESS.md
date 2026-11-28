@@ -681,7 +681,7 @@ deleted, verification, and follow-ups.
   production build.
 - Follow-up: C11b (Dashboard helpers), then C7/C8.
 
-### Round 46 — extract Dashboard payload helpers (2026-11-28)
+### Round 46 — extract Dashboard payload helpers (2026-11-28, `deead36`)
 
 - C11b: `Dashboard.tsx` inlined record guards, first-string selection,
   timestamp validation, stage-array validation, activity-completion
