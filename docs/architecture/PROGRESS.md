@@ -445,7 +445,7 @@ deleted, verification, and follow-ups.
   (mastery, scheduler, updates, run_resume, agentapi) hold the remaining
   copies.
 
-### Round 33 — jsval contracts for readers, three more packages (2026-11-28)
+### Round 33 — jsval contracts for readers, three more packages (2026-11-28, `f0f5af3`)
 
 - G1b: the audit showed two opposite nil conventions. Document readers treat
   nil as JSON null (`Number(null) == 0`), while absence-aware services treat
