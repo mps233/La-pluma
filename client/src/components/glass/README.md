@@ -7,6 +7,10 @@ documented patches and must be preserved when upgrading.
 
 ## Local patches
 
+- `glass-layer-lazy.tsx` / `glass-lens-lazy.tsx` defer the glass engine until
+  after first paint or the first interaction, using `use-deferred-glass.ts`;
+  hosts keep the kit CSS fallback until then. `glass-styles.tsx` keeps
+  `GlassStyles`/`GLASS_CSS` out of the engine module.
 - `controls/glass/useGlassCanvas.ts` defers the three.js runtime until the
   first interaction with a glass control, then broadcasts readiness so every
   mounted canvas upgrades together. `common/Switch.tsx` and

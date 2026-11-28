@@ -28,7 +28,7 @@
 import { useEffect, useRef } from 'react'
 
 import { drawAround } from './dom-snapshot'
-import { GlassStyles } from './glass-layer'
+import { GlassStyles } from './glass-styles'
 import { SPRINGS, clamp, getGlassEngine, lerp, stepSpring, surfaceColorOf, type GlassView, type Rgb, type Spring } from './engine'
 
 /** One option is designed 80 units tall; the optics are scaled to the slider's 120-unit lens. */

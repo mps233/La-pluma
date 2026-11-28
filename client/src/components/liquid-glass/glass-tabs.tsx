@@ -18,7 +18,7 @@
 import { SegmentedControl, SegmentedControlItem } from '@ui-sdk/react/segmented-control'
 import type { ReactNode } from 'react'
 
-import { GlassLens } from './glass-lens'
+import { GlassLens } from './glass-lens-lazy'
 
 export type GlassTabOption<T extends string> = { value: T; label: ReactNode; icon?: ReactNode; 'aria-label'?: string }
 

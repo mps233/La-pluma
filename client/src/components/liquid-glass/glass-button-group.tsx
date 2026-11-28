@@ -34,7 +34,8 @@ import {
   type ReactNode,
 } from 'react'
 
-import { GlassLayer, type GlassMaterial } from './glass-layer'
+import { GlassLayer } from './glass-layer-lazy'
+import type { GlassMaterial } from './glass-layer'
 import { GlassPopupAnchor, GlassPopupContext } from './glass-popup-anchor'
 
 export type GlassButtonGroupSize = 'sm' | 'md' | 'lg'

@@ -31,7 +31,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { drawAround, drawDom } from './dom-snapshot'
-import { GlassStyles } from './glass-layer'
+import { GlassStyles } from './glass-styles'
 import { SPRINGS, clamp, getGlassEngine, lerp, mixRgb, smooth, stepSpring, surfaceColorOf, type GlassView, type Rgb, type Spring } from './engine'
 
 export type GlassSlideState = 'idle' | 'pending' | 'success'

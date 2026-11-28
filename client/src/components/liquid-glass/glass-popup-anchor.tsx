@@ -7,7 +7,7 @@
 import { createContext, useEffect, useRef } from 'react'
 
 import type { GlassPopup } from './glass-popup'
-import { GlassStyles } from './glass-layer'
+import { GlassStyles } from './glass-styles'
 
 /** Each letter of it: how long it takes (seconds), how long after the one before it starts, how soft it starts (CSS px). */
 const LETTER = { duration: 0.4, gap: 0.01, blur: 10 }

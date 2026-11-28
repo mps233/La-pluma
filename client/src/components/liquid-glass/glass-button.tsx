@@ -19,7 +19,8 @@
 import { Button } from '@ui-sdk/react/button'
 import { Children, cloneElement, type ComponentProps, type ReactElement, type ReactNode } from 'react'
 
-import { GlassLayer, type GlassMaterial } from './glass-layer'
+import { GlassLayer } from './glass-layer-lazy'
+import type { GlassMaterial } from './glass-layer'
 
 export type GlassButtonSize = 'sm' | 'md' | 'lg' | 'xl'
 
