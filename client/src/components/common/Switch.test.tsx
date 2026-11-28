@@ -43,6 +43,20 @@ describe('Switch', () => {
     expect(onChange).toHaveBeenCalledWith(true)
   })
 
+  it('renders a solid fallback that tracks the checked state', () => {
+    const { container, rerender } = render(
+      <Switch checked={false} label="启用定时执行" onChange={() => undefined} />,
+    )
+
+    const fallback = container.querySelector<HTMLElement>('[data-glass-fallback="switch"]')
+    expect(fallback?.getAttribute('aria-hidden')).toBe('true')
+    expect(fallback?.classList.contains('is-on')).toBe(false)
+
+    rerender(<Switch checked label="启用定时执行" onChange={() => undefined} />)
+
+    expect(container.querySelector('[data-glass-fallback="switch"]')?.classList.contains('is-on')).toBe(true)
+  })
+
   it('disables the native control and its visual wrapper together', () => {
     const { container } = render(
       <Switch

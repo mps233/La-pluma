@@ -141,6 +141,12 @@ export function CheckboxField({
 
   return (
     <span ref={hostRef} className={`glass-checkbox-field inline-flex ${className}`.trim()}>
+      {/* Solid fallback until the shared glass renderer takes over. */}
+      <span
+        aria-hidden="true"
+        data-glass-fallback="checkbox"
+        className={`app-checkbox-fallback${checked ? ' is-checked' : ''}${shape === 'circle' ? ' is-circle' : ''}`}
+      />
       <KitCheckbox
         checked={checked}
         onChange={onChange}

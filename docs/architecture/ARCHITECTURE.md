@@ -85,6 +85,10 @@ transport → app → infra / domain
   components stay out of the barrel: `Modal`/`ConfirmDialog` and `StatusMark`
   are imported from their files, and framer-motion is not a named manual
   chunk, so the entry preload stays animation-free.
+- Glass switches and checkboxes paint a solid fallback until the shared
+  three.js renderer is triggered by the first interaction; one load upgrades
+  every mounted canvas. The 857 KB renderer chunk therefore stays off the
+  initial page load on Automation, Config, and the other control pages.
 - `components/glass/` is the only application-facing Liquid Glass surface.
 - `services/api/client.ts` owns the base URL, auth headers, and raw `fetch`;
   `services/api.ts` is a facade over `services/api/maa.ts` (which composes the

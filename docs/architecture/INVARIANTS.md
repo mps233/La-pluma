@@ -27,6 +27,8 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | Strict TypeScript, including `noUnusedLocals` and `noUnusedParameters` | `tsc --noEmit` | `npm run type-check --prefix client` |
 | Pages are code-split and PWA/page caching configuration is covered | `vite.config.test.ts` | `npm run test --prefix client` |
 | The entry preload excludes the animation vendor: framer-motion is never a named manual chunk | `vite.config.test.ts` (entry chunk policy) | `npm run test --prefix client` |
+| Glass controls stay readable before the shared renderer loads: Switch and CheckboxField render solid fallbacks | `common/Switch.test.tsx` + `common/fields.test.tsx` | `npm run test --prefix client` |
+| The glass renderer is only created after the first interaction, and one load upgrades every mounted canvas | `controls/glass/useGlassCanvas.test.tsx` | `npm run test --prefix client` |
 
 ## Not yet enforceable
 

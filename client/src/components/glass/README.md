@@ -1,8 +1,17 @@
 # Glass adapter
 
 `@/components/glass` is the only application-facing import for the Liquid
-Glass registry. The registry in `components/liquid-glass/` is vendored
-verbatim and must not be edited; kit upgrades replace it wholesale.
+Glass registry. The registry in `components/liquid-glass/` is vendored from
+upstream. Kit upgrades replace it wholesale, so local changes stay limited to
+documented patches and must be preserved when upgrading.
+
+## Local patches
+
+- `controls/glass/useGlassCanvas.ts` defers the three.js runtime until the
+  first interaction with a glass control, then broadcasts readiness so every
+  mounted canvas upgrades together. `common/Switch.tsx` and
+  `common/fields.tsx` paint solid fallbacks until that happens. Reapply this
+  patch when merging a new kit release.
 
 ## Rules
 

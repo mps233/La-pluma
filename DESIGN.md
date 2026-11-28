@@ -98,7 +98,7 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 - 移动 tabbar 的选中态是一块滑动胶囊（`.la-pluma-tabbar-indicator`，320ms ease-out；`prefers-reduced-motion` 下立即跳转），当前 Tab 不再各自绘制底色。重复点击当前 Tab 让页面平滑回到顶部。页面下滚 8px 后 tabbar 收起为屏幕中央的 40px 胶囊（独立安装 44px），上滚 8px、距顶 48px 内、点按胶囊或键盘聚焦时展开；收起后只有胶囊接收点击。折叠逻辑在 `useTabBarFold`，CSS 只读取 `data-folded`，不要在页面里另写滚动监听。
 - 独立安装（`display-mode: standalone`）下 tabbar 采用 iOS 标签栏尺度：62px 高、两侧与底部 21px、标签 10/13、图标 24px；普通浏览器里保持 68px 高、20px 边距、11px 标签、20px 图标。这些值全部来自 `--la-pluma-tabbar-*` token，不要在调用处写死。
 - 全局 `Button` / `IconButton` 也由 `GlassButton` 承载：primary → filled + `--app-accent-action`，danger → filled + `--app-danger-action`，success → filled + `--app-success-action`，secondary / outline → glass，ghost → clear；loading 时用内置活动指示器填入 icon 并保留 `loadingText`。尺寸映射为 36 / 44 / 52px，粗指针下小号提升到 44px。明暗主题通过 `applyThemePreference` 在 `html[data-theme]` 统一解析，按钮不再逐个包裹主题属性。
-- 公共 `Switch` 由 `GlassSwitch` 适配器承载：保留 `checked` / `onChange` / `label` / `compact` / `disabled` API，`label` 只作 `aria-label`，开启色使用 `--app-accent`；`id` 落在按钮上，外部 `<label htmlFor>` 仍可正常关联。`compact` 通过 0.8 缩放并补偿触摸区域，粗指针下命中高度保持约 44px。
+- 公共 `Switch` 由 `GlassSwitch` 适配器承载：保留 `checked` / `onChange` / `label` / `compact` / `disabled` API，`label` 只作 `aria-label`，开启色使用 `--app-accent`；`id` 落在按钮上，外部 `<label htmlFor>` 仍可正常关联。`compact` 通过 0.8 缩放并补偿触摸区域，粗指针下命中高度保持约 44px。共享玻璃 renderer 尚未加载时，Switch 与 CheckboxField 绘制实色回退（白色旋钮 + accent 填充）；首次交互后自动升级为玻璃，并让当前页面所有已挂载的玻璃控件一起升级。不要在页面里另写回退样式。
 
 ---
 
