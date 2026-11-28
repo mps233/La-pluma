@@ -16,6 +16,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	scwebrtc "github.com/mps233/la-pluma/go/internal/infra/webrtc"
 	"github.com/mps233/la-pluma/go/internal/transport/agentapi"
+	"github.com/mps233/la-pluma/go/internal/transport/assetsapi"
 	"github.com/mps233/la-pluma/go/internal/transport/httpapi"
 	"github.com/mps233/la-pluma/go/internal/transport/quotesapi"
 	"github.com/mps233/la-pluma/go/internal/transport/signaling"
@@ -50,7 +51,7 @@ func main() {
 		httpapi.WithAgentHandler(agentapi.New(application, logger)),
 		httpapi.WithSignalingHandler(signalServer.Handler()),
 		httpapi.WithQuotesHandler(quotesapi.NewHandler(application.Quotes)),
-		httpapi.WithAssetsHandler(application.Assets),
+		httpapi.WithAssetsHandler(assetsapi.New(application.Assets, logger)),
 	)
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	listener, err := net.Listen("tcp", addr)

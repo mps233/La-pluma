@@ -530,6 +530,27 @@ deleted, verification, and follow-ups.
 - Follow-up: G6 (assets router) and C5 (client run projection) are the
   remaining P1 items; PD5 still needs a product decision.
 
+### Round 37 — assets router into transport (2026-11-28)
+
+- G6: `infra/assets` owned the mux, path-value parsing, raw JSON errors, image
+  cache headers, and WebP negotiation in addition to resolution and encoding,
+  so an infrastructure package imported routing.
+- Split it: `infra/assets.Service` resolves normalized item/avatar keys to PNG
+  paths and returns a WebP variant only when it is smaller (cache and encoder
+  stay there); `transport/assetsapi` owns the mux, key validation, status
+  mapping, cache headers, and `http.ServeContent`.
+- Updated the composition root to hold the service and both entry points mount
+  `assetsapi.New`. The raw-image contract is unchanged: same status codes, JSON
+  error bodies, `Vary`/`Cache-Control`, PNG/WebP selection, and mount prefix.
+- Split the tests with the code: pure resolution/cache/encoder tests stay in
+  `infra/assets`; routing, traversal, and WebP response tests moved to
+  `transport/assetsapi`.
+- Extended `TestAppLayerHasNoHTTPHandlers` into
+  `TestHTTPHandlersStayInTransport`, which now scans both app and infra; this
+  was the last known infra handler, so the "not yet enforceable" note is gone.
+- Verified: full Go test suite (716 tests / 51 packages), vet, gofmt.
+- Follow-up: C5 (client run projection) is the last P1 item.
+
 
 
 

@@ -1,4 +1,4 @@
-package assets
+package assetsapi
 
 import (
 	"encoding/base64"
@@ -9,10 +9,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/infra/assets"
 )
 
 // tinyPNG is a valid 1x1 PNG; the routes only stream bytes.
@@ -48,14 +48,14 @@ func createResourceFixture(t *testing.T) string {
 	return root
 }
 
-func mountedHandler(root string, cfg Config) http.Handler {
+func mountedHandler(root string, cfg assets.Config) http.Handler {
 	if cfg.ResourceDir == "" && cfg.ResourceDirFunc == nil {
 		cfg.ResourceDir = root
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = discardLogger()
 	}
-	return http.StripPrefix("/api/maa-assets", New(config.Paths{}, cfg))
+	return http.StripPrefix("/api/maa-assets", New(assets.NewService(config.Paths{}, cfg), discardLogger()))
 }
 
 func getAsset(t *testing.T, handler http.Handler, target string, headers map[string]string) *httptest.ResponseRecorder {
@@ -69,114 +69,9 @@ func getAsset(t *testing.T, handler http.Handler, target string, headers map[str
 	return recorder
 }
 
-func TestNormalizeKeys(t *testing.T) {
-	valid := map[string]string{
-		"30012":                  "30012",
-		"30012.png":              "30012",
-		"30012.PNG":              "30012",
-		"MTL_SL_G2":              "MTL_SL_G2",
-		" icon-name ":            "icon-name",
-		strings.Repeat("a", 128): strings.Repeat("a", 128),
-	}
-	for input, want := range valid {
-		if got := NormalizeItemKey(input); got != want {
-			t.Fatalf("NormalizeItemKey(%q) = %q, want %q", input, got, want)
-		}
-	}
-	for _, input := range []string{"", "../secret", "..", "a/b", "a\\b", "a.png.png", strings.Repeat("a", 129), "图标"} {
-		if got := NormalizeItemKey(input); got != "" {
-			t.Fatalf("NormalizeItemKey(%q) = %q, want rejection", input, got)
-		}
-	}
-
-	if got := NormalizeAvatarID("char_002_amiya"); got != "char_002_amiya" {
-		t.Fatalf("avatar = %q", got)
-	}
-	for _, input := range []string{"", "char_", "char_002_amiya.png", "../char_002", "char_002/amiya", "char_002 ami"} {
-		if got := NormalizeAvatarID(input); got != "" {
-			t.Fatalf("NormalizeAvatarID(%q) = %q, want rejection", input, got)
-		}
-	}
-}
-
-func TestSelectItemAssetID(t *testing.T) {
-	aliases := map[string]string{"MTL_SL_G2": "30012"}
-	if got := SelectItemAssetID("MTL_SL_G2", aliases); got != "30012" {
-		t.Fatalf("alias = %q", got)
-	}
-	if got := SelectItemAssetID("30012.png", aliases); got != "30012" {
-		t.Fatalf("direct = %q", got)
-	}
-	if got := SelectItemAssetID("MTL_SL_G2", map[string]string{}); got != "MTL_SL_G2" {
-		t.Fatalf("empty map = %q", got)
-	}
-	if got := SelectItemAssetID("../secret", aliases); got != "" {
-		t.Fatalf("traversal = %q", got)
-	}
-	if got := SelectItemAssetID("x", nil); got != "x" {
-		t.Fatalf("nil map = %q", got)
-	}
-}
-
-func TestBuildItemAssetMap(t *testing.T) {
-	index := map[string]any{
-		"30012": map[string]any{"name": "固源岩"},
-		"30013": map[string]any{"name": "固源岩组"},
-		"30014": map[string]any{"name": "no icon"},
-	}
-	table := map[string]any{
-		"items": map[string]any{
-			"30012": map[string]any{"iconId": "MTL_SL_G2"},
-			"30013": map[string]any{"iconId": "MTL_SL_G2"},
-			"30014": map[string]any{},
-		},
-	}
-	got := BuildItemAssetMap(index, table)
-	if got["MTL_SL_G2"] != "30012" {
-		t.Fatalf("deterministic first entry = %#v", got)
-	}
-	if len(got) != 1 {
-		t.Fatalf("map = %#v", got)
-	}
-
-	if empty := BuildItemAssetMap(nil, nil); len(empty) != 0 {
-		t.Fatalf("nil input = %#v", empty)
-	}
-}
-
-func TestLoadItemAssetMap(t *testing.T) {
-	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "gamedata", "excel"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	itemIndex := `{"30012":{"name":"固源岩"}}`
-	itemTable := `{"items":{"30012":{"iconId":"MTL_SL_G2"}}}`
-	if err := os.WriteFile(filepath.Join(root, "item_index.json"), []byte(itemIndex), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "gamedata", "excel", "item_table.json"), []byte(itemTable), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	got, err := LoadItemAssetMap(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got["MTL_SL_G2"] != "30012" {
-		t.Fatalf("map = %#v", got)
-	}
-
-	missing, err := LoadItemAssetMap(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(missing) != 0 {
-		t.Fatalf("missing files = %#v", missing)
-	}
-}
-
 func TestHandlerServesAssets(t *testing.T) {
 	root := createResourceFixture(t)
-	handler := mountedHandler(root, Config{
+	handler := mountedHandler(root, assets.Config{
 		LoadItemAssetMap: func(string) (map[string]string, error) {
 			return map[string]string{"MTL_SL_G2": "30012"}, nil
 		},
@@ -242,7 +137,8 @@ func TestHandlerUsesPathsResourceRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	handler := http.StripPrefix("/api/maa-assets", New(config.Paths{MaaDataDir: maaDataDir}, Config{Logger: discardLogger()}))
+	service := assets.NewService(config.Paths{MaaDataDir: maaDataDir}, assets.Config{Logger: discardLogger()})
+	handler := http.StripPrefix("/api/maa-assets", New(service, discardLogger()))
 	recorder := getAsset(t, handler, "/api/maa-assets/item/30012", nil)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", recorder.Code, recorder.Body.String())
@@ -251,7 +147,7 @@ func TestHandlerUsesPathsResourceRoot(t *testing.T) {
 
 func TestHandlerRejectsInvalidKeys(t *testing.T) {
 	root := createResourceFixture(t)
-	handler := mountedHandler(root, Config{
+	handler := mountedHandler(root, assets.Config{
 		LoadItemAssetMap: func(string) (map[string]string, error) {
 			return nil, nil
 		},
@@ -281,33 +177,13 @@ func TestHandlerRejectsInvalidKeys(t *testing.T) {
 
 func TestHandlerTraversalRejection(t *testing.T) {
 	root := createResourceFixture(t)
-	secretPath := filepath.Join(filepath.Dir(root), "secret.png")
-	if err := os.WriteFile(secretPath, tinyPNG, 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	// safeJoin must reject any alias that escapes the item namespace, even if
-	// a malicious resource file produced it.
-	itemsDir := filepath.Join(root, "template", "items")
-	avatarDir := filepath.Join(root, "template", "avatar")
-	if _, ok := safeJoin(itemsDir, "../secret.png"); ok {
-		t.Fatal("safeJoin accepted a traversal path")
-	}
-	if _, ok := safeJoin(avatarDir, "../../secret.png"); ok {
-		t.Fatal("safeJoin accepted a parent escape")
-	}
-	if _, ok := safeJoin(itemsDir, "30012.png"); !ok {
-		t.Fatal("safeJoin rejected a valid in-namespace path")
-	}
-
-	// The key validator rejects traversal before the filesystem is touched.
-	handler := New(config.Paths{}, Config{
+	handler := New(assets.NewService(config.Paths{}, assets.Config{
 		ResourceDir: root,
 		Logger:      discardLogger(),
 		LoadItemAssetMap: func(string) (map[string]string, error) {
 			return map[string]string{"../secret": "../secret"}, nil
 		},
-	})
+	}), discardLogger())
 	request := httptest.NewRequest(http.MethodGet, "/item/anything", nil)
 	request.SetPathValue("key", "../secret")
 	recorder := httptest.NewRecorder()

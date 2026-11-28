@@ -64,6 +64,7 @@ transport → app → infra / domain
 | API timestamp format | `internal/util/timefmt` | One millis layout + UTC formatter; offset/date layouts |
 | Public Agent API contract | `internal/contract` | Manifest and OpenAPI derive from one registry |
 | PRTS HTTP transport | `internal/infra/prts` | Request construction, timeout, status, JSON decode, retry loop; callers own envelope parsing and retry policy |
+| MaaResource image serving | `internal/infra/assets` + `internal/transport/assetsapi` | Resolution and WebP cache in infra; routes, cache headers, and raw image responses in transport |
 | HTTP envelope and error mapping | `internal/transport/httpx` | `success/message/data/error/meta` |
 | Agent route registration | `internal/transport/agentapi` | Every advertised operation must resolve (tested) |
 | Scheduler state and flows | `internal/app/scheduler` | Startup resume + tracked runs |
@@ -90,16 +91,14 @@ transport → app → infra / domain
 These are real today and tracked in `TASKS.md`; do not add new code that
 depends on them.
 
-1. `infra/assets` still owns its HTTP router and raw response writer. Quotes
-   moved to `transport/quotesapi`; assets needs a small transport wrapper
-   before the same is possible.
-2. `operbox.json` / `depot.json` and the `user-configs` path are composed in
+1. `operbox.json` / `depot.json` and the `user-configs` path are composed in
    multiple packages without one typed owner.
-3. JS-coercion helpers and PRTS clients exist in more than one package.
-4. The client keeps local run flags alongside the global run projection, and
+2. JS-coercion helpers still exist in `mastery`, `scheduler`, `updates`,
+   `run_resume`, and `agentapi` (G1c).
+3. The client keeps local run flags alongside the global run projection, and
    configuration-sync drafts are implemented per page.
-5. `client/src/components/common` exports only part of its usable primitives,
+4. `client/src/components/common` exports only part of its usable primitives,
    so some consumers still deep-import; page skeletons live in `Loading.tsx`.
-6. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
+5. Token layers in `DESIGN.md` (primitive/semantic/component) are partly
    aspirational; page CSS and some JS colors still use literals.
-7. `internal/app/logs` has no tests; `agentapi` exercises ~17% of its routes.
+6. `internal/app/logs` has no tests; `agentapi` exercises ~17% of its routes.

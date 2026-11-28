@@ -62,7 +62,7 @@ type App struct {
 	Updates       *updates.Service
 	Mastery       *mastery.Service
 	Skland        *skland.Service
-	Assets        *assets.Handler
+	Assets        *assets.Service
 	WebRTC        *webrtcapp.Service
 	Bot           *notifications.Bot
 
@@ -149,7 +149,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	if cfg.Tuning.AssetWebPDisabled {
 		assetConfig.WebPEncoder = nil
 	}
-	assetsHandler := assets.New(cfg.Paths, assetConfig)
+	assetsService := assets.NewService(cfg.Paths, assetConfig)
 	notificationService := notifications.New(notifications.Options{Paths: cfg.Paths, Logger: logger})
 	if loaded, err := notificationService.Load(); err == nil {
 		notificationService.SetConfig(loaded)
@@ -200,7 +200,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Updates:       updatesService,
 		Mastery:       masteryService,
 		Skland:        sklandService,
-		Assets:        assetsHandler,
+		Assets:        assetsService,
 		WebRTC:        webrtcapp.New(cfg, logger),
 		instanceLock:  instanceLock,
 	}

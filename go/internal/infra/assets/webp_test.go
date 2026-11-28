@@ -1,8 +1,6 @@
 package assets
 
 import (
-	"errors"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -62,74 +60,6 @@ func writeFixtureFile(t *testing.T, root, name string) string {
 		t.Fatal(err)
 	}
 	return path
-}
-
-func TestHandlerWebPConversionAndCache(t *testing.T) {
-	root := createResourceFixture(t)
-	encoder := &fakeEncoder{data: []byte("fake-webp-bytes")}
-	handler := mountedHandler(root, Config{
-		WebPEncoder: encoder,
-		LoadItemAssetMap: func(string) (map[string]string, error) {
-			return map[string]string{}, nil
-		},
-	})
-
-	webp := getAsset(t, handler, "/api/maa-assets/item/30012", map[string]string{
-		"Accept": "image/avif,image/webp,*/*",
-	})
-	if webp.Code != http.StatusOK {
-		t.Fatalf("webp status = %d", webp.Code)
-	}
-	if webp.Header().Get("Content-Type") != "image/webp" {
-		t.Fatalf("content type = %q", webp.Header().Get("Content-Type"))
-	}
-	if webp.Body.String() != "fake-webp-bytes" {
-		t.Fatalf("body = %q", webp.Body.String())
-	}
-
-	second := getAsset(t, handler, "/api/maa-assets/item/30012", map[string]string{"Accept": "image/webp"})
-	if second.Code != http.StatusOK || second.Body.String() != "fake-webp-bytes" {
-		t.Fatalf("cached response = %d %q", second.Code, second.Body.String())
-	}
-	if calls := encoder.callCount(); calls != 1 {
-		t.Fatalf("encoder calls = %d, want 1", calls)
-	}
-
-	png := getAsset(t, handler, "/api/maa-assets/item/30012", nil)
-	if png.Header().Get("Content-Type") != "image/png" {
-		t.Fatalf("png content type = %q", png.Header().Get("Content-Type"))
-	}
-	if png.Body.Len() != len(tinyPNG) {
-		t.Fatalf("png body length = %d", png.Body.Len())
-	}
-	if calls := encoder.callCount(); calls != 1 {
-		t.Fatalf("PNG request should not encode, calls = %d", calls)
-	}
-}
-
-func TestHandlerWebPFailureFallsBackToPNG(t *testing.T) {
-	root := createResourceFixture(t)
-	encoder := &fakeEncoder{err: errors.New("no encoder")}
-	handler := mountedHandler(root, Config{
-		WebPEncoder: encoder,
-		LoadItemAssetMap: func(string) (map[string]string, error) {
-			return map[string]string{}, nil
-		},
-	})
-
-	recorder := getAsset(t, handler, "/api/maa-assets/avatar/char_002_amiya", map[string]string{"Accept": "image/webp"})
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status = %d", recorder.Code)
-	}
-	if recorder.Header().Get("Content-Type") != "image/png" {
-		t.Fatalf("content type = %q", recorder.Header().Get("Content-Type"))
-	}
-	if recorder.Body.Len() != len(tinyPNG) {
-		t.Fatalf("body length = %d", recorder.Body.Len())
-	}
-	if encoder.callCount() != 1 {
-		t.Fatalf("encoder calls = %d", encoder.callCount())
-	}
 }
 
 func TestWebPCacheEviction(t *testing.T) {

@@ -15,7 +15,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | Atomic file replacement has one implementation (0600 temp file, fsync, rename) | `internal/util/jsonstore/store_test.go` | `cd go && go test ./internal/util/jsonstore` |
 | Application code imports Liquid Glass only through `@/components/glass` (documented preview exception) | ESLint `no-restricted-imports` | `npm run lint --prefix client` |
 | Environment access stays in the config layer (`internal/config`, `internal/app/config`); entry points may snapshot env into Config | `TestEnvironmentReadsStayInConfig` | `cd go && go test ./internal/archguard` |
-| The `internal/app` layer owns no HTTP handlers (`ServeHTTP`/`http.Handler`) | `TestAppLayerHasNoHTTPHandlers` | `cd go && go test ./internal/archguard` |
+| The `internal/app` and `internal/infra` layers own no HTTP handlers (`ServeHTTP`/`http.Handler`) | `TestHTTPHandlersStayInTransport` | `cd go && go test ./internal/archguard` |
 | Agent API endpoint files stay split by domain (≤ 800 production lines per file) | `TestAgentAPIFilesStaySmall` | `cd go && go test ./internal/archguard` |
 | Agent run state transitions have one writer (`agentrun.Scope`); transport and services may only read runs or act through the scope | `TestRunLifecycleStaysInAgentRunScope` | `cd go && go test ./internal/archguard` |
 | Raw `fetch(` appears only in `services/api.ts`; everything else uses `fetchWithAuth`/`maaApi` | `services/apiBoundary.test.ts` | `npm run test --prefix client` |
@@ -34,4 +34,3 @@ These are known gaps; do not treat them as guaranteed by CI:
 - No hard-coded hex colors in migrated files; the ratchet allowlist shrinks as
   each file moves to semantic tokens.
 - No page CSS selectors duplicated in global CSS.
-- No HTTP handlers in `infra` (the assets router remains; `app` is enforced).
