@@ -380,7 +380,7 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite, vet, gofmt.
 - Follow-up: readers still decode untyped maps (G3 remainder).
 
-### Round 31 — one writer for the run lifecycle (2026-11-28)
+### Round 31 — one writer for the run lifecycle (2026-11-28, `af7ed10`)
 
 - G7 / PD4: transport, the MAA service, the startup resumer, and the cron
   flow wrapper each carried their own begin/start/fail/stop/complete sequence,
