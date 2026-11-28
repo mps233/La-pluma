@@ -13,6 +13,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -377,7 +378,7 @@ func (s *Service) Send(ctx context.Context, message Message) SendResult {
 	failures := make([]ChannelError, 0)
 	for _, name := range s.channelNames() {
 		channelConfig := config.Channels[name]
-		if channelConfig == nil || !truthy(channelConfig["enabled"]) {
+		if channelConfig == nil || !jsval.Truthy(channelConfig["enabled"]) {
 			continue
 		}
 		factory, ok := s.channelFactory(name)
@@ -423,7 +424,7 @@ func (s *Service) SendToChannel(ctx context.Context, name string, message Messag
 		)
 	}
 	channelConfig := s.GetConfig().Channels[name]
-	if channelConfig == nil || !truthy(channelConfig["enabled"]) {
+	if channelConfig == nil || !jsval.Truthy(channelConfig["enabled"]) {
 		return nil, apperrors.Validation(
 			"AGENT_NOTIFICATION_CHANNEL_DISABLED",
 			"通知渠道 "+name+" 未启用",
@@ -478,7 +479,7 @@ func (s *Service) ShouldCaptureScreenshot() bool {
 	}
 	for _, name := range s.channelNames() {
 		channelConfig := config.Channels[name]
-		if channelConfig == nil || !truthy(channelConfig["enabled"]) {
+		if channelConfig == nil || !jsval.Truthy(channelConfig["enabled"]) {
 			continue
 		}
 		factory, ok := s.channelFactory(name)

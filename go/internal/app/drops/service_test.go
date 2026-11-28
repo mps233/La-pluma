@@ -12,6 +12,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 func TestGetLocalDateStringUsesConfiguredTimeZone(t *testing.T) {
@@ -112,7 +113,7 @@ func TestRecordDropsAndStatistics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read persisted record: %v", err)
 	}
-	persisted := asRecord(raw)
+	persisted := jsval.Record(raw)
 	if persisted == nil {
 		t.Fatalf("persisted record = %#v", raw)
 	}
@@ -125,12 +126,12 @@ func TestRecordDropsAndStatistics(t *testing.T) {
 	if !ok || len(records) != 1 {
 		t.Fatalf("persisted records = %#v", persisted["records"])
 	}
-	first := asRecord(records[0])
+	first := jsval.Record(records[0])
 	persistedItems, ok := first["items"].([]any)
 	if !ok || len(persistedItems) != 2 {
 		t.Fatalf("persisted items = %#v", first["items"])
 	}
-	firstItem := asRecord(persistedItems[0])
+	firstItem := jsval.Record(persistedItems[0])
 	if firstItem["extra"] != "keep" {
 		t.Fatalf("extra field not preserved: %#v", firstItem)
 	}
@@ -279,7 +280,7 @@ func TestDropStatisticsJSONShape(t *testing.T) {
 	if decoded["items"] == nil || decoded["stages"] == nil {
 		t.Fatalf("items/stages should be objects: %s", encoded)
 	}
-	dateRange := asRecord(decoded["dateRange"])
+	dateRange := jsval.Record(decoded["dateRange"])
 	if dateRange["start"] != nil || dateRange["end"] != nil || dateRange["days"] != float64(0) {
 		t.Fatalf("dateRange = %s", encoded)
 	}

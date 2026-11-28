@@ -418,6 +418,33 @@ deleted, verification, and follow-ups.
 - Follow-up: two settle paths still discard persistence errors, matching the
   previous transport behavior (G13).
 
+### Round 32 — jsval JSON contracts and three package migrations (2026-11-28)
+
+- G1a: `drops`, `notifications`, and `infra/maa/results` each carried a full
+  private coercion set with subtly different null, array, and finite-number
+  rules; the differences prevented a mechanical rename.
+- Extended `internal/util/jsval` with the contracts those readers actually
+  need: `StringJSON` (nil is JSON null → `"null"`, arrays join with null
+  entries empty, objects render `"[object Object]"`), `FiniteNumber`
+  (`Number(value)` with null → 0 and non-finite results rejected), and
+  `FiniteNumberOrZero`. `FormatFloat` now follows the JavaScript decimal /
+  exponential thresholds and normalizes exponents (`1e-7`, not `1e-07`), so
+  the notifications-local formatter became redundant.
+- Migrated all three packages to the canonical helpers and deleted their local
+  `asRecord`, `truthy`, `jsString`, `stringValue`, `stringOrEmpty`,
+  `numberValue`, `numberOrZero`, `joinStringValues`, `truthyString`,
+  `formatJSNumber`, `normalizeExponent`, and `formatID` copies (~400 lines).
+- Domain helpers that are not JS coercions stayed, with comments: drops
+  `coalesceValue`/`asAnySlice`, notifications `itemTask`/`errMessage`/
+  `formatTelegramTime`, MAA results `hasField`/`lookupNumber`.
+- Behavior notes: notification IDs and tokens now stringify through
+  `jsval.StringJSON` (textual JSON numbers keep their digits); tiny/large
+  floats render with JavaScript exponents everywhere.
+- Verified: full Go test suite (704 tests / 49 packages), vet, gofmt.
+- Follow-up: G1b (gamedata, recognition, training, customtools) and G1c
+  (mastery, scheduler, updates, run_resume, agentapi) hold the remaining
+  copies.
+
 
 
 

@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // Message is a channel-agnostic notification payload. The JSON tags match the
@@ -125,7 +127,7 @@ func FormatTelegramMessage(title, content, level string, data map[string]any, no
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			text += "\n• " + key + ": " + jsString(data[key])
+			text += "\n• " + key + ": " + jsval.StringJSON(data[key])
 		}
 	}
 	return text + "\n\n🕐 " + formatTelegramTime(now)
@@ -234,7 +236,7 @@ func BuildTaskCompletionMessage(info TaskInfo) Message {
 	if len(warnings) > 0 {
 		content.WriteString("\n\n⚠️ *执行提示*")
 		for _, warning := range warnings {
-			content.WriteString("\n• " + jsString(warning))
+			content.WriteString("\n• " + jsval.StringJSON(warning))
 		}
 	}
 
@@ -244,17 +246,17 @@ func BuildTaskCompletionMessage(info TaskInfo) Message {
 			content.WriteString("\n\n*" + summary.Task + "*")
 			if summary.Stage != "" {
 				content.WriteString("\n• 关卡: " + summary.Stage)
-				if truthy(summary.Times) {
-					content.WriteString("\n• 次数: " + jsString(summary.Times))
+				if jsval.Truthy(summary.Times) {
+					content.WriteString("\n• 次数: " + jsval.StringJSON(summary.Times))
 				}
-				if truthy(summary.Duration) {
-					content.WriteString("\n• 耗时: " + jsString(summary.Duration))
+				if jsval.Truthy(summary.Duration) {
+					content.WriteString("\n• 耗时: " + jsval.StringJSON(summary.Duration))
 				}
-				if truthy(summary.Medicine) && stringValue(summary.Medicine) != "0" {
-					content.WriteString("\n• 理智药: " + jsString(summary.Medicine))
+				if jsval.Truthy(summary.Medicine) && jsval.StringJSON(summary.Medicine) != "0" {
+					content.WriteString("\n• 理智药: " + jsval.StringJSON(summary.Medicine))
 				}
-				if truthy(summary.Stone) && stringValue(summary.Stone) != "0" {
-					content.WriteString("\n• 源石: " + jsString(summary.Stone))
+				if jsval.Truthy(summary.Stone) && jsval.StringJSON(summary.Stone) != "0" {
+					content.WriteString("\n• 源石: " + jsval.StringJSON(summary.Stone))
 				}
 				if summary.Drops != "" {
 					content.WriteString("\n• 掉落: " + summary.Drops)
@@ -263,7 +265,7 @@ func BuildTaskCompletionMessage(info TaskInfo) Message {
 			if summary.Recruits != nil {
 				content.WriteString("\n• 公招结果:")
 				for _, recruit := range summary.Recruits {
-					content.WriteString("\n  - [" + recruit.Tags + "] → " + jsString(recruit.Stars) + "⭐")
+					content.WriteString("\n  - [" + recruit.Tags + "] → " + jsval.StringJSON(recruit.Stars) + "⭐")
 				}
 			}
 			if summary.Infrast != "" {
@@ -293,17 +295,17 @@ func BuildTaskCompletionMessage(info TaskInfo) Message {
 				content.WriteString("\n• " + text)
 				continue
 			}
-			record, ok := asRecord(item)
-			if !ok {
+			record := jsval.Record(item)
+			if record == nil {
 				continue
 			}
 			taskText := ""
-			if truthy(record["task"]) {
-				taskText = jsString(record["task"])
+			if jsval.Truthy(record["task"]) {
+				taskText = jsval.StringJSON(record["task"])
 			}
 			line := "\n• " + taskText
-			if truthy(record["reason"]) {
-				line += " - " + jsString(record["reason"])
+			if jsval.Truthy(record["reason"]) {
+				line += " - " + jsval.StringJSON(record["reason"])
 			}
 			content.WriteString(line)
 		}
@@ -319,16 +321,15 @@ func BuildTaskCompletionMessage(info TaskInfo) Message {
 	if len(remainingErrors) > 0 {
 		content.WriteString("\n\n❌ *失败任务*")
 		for _, item := range remainingErrors {
-			record, ok := asRecord(item)
-			if ok && truthy(record["task"]) {
-				line := "\n• " + jsString(record["task"])
-				if truthy(record["error"]) {
-					line += " - " + jsString(record["error"])
+			if record := jsval.Record(item); record != nil && jsval.Truthy(record["task"]) {
+				line := "\n• " + jsval.StringJSON(record["task"])
+				if jsval.Truthy(record["error"]) {
+					line += " - " + jsval.StringJSON(record["error"])
 				}
 				content.WriteString(line)
 				continue
 			}
-			content.WriteString("\n• " + jsString(item))
+			content.WriteString("\n• " + jsval.StringJSON(item))
 		}
 	}
 

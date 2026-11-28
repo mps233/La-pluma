@@ -3,6 +3,8 @@
 // JS semantics for the JSON value set; keep the differences explicit:
 //
 //   - String(value) treats nil as "undefined".
+//   - StringJSON(value) treats nil as JSON null and renders "null", because
+//     documents decoded from JSON cannot distinguish null from a missing key.
 //   - StringOrNullish(value) is value ?? "" followed by String(value).
 //   - StringOrEmpty(value) is String(value || ""), so 0, false, and "" all
 //     become "".
@@ -89,6 +91,32 @@ func String(value any) string {
 	}
 }
 
+// StringJSON mirrors String(value) for JSON-decoded documents, where nil is a
+// real null rather than an absent/undefined value. It renders null as "null",
+// joins arrays with commas (null entries become empty), and renders objects as
+// "[object Object]".
+func StringJSON(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return "null"
+	case []any:
+		parts := make([]string, len(typed))
+		for index, item := range typed {
+			if item == nil {
+				continue
+			}
+			parts[index] = StringJSON(item)
+		}
+		return strings.Join(parts, ",")
+	case []string:
+		return strings.Join(typed, ",")
+	case map[string]any:
+		return "[object Object]"
+	default:
+		return String(value)
+	}
+}
+
 // StringOrNullish mirrors value ?? "" followed by String(value).
 func StringOrNullish(value any) string {
 	if value == nil {
@@ -149,8 +177,9 @@ func Truthy(value any) bool {
 	}
 }
 
-// FormatFloat prints a float the way JavaScript prints integral numbers: no
-// decimal point, and NaN/Infinity spelled out.
+// FormatFloat prints a float the way JavaScript prints numbers: decimal form
+// for [1e-6, 1e21), exponential form outside that range with a normalized
+// exponent, and NaN/Infinity spelled out.
 func FormatFloat(value float64) string {
 	if math.IsNaN(value) {
 		return "NaN"
@@ -161,10 +190,31 @@ func FormatFloat(value float64) string {
 	if math.IsInf(value, -1) {
 		return "-Infinity"
 	}
-	if value == math.Trunc(value) && math.Abs(value) < 1e21 {
-		return strconv.FormatFloat(value, 'f', -1, 64)
+	abs := math.Abs(value)
+	if abs != 0 && (abs < 1e-6 || abs >= 1e21) {
+		return normalizeExponent(strconv.FormatFloat(value, 'g', -1, 64))
 	}
-	return strconv.FormatFloat(value, 'g', -1, 64)
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+// normalizeExponent removes leading zeros from a strconv exponent so it
+// matches JavaScript's rendering ("1e-7", not "1e-07").
+func normalizeExponent(value string) string {
+	index := strings.LastIndexByte(value, 'e')
+	if index < 0 {
+		return value
+	}
+	sign := ""
+	digits := value[index+1:]
+	if strings.HasPrefix(digits, "-") || strings.HasPrefix(digits, "+") {
+		sign = digits[:1]
+		digits = digits[1:]
+	}
+	digits = strings.TrimLeft(digits, "0")
+	if digits == "" {
+		digits = "0"
+	}
+	return value[:index+1] + sign + digits
 }
 
 // Number mirrors Number(value). The second result is false when the value is
@@ -235,6 +285,31 @@ func Number(value any) (float64, bool) {
 // NumberOrZero coalesces an inconvertible value to zero.
 func NumberOrZero(value any) float64 {
 	parsed, ok := Number(value)
+	if !ok {
+		return 0
+	}
+	return parsed
+}
+
+// FiniteNumber mirrors Number(value) followed by Number.isFinite for
+// JSON-decoded documents: null becomes 0 and the second result is false for
+// values that do not convert to a finite number. JSON-decoded values cannot
+// distinguish null from a missing key, and every document reader treats nil as
+// null here.
+func FiniteNumber(value any) (float64, bool) {
+	if value == nil {
+		return 0, true
+	}
+	parsed, ok := Number(value)
+	if !ok || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+		return 0, false
+	}
+	return parsed, true
+}
+
+// FiniteNumberOrZero coalesces a non-finite or inconvertible value to zero.
+func FiniteNumberOrZero(value any) float64 {
+	parsed, ok := FiniteNumber(value)
 	if !ok {
 		return 0
 	}

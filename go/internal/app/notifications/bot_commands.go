@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 // handleCommand executes one dispatched command. A nil response means the
@@ -268,7 +270,7 @@ func (b *Bot) executeTaskFlow(ctx context.Context, flowType string) (*string, er
 	}
 	enabled := 0
 	for _, task := range tasks {
-		if truthy(task["enabled"]) {
+		if jsval.Truthy(task["enabled"]) {
 			enabled++
 		}
 	}

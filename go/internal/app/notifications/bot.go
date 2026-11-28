@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const defaultCopilotAPIBaseURL = "https://prts.maa.plus"
@@ -78,12 +79,12 @@ func BotConfigFromChannel(channel ChannelConfig) BotConfig {
 	if channel == nil {
 		return config
 	}
-	config.Enabled = truthy(channel["enabled"])
+	config.Enabled = jsval.Truthy(channel["enabled"])
 	if value, ok := channel["botToken"]; ok && value != nil {
-		config.BotToken = stringValue(value)
+		config.BotToken = jsval.StringJSON(value)
 	}
 	if value, ok := channel["chatId"]; ok && value != nil {
-		config.ChatID = stringValue(value)
+		config.ChatID = jsval.StringJSON(value)
 	}
 	switch ids := channel["allowedUserIds"].(type) {
 	case []any:
@@ -420,14 +421,14 @@ func (b *Bot) handleUpdate(ctx context.Context, update TelegramUpdate) {
 	if sender == nil || sender.IsBot {
 		return
 	}
-	chatID := formatID(message.Chat.ID)
-	userID := formatID(sender.ID)
+	chatID := jsval.String(message.Chat.ID)
+	userID := jsval.String(sender.ID)
 	botConfig := b.Config()
 
 	authorized := false
 	if len(botConfig.AllowedUserIDs) > 0 {
 		for _, allowed := range botConfig.AllowedUserIDs {
-			if formatID(allowed) == userID {
+			if jsval.String(allowed) == userID {
 				authorized = true
 				break
 			}

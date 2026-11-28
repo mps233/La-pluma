@@ -115,6 +115,77 @@ func TestNumberAndInteger(t *testing.T) {
 	}
 }
 
+func TestStringJSON(t *testing.T) {
+	cases := []struct {
+		value any
+		want  string
+	}{
+		{nil, "null"},
+		{"x", "x"},
+		{true, "true"},
+		{json.Number("9007199254740993"), "9007199254740993"},
+		{[]any{"a", nil, 2}, "a,,2"},
+		{[]string{"a", "b"}, "a,b"},
+		{map[string]any{"a": 1}, "[object Object]"},
+	}
+	for _, tc := range cases {
+		if got := StringJSON(tc.value); got != tc.want {
+			t.Fatalf("StringJSON(%#v) = %q, want %q", tc.value, got, tc.want)
+		}
+	}
+}
+
+func TestFormatFloatMatchesJavaScript(t *testing.T) {
+	cases := []struct {
+		value float64
+		want  string
+	}{
+		{2, "2"},
+		{1.5, "1.5"},
+		{1e20, "100000000000000000000"},
+		{1e21, "1e+21"},
+		{0.000001, "0.000001"},
+		{1e-7, "1e-7"},
+		{-1.5e-8, "-1.5e-8"},
+		{math.NaN(), "NaN"},
+		{math.Inf(1), "Infinity"},
+	}
+	for _, tc := range cases {
+		if got := FormatFloat(tc.value); got != tc.want {
+			t.Fatalf("FormatFloat(%v) = %q, want %q", tc.value, got, tc.want)
+		}
+	}
+}
+
+func TestFiniteNumber(t *testing.T) {
+	cases := []struct {
+		value any
+		want  float64
+		ok    bool
+	}{
+		{nil, 0, true},
+		{true, 1, true},
+		{" 42 ", 42, true},
+		{"", 0, true},
+		{"1e999", 0, false},
+		{"Infinity", 0, false},
+		{"NaN", 0, false},
+		{"nope", 0, false},
+		{json.Number("3.5"), 3.5, true},
+		{math.Inf(1), 0, false},
+		{math.NaN(), 0, false},
+	}
+	for _, tc := range cases {
+		got, ok := FiniteNumber(tc.value)
+		if ok != tc.ok || (ok && got != tc.want) {
+			t.Fatalf("FiniteNumber(%#v) = %v, %v; want %v, %v", tc.value, got, ok, tc.want, tc.ok)
+		}
+	}
+	if got := FiniteNumberOrZero("Infinity"); got != 0 {
+		t.Fatalf("FiniteNumberOrZero = %v", got)
+	}
+}
+
 func TestParseAndDecodeJSON(t *testing.T) {
 	value, err := ParseJSON([]byte(`{"id":9007199254740993}`))
 	if err != nil {

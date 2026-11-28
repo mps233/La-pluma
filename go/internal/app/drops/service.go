@@ -16,6 +16,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"github.com/mps233/la-pluma/go/internal/util/timefmt"
 )
 
@@ -38,7 +39,7 @@ func (item DropRecordItem) Name() string {
 }
 
 func (item DropRecordItem) Count() float64 {
-	return numberOrZero(item["count"])
+	return jsval.FiniteNumberOrZero(item["count"])
 }
 
 type DropRecordEntry struct {
@@ -173,7 +174,7 @@ func NormalizeDropDays(value any, fallback int) int {
 	if value == nil {
 		return fallback
 	}
-	parsed, ok := numberValue(value)
+	parsed, ok := jsval.FiniteNumber(value)
 	if !ok {
 		return fallback
 	}
@@ -266,14 +267,14 @@ func (s *Service) RecordDrops(dropData any) (DropRecordFile, error) {
 	}
 	normalizeRecord(record)
 
-	input := asRecord(dropData)
+	input := jsval.Record(dropData)
 	entry := DropRecordEntry{
 		Timestamp: timefmt.FormatMillis(s.now()),
-		Stage:     stringOrEmpty(coalesceValue(input, "stage")),
-		Times:     numberOrZero(coalesceValue(input, "times")),
-		Sanity:    numberOrZero(coalesceValue(input, "sanity")),
-		Medicine:  numberOrZero(coalesceValue(input, "medicine")),
-		Stone:     numberOrZero(coalesceValue(input, "stone")),
+		Stage:     jsval.StringOrNullish(coalesceValue(input, "stage")),
+		Times:     jsval.FiniteNumberOrZero(coalesceValue(input, "times")),
+		Sanity:    jsval.FiniteNumberOrZero(coalesceValue(input, "sanity")),
+		Medicine:  jsval.FiniteNumberOrZero(coalesceValue(input, "medicine")),
+		Stone:     jsval.FiniteNumberOrZero(coalesceValue(input, "stone")),
 		Items:     normalizeDropItems(coalesceValue(input, "items")),
 		Source:    "fight",
 		Mode:      "normal",
@@ -453,22 +454,22 @@ func LoadMaterials(resourceDir string) (map[string]MaterialInfo, error) {
 		return nil, err
 	}
 	tableValue, _ := jsonstore.Read(filepath.Join(resourceDir, "gamedata", "excel", "item_table.json"), map[string]any{})
-	index := asRecord(indexValue)
+	index := jsval.Record(indexValue)
 	if index == nil {
 		return map[string]MaterialInfo{}, nil
 	}
-	table := asRecord(tableValue)
+	table := jsval.Record(tableValue)
 	tableItems := map[string]any{}
 	if table != nil {
-		tableItems = asRecord(table["items"])
+		tableItems = jsval.Record(table["items"])
 	}
 	result := map[string]MaterialInfo{}
 	for id, raw := range index {
-		item := asRecord(raw)
+		item := jsval.Record(raw)
 		if item == nil {
 			item = map[string]any{}
 		}
-		tableItem := asRecord(tableItems[id])
+		tableItem := jsval.Record(tableItems[id])
 		if tableItem == nil {
 			tableItem = map[string]any{}
 		}
@@ -514,10 +515,10 @@ func processRecordForStatistics(record DropRecordEntry, statistics *DropStatisti
 				Stages: map[string]float64{},
 			}
 			if material, found := materialsMap[itemName]; found {
-				if truthy(material.IconID) {
+				if jsval.Truthy(material.IconID) {
 					itemStatistic.IconID = material.IconID
 				}
-				if truthy(material.Rarity) {
+				if jsval.Truthy(material.Rarity) {
 					itemStatistic.Rarity = material.Rarity
 				}
 			}
@@ -569,7 +570,7 @@ func normalizeDropItems(value any) []DropRecordItem {
 	}
 	items := make([]DropRecordItem, 0, len(values))
 	for _, rawItem := range values {
-		item := asRecord(rawItem)
+		item := jsval.Record(rawItem)
 		if item == nil {
 			continue
 		}
@@ -580,9 +581,9 @@ func normalizeDropItems(value any) []DropRecordItem {
 		if name, ok := item["name"].(string); ok {
 			normalized["name"] = name
 		} else {
-			normalized["name"] = stringOrEmpty(coalesceValue(item, "name"))
+			normalized["name"] = jsval.StringOrNullish(coalesceValue(item, "name"))
 		}
-		normalized["count"] = numberOrZero(coalesceValue(item, "count"))
+		normalized["count"] = jsval.FiniteNumberOrZero(coalesceValue(item, "count"))
 		items = append(items, normalized)
 	}
 	return items

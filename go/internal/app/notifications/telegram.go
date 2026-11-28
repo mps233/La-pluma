@@ -17,6 +17,7 @@ import (
 	"time"
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 type telegramClient struct {
@@ -175,10 +176,10 @@ func (c *telegramChannel) botToken() string {
 		return ""
 	}
 	value := c.config["botToken"]
-	if !truthy(value) {
+	if !jsval.Truthy(value) {
 		return ""
 	}
-	return jsString(value)
+	return jsval.StringJSON(value)
 }
 
 func (c *telegramChannel) chatID() any {
@@ -189,13 +190,13 @@ func (c *telegramChannel) chatID() any {
 }
 
 func (c *telegramChannel) CanSendImage() bool {
-	return c.botToken() != "" && truthy(c.chatID())
+	return c.botToken() != "" && jsval.Truthy(c.chatID())
 }
 
 func (c *telegramChannel) Send(ctx context.Context, message Message) (map[string]any, error) {
 	token := c.botToken()
 	chatID := c.chatID()
-	if token == "" || !truthy(chatID) {
+	if token == "" || !jsval.Truthy(chatID) {
 		return nil, apperrors.Validation(
 			"AGENT_NOTIFICATION_TELEGRAM_INCOMPLETE",
 			"Telegram 配置不完整",
@@ -235,7 +236,7 @@ func (c *telegramChannel) sendPhoto(ctx context.Context, message Message, token 
 	}
 
 	fields := [][2]string{
-		{"chat_id", jsString(chatID)},
+		{"chat_id", jsval.StringJSON(chatID)},
 		{"caption", caption},
 		{"parse_mode", "Markdown"},
 	}

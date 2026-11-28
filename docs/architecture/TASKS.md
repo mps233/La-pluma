@@ -9,7 +9,8 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
-| G1 | P1 | go | Finish the `internal/util/jsval` migration: `drops`, `scheduler`, `notifications`, `updates`, `quotes`, `gamedata`, `maa/results`, `mastery`, `recognition`, `training`, `customtools`, `run_resume`, `agentapi` still carry local copies | `internal/util/jsval` now serves `activity` and `copilot`; compare each remaining helper body before mapping (`asString` is a type assertion → `jsval.Text`, not `jsval.String`) |
+| G1b | P1 | go | Finish the `internal/util/jsval` migration in the document readers: `gamedata`, `recognition`, `training`, `customtools` still carry local coercion copies | `jsval` now owns the JSON-null contracts (`StringJSON`, `FiniteNumber`); compare each helper body before mapping (`asString` is a type assertion → `jsval.Text`) |
+| G1c | P2 | go | Finish the `internal/util/jsval` migration in mixed domain/coercion files: `mastery`, `scheduler`, `updates`, `app/run_resume`, `agentapi` | These files mix JS coercion with domain field accessors; move only the coercion bodies and keep the accessors documented |
 | G3 | P1 | go | Wire the operbox/depot readers to `internal/domain/snapshot` so field definitions are shared | The document shapes now live in `domain/snapshot` (recognition aliases them); `training/data.go:212,293`, `mastery/data.go:107,112`, `handler.go:1849,1858` still read untyped maps |
 | G2 | P1 | go | One PRTS client in `internal/infra/prts`; unify retry/timeout semantics | `activity/prts.go:50-223` vs `copilot/prts.go:73-473` |
 | G12 | P2 | go | Raise `agentapi` route coverage beyond the current ~18 of 107 paths | `handler_test.go` exercises ~18 distinct routes; contract tests cover the registry, not handler behavior |
@@ -70,3 +71,4 @@ without re-investigation.
 - operbox/depot document shapes moved to `internal/domain/snapshot` with JSON tests; recognition aliases them.
 - Common component barrel completed; all primitive deep imports migrated.
 - G7: `agentrun.Scope` is the single run-lifecycle writer; transport, MAA, resume, and cron flows delegate to it; lifecycle methods are unexported and guarded (Round 31).
+- G1a: `jsval` owns the JSON-null/finite contracts; `drops`, `notifications`, and `infra/maa/results` local coercion copies deleted (Round 32).

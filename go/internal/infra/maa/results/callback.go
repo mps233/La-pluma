@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"io"
 	"strings"
+
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -28,7 +30,7 @@ type CallbackPayload struct {
 // window. Incomplete final lines are ignored.
 func ParseMaaCallbackPayloads(logOutput any) []CallbackPayload {
 	events := make([]CallbackPayload, 0)
-	for _, line := range strings.Split(truthyString(logOutput), "\n") {
+	for _, line := range strings.Split(jsval.StringOrNullish(logOutput), "\n") {
 		markerIndex := strings.Index(line, CallbackMarker)
 		if markerIndex == -1 {
 			continue
@@ -44,7 +46,7 @@ func ParseMaaCallbackPayloads(logOutput any) []CallbackPayload {
 		if err := decodeCallbackJSON([]byte(callback[jsonIndex:]), &parsed); err != nil {
 			continue
 		}
-		record := asRecord(parsed)
+		record := jsval.Record(parsed)
 		if record == nil {
 			continue
 		}
@@ -99,7 +101,7 @@ func LatestSanityState(logOutput any) (SanityReading, bool) {
 		if payload.What != "SanityBeforeStage" {
 			continue
 		}
-		details := asRecord(payload.Details)
+		details := jsval.Record(payload.Details)
 		current, okCurrent := lookupNumber(details, "current_sanity")
 		max, okMax := lookupNumber(details, "max_sanity")
 		if !okCurrent || !okMax || max <= 0 {
@@ -108,7 +110,7 @@ func LatestSanityState(logOutput any) (SanityReading, bool) {
 		latest = SanityReading{
 			Current:  current,
 			Max:      max,
-			ReportAt: truthyString(details["report_time"]),
+			ReportAt: jsval.StringOrNullish(details["report_time"]),
 		}
 		found = true
 	}
