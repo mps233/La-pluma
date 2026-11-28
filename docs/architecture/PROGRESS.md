@@ -573,7 +573,7 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: C5b; the remaining P2/P3 pool is unchanged.
 
-### Round 39 — finish the jsval migration (2026-11-28)
+### Round 39 — finish the jsval migration (2026-11-28, `7ba6d9b`)
 
 - G1c: `mastery`, `scheduler`, `updates`, `app/run_resume`, `agentapi`, and
   `quotes` still carried the last coercion bodies. Mapped each helper onto
