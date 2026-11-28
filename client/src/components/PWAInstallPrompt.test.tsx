@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
+import { createDocumentBuildCheck } from '@/utils/pwaUpdate'
 import { PWA_INSTALL_REQUEST_EVENT } from '@/utils/pwaInstallPrompt'
 import PWAInstallPrompt from './PWAInstallPrompt'
 
@@ -225,6 +225,7 @@ describe('PWAInstallPrompt', () => {
       <script type="module" src="/assets/index-old.js"></script>
       <link rel="stylesheet" href="/assets/index-old.css">
     `
+    const checkForUpdate = createDocumentBuildCheck(currentDocument, new URL('http://console.test/'))
     const fetchDocument = vi.fn().mockResolvedValue({
       ok: true,
       url: 'http://console.test/',
@@ -234,11 +235,7 @@ describe('PWAInstallPrompt', () => {
       `),
     } as unknown as Response)
 
-    await expect(hasDocumentBuildChanged({
-      appUrl: new URL('http://console.test/'),
-      currentDocument,
-      fetchDocument,
-    })).resolves.toBe(true)
+    await expect(checkForUpdate(fetchDocument)).resolves.toBe(true)
 
     expect(fetchDocument).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -251,12 +248,13 @@ describe('PWAInstallPrompt', () => {
     )
   })
 
-  it('keeps the current document when its bundle is already up to date', async () => {
+  it('ignores stylesheets added by a lazy route after the entry document loaded', async () => {
     const currentDocument = document.implementation.createHTMLDocument()
     currentDocument.head.innerHTML = `
       <script type="module" src="/assets/index-current.js"></script>
       <link rel="stylesheet" href="/assets/index-current.css">
     `
+    const checkForUpdate = createDocumentBuildCheck(currentDocument, new URL('http://console.test/'))
     const fetchDocument = vi.fn().mockResolvedValue({
       ok: true,
       url: 'http://console.test/',
@@ -266,10 +264,10 @@ describe('PWAInstallPrompt', () => {
       `),
     } as unknown as Response)
 
-    await expect(hasDocumentBuildChanged({
-      appUrl: new URL('http://console.test/'),
-      currentDocument,
-      fetchDocument,
-    })).resolves.toBe(false)
+    currentDocument.head.insertAdjacentHTML(
+      'beforeend',
+      '<link rel="stylesheet" href="/assets/automation-lazy.css">',
+    )
+    await expect(checkForUpdate(fetchDocument)).resolves.toBe(false)
   })
 })

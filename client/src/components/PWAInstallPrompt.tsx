@@ -4,7 +4,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useStatusStore } from '@/state'
 import { GlassCard } from '@/components/glass'
 import { Button, CjkText, IconButton } from '@/components/common'
-import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
+import { createDocumentBuildCheck } from '@/utils/pwaUpdate'
 import { PWA_INSTALL_REQUEST_EVENT } from '@/utils/pwaInstallPrompt'
 import { isDesktopRuntime } from '@/desktop/desktopMode'
 import { useResolvedTheme } from '@/hooks/useResolvedTheme'
@@ -22,6 +22,12 @@ interface NavigatorWithStandalone extends Navigator {
 const INSTALL_DISMISS_KEY = 'pwa-install-dismissed-at'
 const INSTALL_REMINDER_DELAY_MS = 7 * 24 * 60 * 60 * 1000
 const UPDATE_CHECK_INTERVAL_MS = 60 * 1000
+
+// Capture the entry assets before React mounts and lazy routes add their stylesheets.
+const hasDocumentBuildChanged = createDocumentBuildCheck(
+  document,
+  new URL(import.meta.env.BASE_URL, window.location.href),
+)
 
 const isStandalone = () =>
   window.matchMedia('(display-mode: standalone)').matches
