@@ -1089,3 +1089,24 @@ deleted, verification, and follow-ups.
   `PreviewSessionProvider` owns the only WebRTC session and quality-restart
   logic, so moving the preview entry requires a session-engine split.
 - Follow-up: PF5/PF6, and a decision on the PF3 session refactor.
+
+### Round 69 — split the lightweight glass popup anchor (2026-11-28, `505f76f`)
+
+- PF4b (implemented): the popup context, CSS, and anchor canvas moved to
+  `glass-popup-anchor.tsx`; the heavy surface, engine, and menu/select
+  machinery stay in `glass-popup.tsx`. `GlassButtonGroup` imports only the
+  lightweight half, and the heavy module re-exports the same context, so
+  menus/selects keep one shared instance.
+- Bundle: the preloaded popup chunk falls from 12.4 to 2.3 KB gzip. Total
+  initial JS+CSS falls from ~244 to ~235 KB gzip; the entry chunk is unchanged
+  at 73.1 KB gzip. The heavy popup chunk loads with the menu/select on use.
+- Visual/runtime check against the production preview build: the overflow
+  menu still opens with the same styling, focus, and Escape behavior; the
+  button-group and chrome appearance is unchanged.
+- Added `glassPopupBoundary.test.ts` so button groups cannot drift back to the
+  heavy popup import. Verified: client lint, type-check, full suite
+  (548 tests / 87 files), and production build (16 precache entries /
+  728.83 KiB).
+- Follow-up: PF3 (blocked on the preview-session refactor), PF5/PF6. The
+  remaining no-visual-change glass work is engine lazy-upgrade (transient CSS
+  fallback) and shared snapshot/canvas runtime work.
