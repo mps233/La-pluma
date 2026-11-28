@@ -1,0 +1,13 @@
+{
+  "cases": [
+    { "input": "", "want": "/" },
+    { "input": "/", "want": "/" },
+    { "input": "la-pluma", "want": "/la-pluma/" },
+    { "input": "/la-pluma", "want": "/la-pluma/" },
+    { "input": "/la-pluma//", "want": "/la-pluma/" },
+    { "input": " /nested/path ", "want": "/nested/path/" },
+    { "input": "///", "want": "/" },
+    { "input": "a/b", "want": "/a/b/" },
+    { "input": "/a//b/", "want": "/a//b/" }
+  ]
+}

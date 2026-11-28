@@ -1,22 +1,34 @@
 package config
 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 )
 
+// TestNormalizeBasePath uses the same fixture as the Vite config test so the
+// Go server and the client build cannot disagree about a deployment path.
 func TestNormalizeBasePath(t *testing.T) {
-	cases := map[string]string{
-		"":               "/",
-		"/":              "/",
-		"la-pluma":       "/la-pluma/",
-		"/la-pluma":      "/la-pluma/",
-		"/la-pluma//":    "/la-pluma/",
-		" /nested/path ": "/nested/path/",
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "base-path-fixtures.json"))
+	if err != nil {
+		t.Fatalf("read base-path fixtures: %v", err)
 	}
-	for input, want := range cases {
-		if got := NormalizeBasePath(input); got != want {
-			t.Fatalf("NormalizeBasePath(%q) = %q, want %q", input, got, want)
+	var fixture struct {
+		Cases []struct {
+			Input string `json:"input"`
+			Want  string `json:"want"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatalf("decode base-path fixtures: %v", err)
+	}
+	if len(fixture.Cases) == 0 {
+		t.Fatal("base-path fixtures are empty")
+	}
+	for _, testCase := range fixture.Cases {
+		if got := NormalizeBasePath(testCase.Input); got != testCase.Want {
+			t.Fatalf("NormalizeBasePath(%q) = %q, want %q", testCase.Input, got, testCase.Want)
 		}
 	}
 }

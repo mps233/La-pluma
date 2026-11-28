@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import type { Plugin, ViteDevServer } from 'vite'
 import {
@@ -77,10 +78,15 @@ describe('PWA base path configuration', () => {
     return Boolean(result && (url.origin === origin || result.index === 0))
   }
 
-  it('normalizes a configured deployment path', () => {
+  it('normalizes the shared deployment path fixtures', () => {
+    const fixture = JSON.parse(
+      readFileSync(new URL('../testdata/base-path-fixtures.json', import.meta.url), 'utf8'),
+    ) as { cases: Array<{ input: string; want: string }> }
+    expect(fixture.cases.length).toBeGreaterThan(0)
     expect(normalizeBasePath()).toBe('/')
-    expect(normalizeBasePath('la-pluma')).toBe('/la-pluma/')
-    expect(normalizeBasePath('/la-pluma/')).toBe('/la-pluma/')
+    for (const testCase of fixture.cases) {
+      expect(normalizeBasePath(testCase.input)).toBe(testCase.want)
+    }
   })
 
   it('keeps API and signaling routes out of the navigation fallback', () => {
