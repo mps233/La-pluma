@@ -418,7 +418,7 @@ deleted, verification, and follow-ups.
 - Follow-up: two settle paths still discard persistence errors, matching the
   previous transport behavior (G13).
 
-### Round 32 — jsval JSON contracts and three package migrations (2026-11-28)
+### Round 32 — jsval JSON contracts and three package migrations (2026-11-28, `b9c8f39`)
 
 - G1a: `drops`, `notifications`, and `infra/maa/results` each carried a full
   private coercion set with subtly different null, array, and finite-number
