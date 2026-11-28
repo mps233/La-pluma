@@ -15,7 +15,7 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
-| C7 | P2 | client | Split `services/api.ts` into `api/client.ts` + endpoint modules; unify `maaApi` and standalone exports | 1,305 lines, 89 calls, 37 standalone functions |
+| C7b | P2 | client | Split the remaining `services/api.ts` endpoints into domain modules; unify `maaApi` and standalone exports | `services/api/client.ts` now owns base URL/fetch/auth; `api.ts` still holds the endpoint methods and 37 standalone exports |
 | C10c | P3 | client | Remove the jsdom-only DOM branches in `fields.tsx` | `SelectField`/`CheckboxField` render native controls when `import.meta.env.MODE === 'test'`; tests must drive the glass controls or a shared a11y harness instead. The page skeletons are already page-adjacent (C10b) |
 | C8 | P2 | client | Token/color migration for the remaining literals; shift `statusMessage` pulse RGB to the effective iOS theme | Nine files remain in the `themeColorBoundary` allowlist; ~8 production hex sites; visual verification required |
 | C9 | P3 | client | Move page-prefixed CSS out of `index.css` into route CSS | 13 class names defined twice; visual verification required |
@@ -76,3 +76,4 @@ without re-investigation.
 - C10b: every page skeleton moved next to its page; `common/Loading.tsx` is only the spinner and `components/PageSkeleton.tsx` dispatches variants (Round 44).
 - C11a: AutomationTasks schedule-time parsing/normalization moved to `utils/automationSchedule.ts` with tests (Round 45).
 - C11b: Dashboard payload guards/completion normalization/usage classes moved to `utils/dashboardData.ts` with tests (Round 46).
+- C7a: HTTP base URL/fetch/auth moved to `services/api/client.ts`; `api.ts` re-exports it and the boundary test allows the new module (Round 47).

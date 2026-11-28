@@ -15,7 +15,12 @@ const sources = import.meta.glob('../**/*.{ts,tsx}', {
   eager: true,
 }) as Record<string, string>
 
-const isApiClient = (path: string) => path === './api.ts' || path.endsWith('/services/api.ts')
+const isApiClient = (path: string) => (
+  path === './api.ts'
+  || path.endsWith('/services/api.ts')
+  || path === './api/client.ts'
+  || path.endsWith('/services/api/client.ts')
+)
 const ignoredDirectories = ['liquid-glass', 'islandcn']
 
 describe('API boundary', () => {

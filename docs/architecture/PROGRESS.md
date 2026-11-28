@@ -694,6 +694,20 @@ deleted, verification, and follow-ups.
 - Follow-up: C7 (API module split) and C8 (color tokens) are the remaining P2
   client items.
 
+### Round 47 — split the API client core (2026-11-28)
+
+- C7a: `services/api.ts` mixed the HTTP core (base URL, auth headers, raw
+  fetch, icon URL) with every endpoint method.
+- Moved the core to `services/api/client.ts`; `api.ts` imports and re-exports
+  `API_BASE_URL`, `fetchWithAuth`, and `getItemIconUrl`, so existing imports
+  keep working. `getAuthHeaders` stays internal to the client but is exported
+  for the one custom-header request.
+- Updated `apiBoundary.test.ts` to allow the new client module while still
+  rejecting raw fetch everywhere else.
+- Verified: client type-check, boundary test, lint at the ratchet, full suite
+  (535 tests / 80 files), and production build.
+- Follow-up: C7b splits the endpoint methods into domain modules.
+
 
 
 

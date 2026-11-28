@@ -83,7 +83,8 @@ transport → app → infra / domain
 - `components/common/` holds shared primitives exported from the barrel;
   page-specific visual compositions stay with their page.
 - `components/glass/` is the only application-facing Liquid Glass surface.
-- `services/api.ts` is the single HTTP client; raw `fetch` is enforced there.
+- `services/api/client.ts` owns the base URL, auth headers, and raw `fetch`;
+  `services/api.ts` builds the endpoint surface and re-exports the client.
   Page components should call `maaApi` or a domain service module.
 - `state/` is the single Zustand module: one file per concern and one barrel.
   Pages and hooks import `@/state`; tests mock `@/state` only.
