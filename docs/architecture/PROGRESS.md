@@ -694,7 +694,7 @@ deleted, verification, and follow-ups.
 - Follow-up: C7 (API module split) and C8 (color tokens) are the remaining P2
   client items.
 
-### Round 47 — split the API client core (2026-11-28)
+### Round 47 — split the API client core (2026-11-28, `6d5d7b8`)
 
 - C7a: `services/api.ts` mixed the HTTP core (base URL, auth headers, raw
   fetch, icon URL) with every endpoint method.
