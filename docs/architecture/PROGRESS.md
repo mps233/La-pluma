@@ -733,6 +733,18 @@ deleted, verification, and follow-ups.
   ratchet, full suite (535 tests / 80 files), and production build.
 - Follow-up: C7d moves the training endpoints and the `maaApi` object.
 
+### Round 50 — split the training API (2026-11-28)
+
+- C7d: the training/operbox endpoint functions and their request/response
+  types were still defined in `services/api.ts`.
+- Moved them to `services/api/training.ts`; the facade re-exports the
+  functions and the public response types. Restored `LogFileContentData` and
+  `CopilotSetInfo`, which the range move had clipped, and removed the unused
+  type imports.
+- Verified: training/statistics tests, boundary test, type-check, lint at the
+  ratchet, full suite (535 tests / 80 files), and production build.
+- Follow-up: C7e composes `maaApi` from domain modules.
+
 
 
 

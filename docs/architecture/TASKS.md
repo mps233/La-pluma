@@ -15,7 +15,7 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
-| C7d | P2 | client | Split the training endpoints and the `maaApi` object out of `services/api.ts` | Notifications moved to `services/api/notifications.ts`; `api.ts` still holds the training functions/types and the maaApi surface |
+| C7e | P2 | client | Split the `maaApi` method groups out of `services/api.ts` and compose the object from domain modules | Training endpoints/types moved to `services/api/training.ts`; `api.ts` still holds the maaApi object and its local DTOs |
 | C10c | P3 | client | Remove the jsdom-only DOM branches in `fields.tsx` | `SelectField`/`CheckboxField` render native controls when `import.meta.env.MODE === 'test'`; tests must drive the glass controls or a shared a11y harness instead. The page skeletons are already page-adjacent (C10b) |
 | C8 | P2 | client | Token/color migration for the remaining literals; shift `statusMessage` pulse RGB to the effective iOS theme | Nine files remain in the `themeColorBoundary` allowlist; ~8 production hex sites; visual verification required |
 | C9 | P3 | client | Move page-prefixed CSS out of `index.css` into route CSS | 13 class names defined twice; visual verification required |
@@ -79,3 +79,4 @@ without re-investigation.
 - C7a: HTTP base URL/fetch/auth moved to `services/api/client.ts`; `api.ts` re-exports it and the boundary test allows the new module (Round 47).
 - C7b: mastery, skland, copilot-search, and drops endpoints moved to `services/api/*` and re-exported from `api.ts` (Round 48).
 - C7c: notification config types, cache, and `notificationsApi` moved to `services/api/notifications.ts` and re-exported (Round 49).
+- C7d: training endpoints and their types moved to `services/api/training.ts` and re-exported (Round 50).
