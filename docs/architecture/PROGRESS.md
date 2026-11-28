@@ -869,3 +869,24 @@ deleted, verification, and follow-ups.
 - Verified: client type-check, lint at the ratchet, full suite (535 tests / 80
   files), and production build.
 - Follow-up: C9 (page CSS split) is the last actionable task.
+
+### Round 59 — page CSS split blocked on skeleton ownership (2026-11-28)
+
+- C9: moving page-prefixed rules out of `index.css` looked mechanical, so the
+  logs set was migrated as a trial: 46 rules (including their media contexts)
+  moved to `src/styles/pages/logs.css`, and the live logs page matched the
+  baseline pixel-for-pixel in light/dark desktop and mobile (only the rotating
+  status quote differed).
+- The trial exposed a coupling the task did not account for:
+  `LogViewerSkeleton` (and the other page skeletons) reuse the page's
+  structural classes and render before the lazy route CSS is imported, so
+  their loading state depends on the base rules in `index.css`. Several
+  `automation-*` classes are also shared by notification/training/dashboard
+  components, so a prefix-based move would strip their styling on other pages.
+- Decision: do not move the rules until the design system owns the skeleton
+  styling strategy. The trial changes were reverted; the working tree keeps
+  the original `index.css` and `logs.css`. Recorded as PD8 (choose
+  self-contained skeleton CSS, eager skeleton CSS, or a documented base-layer
+  exception).
+- Verified: reverted files match HEAD; no production change this round.
+- Follow-up: PD8; all other actionable tasks are complete.

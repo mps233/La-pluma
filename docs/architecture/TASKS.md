@@ -14,7 +14,6 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
-| C9 | P3 | client | Move page-prefixed CSS out of `index.css` into route CSS | 13 class names defined twice; visual verification required |
 
 ## Blocked / pending decision
 
@@ -26,6 +25,7 @@ without re-investigation.
 | PD5 | Choose one PRTS retry contract (activity starts at attempt 0, copilot at 1) | Transport is now shared in `internal/infra/prts`; activity keeps 250 ms × attempt and copilot 500 ms × attempt. Pick the canonical schedule before changing either. |
 | PD6 | Replace the 40-hue CustomTools tool palette with design tokens | The palette is a user-selectable feature (40 colours); narrowing it is a product/design decision, so the file stays in the color allowlist |
 | PD7 | Reconcile `DESIGN.md` references to `GlassNav`/`GlassMenu` with the actual Layout composition (`DESIGN.md:89,700-712`) | Decide implement vs document; needs a design call |
+| PD8 | Decide where skeleton styles live before moving page CSS out of `index.css` (C9) | Page skeletons reuse the page structural classes and render before the lazy route CSS loads, so moving those base rules into route CSS leaves the loading state unstyled |
 
 ## Completed
 
