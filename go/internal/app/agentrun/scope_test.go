@@ -295,6 +295,37 @@ func TestScopeSettleManualOutcomes(t *testing.T) {
 	}
 }
 
+func TestScopeSettleSurfacesPersistenceFailure(t *testing.T) {
+	service := newService(t)
+	scope := openTestScope(t, service, Request{OperationID: "run_copilot_set_manual"})
+	if _, err := scope.Start(); err != nil {
+		t.Fatal(err)
+	}
+	// Point the store at a directory so the terminal write fails.
+	service.mu.Lock()
+	service.filePath = t.TempDir()
+	service.mu.Unlock()
+
+	err := scope.Settle(Outcome{}, errors.New("step failed"))
+	if code := errorCode(err); code != "AGENT_RUN_PERSISTENCE_FAILED" {
+		t.Fatalf("err = %v (code %q), want the persistence error", err, code)
+	}
+}
+
+func TestScopeExecuteSurfacesPersistenceFailure(t *testing.T) {
+	service := newService(t)
+	scope := openTestScope(t, service, Request{OperationID: "run_task"})
+	_, err := scope.Execute(context.Background(), func(ctx context.Context) (any, error) {
+		service.mu.Lock()
+		service.filePath = t.TempDir()
+		service.mu.Unlock()
+		return nil, errors.New("action failed")
+	})
+	if code := errorCode(err); code != "AGENT_RUN_PERSISTENCE_FAILED" {
+		t.Fatalf("err = %v (code %q), want the persistence error", err, code)
+	}
+}
+
 func TestScopeProgressUpdatesTheRun(t *testing.T) {
 	service := newService(t)
 	scope := openTestScope(t, service, Request{OperationID: "run_task"})

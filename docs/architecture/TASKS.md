@@ -83,3 +83,4 @@ without re-investigation.
 - C7f: shared API DTOs moved to `services/api/types.ts`; `maa.ts` imports them and the facade re-exports them (Round 52).
 - C7g: all remaining `maaApi` groups moved to `services/api/groups/*`; `maa.ts` composes them (Round 54). C7 is complete.
 - C8: all JS hex/RGB literals migrated to theme tokens (including status pulse RGB per theme); CustomTools' user palette is PD6 (Round 55).
+- G13: terminal persistence failures now fail the request instead of being discarded (`Execute`/`Settle`/accepted-stop release), with tests (Round 56).

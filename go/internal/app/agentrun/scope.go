@@ -118,7 +118,10 @@ func (sc *Scope) Execute(ctx context.Context, action func(context.Context) (any,
 			}
 			return stopped, nil
 		}
-		failed, _ := sc.service.fail(sc.RunID(), actionErr)
+		failed, failErr := sc.service.fail(sc.RunID(), actionErr)
+		if failErr != nil {
+			return agentrun.DTO{}, failErr
+		}
 		return failed, actionErr
 	}
 	if current.State == agentrun.StatusStopping {
@@ -158,7 +161,9 @@ func (sc *Scope) Settle(outcome Outcome, actionErr error) error {
 			_, stopErr := sc.service.stop(sc.RunID(), map[string]any{"message": actionErr.Error()})
 			return stopErr
 		}
-		_, _ = sc.service.fail(sc.RunID(), actionErr)
+		if _, failErr := sc.service.fail(sc.RunID(), actionErr); failErr != nil {
+			return failErr
+		}
 		return actionErr
 	}
 	if outcome.Result == nil {
@@ -221,7 +226,9 @@ func (sc *Scope) Stop(ctx context.Context, request StopRequest) (StopOutcome, er
 		if err != nil {
 			return StopOutcome{}, err
 		}
-		_, _ = sc.service.releaseIdempotency(sc.RunID())
+		if _, err := sc.service.releaseIdempotency(sc.RunID()); err != nil {
+			return StopOutcome{Run: stopped}, err
+		}
 		return StopOutcome{Run: stopped, Canceled: true}, nil
 	}
 	stopping, err := sc.service.markStopping(sc.RunID())

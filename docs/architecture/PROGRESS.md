@@ -811,6 +811,20 @@ deleted, verification, and follow-ups.
   files), and production build.
 - Follow-up: P3 pool remains (G13, C9, C10c, T5); PD6/PD7 wait for decisions.
 
+### Round 56 — surface terminal persistence failures (2026-11-28)
+
+- G13: `Scope.Execute` and `Settle` discarded a failed terminal write and
+  returned the action error, and the accepted-stop path ignored a failed
+  idempotency release. A client could see a normal error while the store still
+  held an active run or a replayable key.
+- Decision: a terminal write that cannot be persisted fails the request. The
+  scope now returns the persistence error from `Execute`, `Settle`, and the
+  accepted-stop release; the handler maps it to the existing 503 envelope.
+- Added tests that break the store path mid-action and assert the persistence
+  error code instead of the action error.
+- Verified: full Go test suite (745 tests / 53 packages), vet, gofmt.
+- Follow-up: C9/C10c/T5 remain.
+
 
 
 
