@@ -551,6 +551,28 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite (716 tests / 51 packages), vet, gofmt.
 - Follow-up: C5 (client run projection) is the last P1 item.
 
+### Round 38 — derive page run state from the projection (2026-11-28)
+
+- C5a: CombatTasks and RoguelikeTasks each owned a local `isRunning` flag that
+  was written both by their submit flow and by `useTaskRestoreMonitor`, so a
+  task started in another tab or before a refresh depended on the legacy
+  `/tasks/status` poll.
+- Added `AgentRun.metadata` to the client DTO type, a pure `selectOwnedRun`
+  selector (operation id or server `taskType`, optional "waiting is idle" for
+  manual copilot sets), and the `useOwnedRunActive` hook.
+- CombatTasks and RoguelikeTasks now render `isSubmitting || runIsActive`:
+  their local flag is renamed to `isSubmitting` and only covers the in-flight
+  request; the global projection supplies restore and cross-page visibility.
+  A waiting manual set stays idle so the continue action remains available.
+- `useTaskRestoreMonitor` still supplies status messages and the global active
+  flag; retiring its running writer and migrating AutomationTasks/
+  DataStatistics is C5b, where PD3's polling decision applies.
+- Added selector tests and a page test that a projected combat run renders the
+  stop action while a waiting manual run does not.
+- Verified: client type-check, lint at the ratchet, full suite (525 tests / 78
+  files), and production build.
+- Follow-up: C5b; the remaining P2/P3 pool is unchanged.
+
 
 
 

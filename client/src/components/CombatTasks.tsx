@@ -31,6 +31,7 @@ import type {
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import { useTaskRestoreMonitor } from '../hooks/useTaskRestoreMonitor'
+import { useOwnedRunActive } from '../hooks/useOwnedRun'
 import { createConfigSyncGate } from '../utils/configSync'
 import { useUIStore, type CombatCopilotPrefill } from '@/state'
 
@@ -218,7 +219,15 @@ function CopilotInfoFooter({ meta, onClear }: { meta: ReactNode; onClear: () => 
 }
 
 export default function CombatTasks() {
-  const [isRunning, setIsRunning] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  // A manual set waits for the user between items, so the page treats a
+  // waiting run as idle and offers the continue action instead.
+  const runIsActive = useOwnedRunActive({
+    operationIds: ['run_copilot_set', 'run_copilot_set_manual', 'run_current_activity_copilots'],
+    taskTypes: ['combat'],
+    waitingIsIdle: true,
+  })
+  const isRunning = isSubmitting || runIsActive
   const [isStopping, setIsStopping] = useState(false)
   const [isResettingProgress, setIsResettingProgress] = useState(false)
   const [resetProgressDialogOpen, setResetProgressDialogOpen] = useState(false)
@@ -317,7 +326,7 @@ export default function CombatTasks() {
     setCopilotSetResults(results)
     setManualRunId(currentRun.runId)
     setCurrentCopilotTask(task)
-    setIsRunning(false)
+    setIsSubmitting(false)
     setIsActiveStatus(false)
     setWaitingForNextCopilot(true)
     if (nextItemIndex !== null) {
@@ -371,7 +380,7 @@ export default function CombatTasks() {
     stopRequestedRef.current = false
     stopRequestInFlightRef.current = false
     setIsStopping(false)
-    setIsRunning(true)
+    setIsSubmitting(true)
     setIsActiveStatus(true)
     executionGenerationRef.current += 1
     return executionGenerationRef.current
@@ -602,7 +611,7 @@ export default function CombatTasks() {
 
   useTaskRestoreMonitor({
     taskType: 'combat',
-    setRunning: setIsRunning,
+    setRunning: setIsSubmitting,
     setActiveStatus: setIsActiveStatus,
     setStatusMessage,
     unreachableWarning: '暂时无法确认作业状态，将继续重试；需要时可手动终止',
@@ -950,7 +959,7 @@ export default function CombatTasks() {
       return
     }
 
-    setIsRunning(true)
+    setIsSubmitting(true)
     setWaitingForNextCopilot(false)
     setCopilotSetResults([])
     setCurrentCopilotTask(task)
@@ -1071,7 +1080,7 @@ export default function CombatTasks() {
   ) => {
     if (!isCurrentExecution(generation)) return
     setManualRunId(data.runId)
-    setIsRunning(false)
+    setIsSubmitting(false)
     setIsActiveStatus(false)
     setCurrentCopilotTask(task)
 
@@ -1124,7 +1133,7 @@ export default function CombatTasks() {
       return
     }
 
-    setIsRunning(true)
+    setIsSubmitting(true)
     setIsActiveStatus(true)
     setWaitingForNextCopilot(false)
     setCopilotSetResults([])
@@ -1171,7 +1180,7 @@ export default function CombatTasks() {
     }
 
     setWaitingForNextCopilot(false)
-    setIsRunning(true)
+    setIsSubmitting(true)
     setIsActiveStatus(true)
     const generation = beginExecution()
     try {
@@ -1192,7 +1201,7 @@ export default function CombatTasks() {
   const finishCopilotSet = (generation?: number) => {
     if (generation !== undefined && executionGenerationRef.current !== generation) return
     stopRequestedRef.current = false
-    setIsRunning(false)
+    setIsSubmitting(false)
     setIsActiveStatus(false)
     setWaitingForNextCopilot(false)
     setCurrentCopilotTask(null)
@@ -1252,7 +1261,7 @@ export default function CombatTasks() {
       }
 
       stopRequestedRef.current = false
-      setIsRunning(false)
+      setIsSubmitting(false)
       setIsActiveStatus(false)
       setWaitingForNextCopilot(false)
       setCurrentCopilotTask(null)
@@ -1271,7 +1280,7 @@ export default function CombatTasks() {
   }
 
   const startActivityFallback = async (task: CombatTask, generation: number) => {
-    setIsRunning(true)
+    setIsSubmitting(true)
     setWaitingForNextCopilot(false)
     setCopilotSetResults([])
     setCurrentCopilotTask(task)
@@ -1377,7 +1386,7 @@ export default function CombatTasks() {
       } finally {
         if (isCurrentExecution(generation)) {
           stopRequestedRef.current = false
-          setIsRunning(false)
+          setIsSubmitting(false)
           setIsActiveStatus(false)
           stopRequestInFlightRef.current = false
           setIsStopping(false)

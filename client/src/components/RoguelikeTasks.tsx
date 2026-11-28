@@ -21,6 +21,7 @@ import type {
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import { useTaskRestoreMonitor } from '../hooks/useTaskRestoreMonitor'
+import { useOwnedRunActive } from '../hooks/useOwnedRun'
 import { createConfigSyncGate } from '../utils/configSync'
 import {
   getRoguelikeModeChoices,
@@ -88,7 +89,9 @@ const splitCommaList = (value: unknown): string[] => (
 
 export default function RoguelikeTasks() {
   const currentRun = useRunStore(state => state.run)
-  const [isRunning, setIsRunning] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const runIsActive = useOwnedRunActive({ taskTypes: ['roguelike'] })
+  const isRunning = isSubmitting || runIsActive
   const [isStopping, setIsStopping] = useState(false)
   const stopRequestInFlightRef = useRef(false)
   const stopRequestedRef = useRef(false)
@@ -119,7 +122,7 @@ export default function RoguelikeTasks() {
     stopRequestedRef.current = false
     stopRequestInFlightRef.current = false
     setIsStopping(false)
-    setIsRunning(true)
+    setIsSubmitting(true)
     setIsActiveStatus(true)
     executionGenerationRef.current += 1
     return executionGenerationRef.current
@@ -165,7 +168,7 @@ export default function RoguelikeTasks() {
 
   useTaskRestoreMonitor({
     taskType: 'roguelike',
-    setRunning: setIsRunning,
+    setRunning: setIsSubmitting,
     setActiveStatus: setIsActiveStatus,
     setStatusMessage,
     unreachableWarning: '暂时无法确认肉鸽任务状态，将继续重试；需要时可手动终止',
@@ -628,7 +631,7 @@ export default function RoguelikeTasks() {
     } finally {
       if (isCurrentExecution(generation)) {
         stopRequestedRef.current = false
-        setIsRunning(false)
+        setIsSubmitting(false)
         setIsActiveStatus(false)
         stopRequestInFlightRef.current = false
         setIsStopping(false)
@@ -667,7 +670,7 @@ export default function RoguelikeTasks() {
       }
 
       stopRequestedRef.current = false
-      setIsRunning(false)
+      setIsSubmitting(false)
       setIsActiveStatus(false)
       setStatusMessage('肉鸽任务已终止', 'warning')
     } catch (error) {

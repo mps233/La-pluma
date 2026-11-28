@@ -95,8 +95,10 @@ depends on them.
    multiple packages without one typed owner.
 2. JS-coercion helpers still exist in `mastery`, `scheduler`, `updates`,
    `run_resume`, and `agentapi` (G1c).
-3. The client keeps local run flags alongside the global run projection, and
-   configuration-sync drafts are implemented per page.
+3. The client derives Combat/Roguelike run state from the global projection
+   but still keeps submit-in-flight flags; Automation/DataStatistics keep
+   their own workflow flags (C5b), and `useTaskRestoreMonitor` still writes the
+   running flag alongside the projection.
 4. `client/src/components/common` exports only part of its usable primitives,
    so some consumers still deep-import; page skeletons live in `Loading.tsx`.
 5. Token layers in `DESIGN.md` (primitive/semantic/component) are partly

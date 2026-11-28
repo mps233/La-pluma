@@ -54,6 +54,12 @@ export interface AgentRun {
   acceptedAt?: string
   startedAt?: string | null
   finishedAt?: string | null
+  /** Server metadata; taskType is how a page identifies the runs it owns. */
+  metadata?: {
+    taskType?: string
+    taskName?: string
+    [key: string]: unknown
+  } | null
   progress?: AgentRunProgress | null
   taskResults?: RunTaskResult[]
   error?: {

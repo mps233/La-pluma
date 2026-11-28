@@ -1070,6 +1070,37 @@ describe('CombatTasks execution recovery', () => {
     await act(async () => useRunStore.getState().applyRun(null))
   })
 
+  it('derives the running state from the global run projection', async () => {
+    await renderComponent()
+    expect(buttonsByText('终止执行')).toHaveLength(0)
+
+    await act(async () => {
+      useRunStore.getState().applyRun({
+        runId: 'external-run',
+        operationId: 'run_task',
+        state: 'running',
+        metadata: { taskType: 'combat', taskName: '自动战斗' },
+      })
+    })
+    await flush()
+    expect(buttonsByText('终止执行').length).toBeGreaterThan(0)
+
+    // A waiting manual set belongs to the page but must render as idle so the
+    // continue action is available.
+    await act(async () => {
+      useRunStore.getState().applyRun({
+        runId: 'manual-run',
+        operationId: 'run_copilot_set_manual',
+        state: 'waiting',
+        metadata: { taskType: 'copilot' },
+      })
+    })
+    await flush()
+    expect(buttonsByText('终止执行')).toHaveLength(0)
+
+    await act(async () => useRunStore.getState().applyRun(null))
+  })
+
   it('loads a dashboard activity set without executing and enables sanity potions on execute', async () => {
     mocks.getCopilotSetPlan.mockResolvedValue({
       success: true,

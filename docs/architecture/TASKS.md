@@ -19,7 +19,7 @@ without re-investigation.
 | --- | --- | --- | --- | --- |
 | G5 | P2 | go | Shared HTTP client/retry factory | 10 `&http.Client{...}` sites; retries only in PRTS |
 | G10 | P2 | go | One bootstrap for desktop and headless mounts | `go/main.go:277-289` vs `cmd/server/main.go:40-50` |
-| C5 | P1 | client | Derive page `isRunning` from the global run projection; keep local state only for submit-in-flight | four local flags; `statusStore.runStatus` + `runStore` already project runs; behavior-sensitive |
+| C5b | P1 | client | Finish deriving page run state: migrate `AutomationTasks` and `DataStatistics`, then retire `useTaskRestoreMonitor`'s running writer | Combat/Roguelike now combine submit-in-flight with `useOwnedRunActive`; the restore hook still writes the local flag, and the two workflow pages keep their own flags. Changing the remaining polling/keep-alive semantics is PD3 |
 | C7 | P2 | client | Split `services/api.ts` into `api/client.ts` + endpoint modules; unify `maaApi` and standalone exports | 1,305 lines, 89 calls, 37 standalone functions |
 | C10 | P2 | client | Move page skeletons out of `common/Loading.tsx` next to their pages; remove the test-only DOM branches in `fields.tsx` | Barrel now exports the used primitives; `Loading.tsx` still holds 20 skeletons and `fields.tsx:64,172` branches on `import.meta.env.MODE` |
 | C11 | P2 | client | Extract pure helpers from giant pages | `AutomationTasks.tsx:29-150,283,1745-1785`; `Dashboard.tsx:146-300,348-378` |
@@ -73,3 +73,4 @@ without re-investigation.
 - G3: operbox/depot readers decode through `domain/snapshot` (`DecodeOperBox`/`DecodeDepot`); training, mastery, and the `/data` endpoints share the schema. Activity's legacy own-flag heuristic still reads the raw document (Round 35).
 - G2: one PRTS transport in `internal/infra/prts`; activity and copilot keep their own retry policies and envelope parsing (Round 36).
 - G6: the assets router and raw image writers moved to `transport/assetsapi`; `infra/assets` is a resolver + WebP cache, and the archguard now forbids HTTP handlers in app and infra (Round 37).
+- C5a: `selectOwnedRun` + `useOwnedRunActive` derive the page run from the global projection; Combat and Roguelike combine it with a submit-in-flight flag (Round 38).
