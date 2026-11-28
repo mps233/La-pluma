@@ -891,7 +891,7 @@ deleted, verification, and follow-ups.
 - Verified: reverted files match HEAD; no production change this round.
 - Follow-up: PD8; all other actionable tasks are complete.
 
-### Round 60 — resolve the blocked decisions (2026-11-28)
+### Round 60 — resolve the blocked decisions (2026-11-28, `93fb102`)
 
 - PD5 (implemented): activity now retries at 500 ms × attempt, matching
   copilot; both use three attempts. ADR-0003.
