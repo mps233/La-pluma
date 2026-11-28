@@ -16,7 +16,6 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence / risk |
 | --- | --- | --- | --- | --- |
-| G10 | P2 | go | One bootstrap for desktop and headless mounts | `go/main.go:277-289` vs `cmd/server/main.go:40-50` |
 | C7 | P2 | client | Split `services/api.ts` into `api/client.ts` + endpoint modules; unify `maaApi` and standalone exports | 1,305 lines, 89 calls, 37 standalone functions |
 | C10 | P2 | client | Move page skeletons out of `common/Loading.tsx` next to their pages; remove the test-only DOM branches in `fields.tsx` | Barrel now exports the used primitives; `Loading.tsx` still holds 20 skeletons and `fields.tsx:64,172` branches on `import.meta.env.MODE` |
 | C11 | P2 | client | Extract pure helpers from giant pages | `AutomationTasks.tsx:29-150,283,1745-1785`; `Dashboard.tsx:146-300,348-378` |
@@ -73,3 +72,4 @@ without re-investigation.
 - C5a: `selectOwnedRun` + `useOwnedRunActive` derive the page run from the global projection; Combat and Roguelike combine it with a submit-in-flight flag (Round 38).
 - G1c: `jsval` now owns the last coercion copies; `mastery`, `scheduler`, `updates`, `run_resume`, `agentapi`, and `quotes` keep only documented field/domain adapters (Round 39).
 - G5: `internal/infra/httpclient` owns client construction; nine ad-hoc `&http.Client` sites migrated and guarded (Round 40).
+- G10: `transport/bootstrap.ServerOptions` is the shared mount for desktop and headless entries; an archguard checks both use it (Round 41).

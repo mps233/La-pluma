@@ -250,6 +250,21 @@ func TestLayersAreKnown(t *testing.T) {
 	}
 }
 
+// TestEntriesShareTheHTTPBootstrap keeps the headless server and the desktop
+// shell on the same handler mounts.
+func TestEntriesShareTheHTTPBootstrap(t *testing.T) {
+	root := moduleRoot(t)
+	for _, entry := range []string{"main.go", filepath.Join("cmd", "server", "main.go")} {
+		data, err := os.ReadFile(filepath.Join(root, entry))
+		if err != nil {
+			t.Fatalf("read %s: %v", entry, err)
+		}
+		if !strings.Contains(string(data), "bootstrap.ServerOptions(") {
+			t.Errorf("%s does not mount the shared HTTP bootstrap", filepath.ToSlash(entry))
+		}
+	}
+}
+
 // TestHTTPClientsComeFromTheFactory keeps client construction in
 // infra/httpclient so timeouts and transport defaults have one owner.
 func TestHTTPClientsComeFromTheFactory(t *testing.T) {

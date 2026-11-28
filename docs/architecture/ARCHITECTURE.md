@@ -65,6 +65,7 @@ transport → app → infra / domain
 | Public Agent API contract | `internal/contract` | Manifest and OpenAPI derive from one registry |
 | PRTS HTTP transport | `internal/infra/prts` | Request construction, timeout, status, JSON decode, retry loop; callers own envelope parsing and retry policy |
 | HTTP client construction | `internal/infra/httpclient` | Timeouts and transport defaults; retries stay with the endpoint owner |
+| Shared HTTP mount surface | `internal/transport/bootstrap` | Desktop and headless entries pass its options, then append entry-only options |
 | MaaResource image serving | `internal/infra/assets` + `internal/transport/assetsapi` | Resolution and WebP cache in infra; routes, cache headers, and raw image responses in transport |
 | HTTP envelope and error mapping | `internal/transport/httpx` | `success/message/data/error/meta` |
 | Agent route registration | `internal/transport/agentapi` | Every advertised operation must resolve (tested) |

@@ -30,12 +30,8 @@ import (
 	"github.com/mps233/la-pluma/go/internal/app"
 	configapp "github.com/mps233/la-pluma/go/internal/app/config"
 	"github.com/mps233/la-pluma/go/internal/config"
-	scwebrtc "github.com/mps233/la-pluma/go/internal/infra/webrtc"
-	"github.com/mps233/la-pluma/go/internal/transport/agentapi"
-	"github.com/mps233/la-pluma/go/internal/transport/assetsapi"
+	"github.com/mps233/la-pluma/go/internal/transport/bootstrap"
 	"github.com/mps233/la-pluma/go/internal/transport/httpapi"
-	"github.com/mps233/la-pluma/go/internal/transport/quotesapi"
-	"github.com/mps233/la-pluma/go/internal/transport/signaling"
 )
 
 const desktopPort = 32123
@@ -278,17 +274,9 @@ func startDesktop() {
 		return
 	}
 	application.ResumeInterruptedFlows(context.Background(), logger)
-	signalServer := signaling.New(func() *scwebrtc.Publisher {
-		return application.WebRTC.CurrentPublisher()
-	}, logger)
-	signalServer.SetICEServers(application.WebRTC.ICEServers)
-	handler := httpapi.New(cfg, logger,
-		httpapi.WithAgentHandler(agentapi.New(application, logger)),
-		httpapi.WithSignalingHandler(signalServer.Handler()),
-		httpapi.WithQuotesHandler(quotesapi.NewHandler(application.Quotes)),
-		httpapi.WithAssetsHandler(assetsapi.New(application.Assets, logger)),
-		httpapi.WithTokenSource(func() string { return tokenHolder.Load().(string) }),
-	).Handler()
+	options := bootstrap.ServerOptions(application, logger)
+	options = append(options, httpapi.WithTokenSource(func() string { return tokenHolder.Load().(string) }))
+	handler := httpapi.New(cfg, logger, options...).Handler()
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, desktopPort))
 	if err != nil {

@@ -14,12 +14,8 @@ import (
 
 	"github.com/mps233/la-pluma/go/internal/app"
 	"github.com/mps233/la-pluma/go/internal/config"
-	scwebrtc "github.com/mps233/la-pluma/go/internal/infra/webrtc"
-	"github.com/mps233/la-pluma/go/internal/transport/agentapi"
-	"github.com/mps233/la-pluma/go/internal/transport/assetsapi"
+	"github.com/mps233/la-pluma/go/internal/transport/bootstrap"
 	"github.com/mps233/la-pluma/go/internal/transport/httpapi"
-	"github.com/mps233/la-pluma/go/internal/transport/quotesapi"
-	"github.com/mps233/la-pluma/go/internal/transport/signaling"
 )
 
 func main() {
@@ -43,16 +39,7 @@ func main() {
 		os.Exit(1)
 	}
 	application.ResumeInterruptedFlows(context.Background(), logger)
-	signalServer := signaling.New(func() *scwebrtc.Publisher {
-		return application.WebRTC.CurrentPublisher()
-	}, logger)
-	signalServer.SetICEServers(application.WebRTC.ICEServers)
-	server := httpapi.New(cfg, logger,
-		httpapi.WithAgentHandler(agentapi.New(application, logger)),
-		httpapi.WithSignalingHandler(signalServer.Handler()),
-		httpapi.WithQuotesHandler(quotesapi.NewHandler(application.Quotes)),
-		httpapi.WithAssetsHandler(assetsapi.New(application.Assets, logger)),
-	)
+	server := httpapi.New(cfg, logger, bootstrap.ServerOptions(application, logger)...)
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {

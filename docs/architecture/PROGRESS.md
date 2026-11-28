@@ -609,6 +609,19 @@ deleted, verification, and follow-ups.
 - Follow-up: G10 (bootstrap dedupe) and G12 (route coverage) are the remaining
   Go P2 items.
 
+### Round 41 — one HTTP bootstrap for both entries (2026-11-28)
+
+- G10: `cmd/server` and the MyGo desktop entry each constructed the signaling
+  server and the same four handler mounts; only the desktop auth token
+  differed, so a new shared handler could be added to one entry and not the
+  other.
+- Added `transport/bootstrap.ServerOptions`: it builds the signaling server
+  and the agent/quotes/assets mounts; entries append their own options (the
+  desktop token source).
+- Added `TestEntriesShareTheHTTPBootstrap` so both entries keep using it.
+- Verified: full Go test suite (718 tests / 53 packages), vet, gofmt.
+- Follow-up: G12 (route coverage) is the last Go P2 item.
+
 
 
 
