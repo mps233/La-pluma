@@ -85,20 +85,11 @@ transport → app → infra / domain
   components stay out of the barrel: `Modal`/`ConfirmDialog` and `StatusMark`
   are imported from their files, and framer-motion is not a named manual
   chunk, so the entry preload stays animation-free.
-- Glass switches and checkboxes paint a solid fallback until the shared
-  three.js renderer is triggered by the first interaction; one load upgrades
-  every mounted canvas. The 857 KB renderer chunk therefore stays off the
-  initial page load on Automation, Config, and the other control pages.
-- Glass buttons, cards, and tabs reach the engine through deferred layer/lens
-  wrappers: the kit CSS fallback paints first, and the engine loads after the
-  first frame or first interaction. GlassStyles is a light module so badges
-  and tabs do not pull the engine.
-- Glass button groups use the lightweight `glass-popup-anchor` context/anchor;
-  the heavy popup surface stays behind menus, selects, and popovers.
-- The glass menu kit lives behind `LayoutGlassChrome`'s lazy `GlassMenu`
-  boundary (placeholder trigger first, full `GlassMenuImpl` on hover/click).
-  `vite.config.ts` marks glass and common modules side-effect-free so unused
-  menu/select/popup exports tree-shake out of the entry.
+- The glass registry is vendored verbatim from upstream
+  `bilalgursen/liquid-glass` at `f697b08` (Search 2.1.1); app imports go
+  through `components/glass`. The desktop sidebar search is the official
+  `GlassSearch` with one workspace layer; selecting a result navigates the
+  tabs, and the sidebar nav is not filtered in place.
 - The Dynamic Island subsystem (provider, surface, activity adapters,
   islandcn visuals, and hugeicons) mounts behind one lazy `IslandLayer` chunk
   after the first frame. `App`/`Layout` keep no island imports; the layer is

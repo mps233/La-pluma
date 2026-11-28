@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench } from 'lucide-react'
-import { GlassButton, GlassCard } from '@/components/glass'
+import { GlassButton, GlassCard, GlassSearch } from '@/components/glass'
 import { GlassLiveCardButton } from '@/components/common'
-import { GlassInput, GlassMenu, GlassNav } from './LayoutGlassChrome'
+import { GlassMenu, GlassNav } from './LayoutGlassChrome'
 import ThemeToggle from './ThemeToggle'
 import IslandHost from './IslandHost'
 import AsciiFieldBackdrop from './backgrounds/AsciiFieldBackdrop'
@@ -133,7 +133,6 @@ export default function Layout({ children }: LayoutProps) {
   const resolvedTheme = useResolvedTheme()
   const brandMark = brandMarkUrl(resolvedTheme)
   const activeTab: AppTab = isAppTab(storedActiveTab) ? storedActiveTab : 'dashboard'
-  const [sidebarQuery, setSidebarQuery] = useState('')
   const [sidebarIdentity, setSidebarIdentity] = useState(DEFAULT_OPERATOR_QUOTE)
   const pageRef = useRef<HTMLDivElement>(null)
   const scrollPositions = useRef(new Map<AppTab, number>())
@@ -313,19 +312,6 @@ export default function Layout({ children }: LayoutProps) {
     else window.scrollTo({ top: 0, left: 0, behavior })
   }, [])
 
-  // Browser form restore and password managers can write a saved value into the
-  // search field while it is not focused. Such a value is not a workspace filter
-  // and would hide every destination, so it is dropped and the controlled value
-  // is written back instead of becoming sidebar state.
-  const handleSidebarQueryChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const input = event.currentTarget
-    if (document.activeElement !== input) {
-      input.value = sidebarQuery
-      return
-    }
-    setSidebarQuery(input.value)
-  }
-
   const activePrimaryMobileIndex = mobileTabs.findIndex(tab => tab.id === activeTab)
   const isOverflowActive = overflowTabs.some(tab => tab.id === activeTab)
   const mobileNavItems = mobileTabs.map(tab => ({
@@ -333,6 +319,16 @@ export default function Layout({ children }: LayoutProps) {
     label: tab.name,
     icon: <TabIcon tab={tab} size="h-6 w-6" />,
   }))
+  const workspaceSearchLayer = {
+    value: 'workspaces',
+    label: '工作区',
+    icon: <Search aria-hidden="true" />,
+    items: tabs.map(tab => ({
+      value: tab.id,
+      label: tab.name,
+      icon: <TabIcon tab={tab} size="h-4 w-4" />,
+    })),
+  }
   const overflowMenuItems = [
     ...overflowTabs.map(tab => ({
       label: tab.name,
@@ -358,18 +354,6 @@ export default function Layout({ children }: LayoutProps) {
   // Sidebar search is local to Layout; memoizing the page render keeps every
   // keystroke from re-rendering the active workspace.
   const pageContent = useMemo(() => children({ activeTab }), [children, activeTab])
-
-  const normalizedSidebarQuery = sidebarQuery.trim().toLocaleLowerCase()
-  const visibleDesktopGroups = desktopTabGroups
-    .map(group => ({
-      ...group,
-      tabs: group.tabs.filter(tab => (
-        !normalizedSidebarQuery
-        || `${tab.name} ${tab.id}`.toLocaleLowerCase().includes(normalizedSidebarQuery)
-      )),
-    }))
-    .filter(group => group.tabs.length > 0)
-  const visibleDesktopTabCount = visibleDesktopGroups.reduce((count, group) => count + group.tabs.length, 0)
 
   return (
     <div className="view view-main la-pluma-view">
@@ -419,36 +403,14 @@ export default function Layout({ children }: LayoutProps) {
         <div className="la-pluma-page-body">
           <aside className="la-pluma-sidebar" aria-label="主要功能">
             <search className="la-pluma-sidebar-search" role="search">
-              <GlassInput
-                type="search"
-                icon={<Search aria-hidden="true" />}
-                value={sidebarQuery}
-                onChange={handleSidebarQueryChange}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape' && sidebarQuery) {
-                    event.preventDefault()
-                    setSidebarQuery('')
-                  }
-                }}
-                onFocus={(event) => {
-                  // A value written without an input event (some password
-                  // managers only touch the DOM) never reaches sidebar state;
-                  // clear it as soon as the user focuses the real field.
-                  const input = event.currentTarget
-                  if (input.value !== sidebarQuery) input.value = sidebarQuery
-                }}
-                onClear={() => setSidebarQuery('')}
+              <GlassSearch
+                label="搜索工作区"
                 placeholder="搜索工作区"
-                aria-label="搜索工作区"
-                name="workspace-search"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                data-lpignore="true"
-                data-1p-ignore="true"
-                data-bwignore="true"
-                data-form-type="other"
+                className="w-full"
+                layers={[workspaceSearchLayer]}
+                onAction={(item) => {
+                  if (isAppTab(item.value)) navigateToTab(item.value)
+                }}
               />
             </search>
 
@@ -477,7 +439,7 @@ export default function Layout({ children }: LayoutProps) {
             </div>
 
             <nav className="la-pluma-sidebar-nav" aria-label="工作台">
-              {visibleDesktopGroups.map(group => (
+              {desktopTabGroups.map(group => (
                 <div
                   key={group.id}
                   className="la-pluma-sidebar-nav-group"
@@ -490,19 +452,6 @@ export default function Layout({ children }: LayoutProps) {
                   ))}
                 </div>
               ))}
-              {visibleDesktopTabCount === 0 && (
-                <div className="la-pluma-sidebar-empty" role="status">
-                  <p>没有匹配的工作区</p>
-                  <GlassButton
-                    type="button"
-                    size="sm"
-                    material="tinted"
-                    onClick={() => setSidebarQuery('')}
-                  >
-                    清除搜索
-                  </GlassButton>
-                </div>
-              )}
             </nav>
           </aside>
 

@@ -277,7 +277,7 @@ describe('top-level application navigation', () => {
     unsubscribe()
   })
 
-  it('groups and filters desktop workspaces without changing the mobile destinations', async () => {
+  it('groups desktop workspaces and searches them with the official field', async () => {
     const user = userEvent.setup()
     renderLayout()
 
@@ -312,68 +312,18 @@ describe('top-level application navigation', () => {
 
     const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
     await user.type(search, '数据')
+    await waitFor(() => expect(sidebar.querySelectorAll('[data-glass-item]').length).toBeGreaterThan(0))
 
-    const filteredLinks = [...sidebar.querySelectorAll<HTMLButtonElement>('.la-pluma-sidebar-nav button[data-app-tab]')]
-    expect(filteredLinks.map(button => button.dataset.appTab)).toEqual(['statistics'])
-    expect(mobileDestinations).toHaveLength(4)
+    const result = [...sidebar.querySelectorAll<HTMLElement>('[data-glass-item]')]
+      .find(item => item.textContent?.includes('数据'))
+    expect(result).toBeTruthy()
+    await user.click(result!)
 
-    await user.click(filteredLinks[0]!)
     expect(sidebar.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
     expect(sidebar.querySelector<HTMLElement>('[aria-current="page"]')?.dataset.appTab).toBe('statistics')
     expect(container.querySelector('.la-pluma-tabbar-more-anchor')?.classList.contains('is-active')).toBe(true)
     expect(container.querySelector('.la-pluma-tabbar-nav .lg-track > [data-lg-item][aria-selected="true"]')).toBeNull()
-
-    await user.click(sidebar.querySelector<HTMLButtonElement>('button[aria-label="Clear"]')!)
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
-  })
-
-  it('drops a saved value written into the sidebar search while it is unfocused', () => {
-    renderLayout()
-
-    const sidebar = container.querySelector<HTMLElement>('.la-pluma-sidebar')!
-    const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
-
-    // Browsers and password managers write remembered form values into a field
-    // they never focused; that value must not become a workspace filter and
-    // hide every destination.
-    fireEvent.change(search, { target: { value: 'admin@la-pluma' } })
-
-    expect(search.value).toBe('')
-    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
-    expect(sidebar.querySelector('.la-pluma-sidebar-empty')).toBeNull()
-  })
-
-  it('clears a DOM-only saved value when the sidebar search receives focus', () => {
-    renderLayout()
-
-    const sidebar = container.querySelector<HTMLElement>('.la-pluma-sidebar')!
-    const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
-    search.value = 'admin@la-pluma'
-
-    fireEvent.focus(search)
-
-    expect(search.value).toBe('')
-    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
-  })
-
-  it('offers a clear action when the sidebar filter matches no workspace', async () => {
-    const user = userEvent.setup()
-    renderLayout()
-
-    const sidebar = container.querySelector<HTMLElement>('.la-pluma-sidebar')!
-    const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
-    await user.type(search, 'zzz')
-
-    const empty = sidebar.querySelector<HTMLElement>('.la-pluma-sidebar-empty')!
-    expect(empty.textContent).toContain('没有匹配的工作区')
-    const clear = empty.querySelector<HTMLButtonElement>('button')!
-    expect(clear.textContent).toBe('清除搜索')
-
-    await user.click(clear)
-
-    expect(search.value).toBe('')
-    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
-    expect(sidebar.querySelector('.la-pluma-sidebar-empty')).toBeNull()
   })
 
   it('shows the daily operator portrait, name, and quote in the desktop identity area', async () => {

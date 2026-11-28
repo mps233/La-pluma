@@ -18,7 +18,15 @@
 // The gooey droplet (used only by GlassActionButton): the host's direct child marked
 // `data-glass-drop` sits at the end, and the glass separates around it (`apart`) or melts
 // back into one body (`merged`). Switching between the two animates, and the glass swells
-// once as it does under the pointer.
+// once as it does under the pointer. With more than one such child (GlassSearch's layers) they
+// bud off the body's end as a chain instead, each to the place its own element has (BUD in
+// engine.ts). Each of those elements then carries `--glass-drop-x` (how far its droplet is from
+// that place, px), `--glass-drop-size` (the droplet's size, × its own) and `--glass-drop-out`
+// (how far out it is, 0–1): put them on its `translate`, `scale` and what fades in, and its
+// content rides with the glass.
+// Resize the host yourself, frame by frame (a spring on its height), and dispatch a
+// `glass-measure` event on it each time: the glass measures again on its very next frame
+// instead of waiting to be told the size changed.
 // `pulse`: change it and the glass answers once, as if hovered and pressed for a moment
 // (GlassActionButton does it when its action succeeds). While it does, the host carries `--glass-bend` (two numbers): put `scale: var(--glass-bend, 1)` on the
 // content that should stretch with the glass. `pulseHold` (seconds) keeps it swollen longer
@@ -32,10 +40,9 @@
 
 import { useEffect, useRef } from 'react'
 
-import { GlassStyles } from './glass-styles'
-
 import { drawAround, drawDom } from './dom-snapshot'
 import {
+  BUD,
   DESIGN_HEIGHT,
   PULL,
   SPRINGS,
@@ -67,6 +74,10 @@ export type GlassOptics = {
   borderColor?: string
   borderAlpha?: number
   borderWidth?: number
+  /** An outline on the very edge of clear glass, outside that line: its colour (default black), opacity (0–1, default 0: none) and width in px (default 1). */
+  outlineColor?: string
+  outlineAlpha?: number
+  outlineWidth?: number
   /** With `blur`: how much of the frost shows over the sharp bend (0–1, default 1). */
   frostMix?: number
   /** With `blur`: × the frost at the rim, where the glass bends (default 1). */
@@ -112,8 +123,10 @@ export type GlassOptics = {
   shadow?: number
   shadowSoftness?: number
   shadowOffset?: number
+  /** `true`: the drop shadow begins right at the glass's edge, as a card's does. By default it comes up a little way off the edge. */
+  shadowFlush?: boolean
   /** Dark glass (a black tint, on a dark page): its own tint cover (in place of `tint`) and rim line. Unset values follow the rest. */
-  dark?: { tint?: number; borderColor?: string; borderAlpha?: number }
+  dark?: { tint?: number; borderColor?: string; borderAlpha?: number; outlineColor?: string; outlineAlpha?: number }
 }
 
 export type GlassLayerProps = {
@@ -157,6 +170,12 @@ export type GlassLayerProps = {
    * its place. Glass that does not swell (`swell={false}`) is never pulled.
    */
   pull?: boolean
+  /**
+   * Shade the glass as if it were this tall, in px (default: its own height). Glass that grows
+   * (GlassSearch's field opening into its results) keeps the rim, the bend and the shadow of the
+   * height it has at rest.
+   */
+  restHeight?: number
   /** Fine-tuning: tint colour, a rim line, frost mix, bend, light and shadow (see GlassOptics). */
   optics?: GlassOptics
 }
@@ -182,6 +201,35 @@ const PULSE_KICK = { x: 24, y: 20 }
  */
 const PULSE_BEND = { amount: 0.5, in: 30, out: 5, even: 4, back: 12 }
 
+/** The CSS the glass relies on. Rendered once per page by <GlassStyles /> (React 19 dedupes it). */
+export const GLASS_CSS = `
+/* Layered, so a utility class on the host (absolute, fixed) still wins over relative. */
+@layer components{:where([data-glass-host]){position:relative;isolation:isolate}}
+/* Unlayered on purpose: once the glass draws, it must beat the host's own fill utilities. */
+[data-glass-host][data-glass-ready]{background:transparent!important;border-color:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+@keyframes glass-marquee{to{transform:translateX(-50%)}}
+[data-glass-marquee]{animation:glass-marquee var(--glass-marquee-duration,5s) linear infinite}
+/* Swapped labels and icons rise from a soft blur; a check draws itself in. */
+@keyframes glass-in{from{opacity:0;filter:blur(3px);transform:translateY(4px)}}
+[data-glass-in]{animation:glass-in .38s cubic-bezier(.2,.8,.2,1) both}
+@keyframes glass-draw{from{stroke-dashoffset:25}}
+[data-glass-draw]{stroke-dasharray:25;animation:glass-draw .42s cubic-bezier(.65,0,.35,1) .12s both}
+@keyframes glass-spin{to{transform:rotate(1turn)}}
+[data-glass-spin]{animation:glass-spin .8s linear infinite}
+[data-glass-ready] [data-glass-fallback]{visibility:hidden}
+/* A hidden fallback stops moving too. Its marquee ran on unseen, on the main thread, and made the browser work out the page's layers again on every frame of anything else on the page. */
+[data-glass-ready] [data-glass-fallback] [data-glass-marquee]{animation:none}
+@media (prefers-reduced-motion:reduce){[data-glass-marquee],[data-glass-in],[data-glass-draw],[data-glass-spin]{animation:none}}
+`
+
+/** Injects GLASS_CSS once (React 19 hoists and dedupes `<style href precedence>`). */
+export function GlassStyles() {
+  return (
+    <style href="liquid-glass" precedence="default">
+      {GLASS_CSS}
+    </style>
+  )
+}
 
 export function GlassLayer({
   material = 'clear',
@@ -196,6 +244,7 @@ export function GlassLayer({
   pulse,
   pulseHold,
   pull = true,
+  restHeight,
   optics,
 }: GlassLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -203,10 +252,10 @@ export function GlassLayer({
   const dropletRef = useRef(droplet)
   dropletRef.current = droplet
   // Tint, frost and optics are read on every frame: changing them redraws, never rebuilds.
-  const tuneRef = useRef({ tint, blur, optics })
-  tuneRef.current = { tint, blur, optics }
+  const tuneRef = useRef({ tint, blur, optics, restHeight })
+  tuneRef.current = { tint, blur, optics, restHeight }
   const pokeRef = useRef<(() => void) | null>(null)
-  useEffect(() => pokeRef.current?.(), [droplet, tint, blur, optics])
+  useEffect(() => pokeRef.current?.(), [droplet, tint, blur, optics, restHeight])
   // A pulse plays when the value changes, never for the one the glass was mounted with.
   const pulseRef = useRef<(() => void) | null>(null)
   const pulseHoldRef = useRef(pulseHold)
@@ -248,6 +297,8 @@ export function GlassLayer({
     let border: [Rgb, Rgb] | null = null
     /** Clear glass: opacity of the optional rim line (GlassOptics). */
     let borderAlpha = 1
+    /** Clear glass: the optional outline on its very edge (GlassOptics). */
+    let outline: { color: Rgb; alpha: number } | null = null
     /** Clear glass: the tint ended up dark (optics.dark applies). */
     let darkGlass = false
     let colorT = 1
@@ -281,6 +332,25 @@ export function GlassLayer({
     const growY: Spring = { x: 0, v: 0 }
     const scale: Spring = { x: 1, v: 0 }
     const drop: Spring = { x: 0, v: 0 }
+    // A row of droplets (more than one `data-glass-drop`): where each one rests, from the host's
+    // centre, and its radius; how far the body pulls back for them; one spring each, and the
+    // seconds since they were let out (BUD).
+    let buds: { x: number; y: number; r: number; el: HTMLElement }[] = []
+    /** What each droplet's element was last told (see `ride`). */
+    const rode: string[] = []
+    // A droplet's own element rides with it: where it is from its place, its size, how far out it is.
+    const ride = (i: number, dx: number, size: number, out: number) => {
+      const key = `${dx.toFixed(1)}|${size.toFixed(3)}|${out.toFixed(3)}`
+      if (rode[i] === key) return
+      rode[i] = key
+      const style = buds[i].el.style
+      style.setProperty('--glass-drop-x', `${dx.toFixed(1)}px`)
+      style.setProperty('--glass-drop-size', size.toFixed(3))
+      style.setProperty('--glass-drop-out', out.toFixed(3))
+    }
+    let budPull = 0
+    let budClock = 0
+    const budSprings: Spring[] = []
     /** How much the droplet is on its way in (0–1), eased: the bridge is held flat then (see the lens). */
     let closing = 0
     // A pulse: seconds of its swell left, and how much the content bends with it (0–1).
@@ -327,6 +397,10 @@ export function GlassLayer({
           press.x = growX.x = growY.x = press.v = growX.v = growY.v = 0
           drop.x = hasDroplet && dropletRef.current === 'apart' ? 1 : 0
           drop.v = 0
+          for (const b of budSprings) {
+            b.x = drop.x
+            b.v = 0
+          }
           closing = drop.x ? 0 : 1
           bendFrom = hovered ? 1 : 0
           settle = nod = bend = 0
@@ -352,7 +426,14 @@ export function GlassLayer({
         const c = stepSpring(growY, hov, SPRINGS.hoverY, dt)
         const d = stepSpring(scale, target, SPRINGS.press, dt)
         const apart = dropletRef.current === 'apart' && view.visible && !pressed
-        const e = hasDroplet ? stepSpring(drop, apart ? 1 : 0, apart ? SPRINGS.dropletOut : SPRINGS.dropletIn, dt) : false
+        const row = buds.length > 0
+        let e = hasDroplet ? stepSpring(drop, apart ? 1 : 0, row ? (apart ? SPRINGS.budBody : SPRINGS.budIn) : apart ? SPRINGS.dropletOut : SPRINGS.dropletIn, dt) : false
+        // The row: the body pulls back first, then the droplets come out, one a moment after the other.
+        budClock = row && apart ? budClock + dt : 0
+        for (let i = 0; i < buds.length; i++) {
+          const out = apart && budClock >= BUD.wait + (i ? BUD.lead + (i - 1) * BUD.stagger : 0)
+          if (stepSpring((budSprings[i] ??= { x: 0, v: 0 }), out ? 1 : 0, out ? SPRINGS.budOut : SPRINGS.budIn, dt) || (apart && !out)) e = true
+        }
         closing = clamp(closing + (apart ? -1 : 1) * dt * 12)
         if (nodDue && (apart || drop.x < NOD_AT)) playNod()
         // The content follows the glass while the pulse lasts, and lets go as it settles.
@@ -377,7 +458,19 @@ export function GlassLayer({
           corner = px >= Math.min(w, h) / 2 - 0.5 ? null : px
           // The droplet: a direct child marked `data-glass-drop`, laid out by its owner at the end.
           const had = hasDroplet
-          hasDroplet = dropletRef.current !== 'none' && [...host.children].some((c) => c.hasAttribute('data-glass-drop'))
+          const marked = dropletRef.current === 'none' ? [] : ([...host.children].filter((c) => c.hasAttribute('data-glass-drop')) as HTMLElement[])
+          hasDroplet = marked.length > 0
+          // More than one is a row (BUD): each rests where its own element is laid out, the nearest first.
+          buds =
+            marked.length > 1
+              ? marked
+                  .map((el) => ({ x: el.offsetLeft + host.clientLeft + el.offsetWidth / 2 - w / 2, y: el.offsetTop + host.clientTop + el.offsetHeight / 2 - h / 2, r: el.offsetWidth / 2, el }))
+                  .sort((a, b) => a.x - b.x)
+                  .slice(0, 4)
+              : []
+          // The body ends as far before the first droplet as the droplets are from each other.
+          rode.length = 0
+          budPull = buds.length ? Math.max(0, w / 2 - (buds[0].x - buds[0].r - Math.max(0, buds[1].x - buds[1].r - buds[0].x - buds[0].r))) : 0
           // Springs step before shapes are read: one more frame lets the droplet start moving.
           if (hasDroplet !== had) engine.wake()
           const s = engine.resolveColor(surfaceColorOf(host.parentElement))
@@ -398,6 +491,8 @@ export function GlassLayer({
             const bc = line?.borderColor && (line.borderAlpha ?? 0) > 0 ? engine.resolveColor(line.borderColor) : null
             border = bc ? [[bc[0], bc[1], bc[2]], [bc[0], bc[1], bc[2]]] : null
             borderAlpha = bc ? clamp((line?.borderAlpha ?? 0) * bc[3]) : 1
+            const oc = (line?.outlineAlpha ?? 0) > 0 ? engine.resolveColor(line?.outlineColor || '#000000') : null
+            outline = oc ? { color: [oc[0], oc[1], oc[2]], alpha: clamp((line?.outlineAlpha ?? 0) * oc[3]) } : null
             colorT = 1
             sampled = true
           } else {
@@ -442,8 +537,11 @@ export function GlassLayer({
         const s = Math.max(0.5, scale.x)
         const k = lerp(1, Math.min(PRESS_SCALE, maxScale()), p) / s
         const grow = (h * HOVER_GROW) / s
-        const t = hasDroplet ? clamp(drop.x, 0, 1.06) : 0
-        const pull = h * (1 + DROPLET_GAP) * t
+        const row = buds.length > 0
+        const t = hasDroplet ? clamp(drop.x, 0, row ? 1.2 : 1.06) : 0
+        const pull = row ? budPull * t : h * (1 + DROPLET_GAP) * t
+        // The glass is shaded for this height: its own, or the one it has at rest (`restHeight`).
+        const sh = Math.max(1, tuneRef.current.restHeight ?? h)
         const hy = (h / 2) * k + grow * growY.x
         // Swollen, the droplet's end sits a little off the body's. It joins it as the two
         // become one, or the end would jump when the droplet goes (the spring's last
@@ -451,7 +549,9 @@ export function GlassLayer({
         const dropX = (w / 2 - h / 2) * k + grow * lerp(growX.x - growY.x, growX.x * 0.5, smooth(0, 0.15, t))
         // The canvas keeps 8px beside the glass and 10px above it, and more whenever the glass
         // swells past that (a push while it is already swollen): its end is never cut off.
-        const reach = Math.max((w / 2) * k + grow * growX.x, t > 0.001 ? dropX + hy : 0)
+        // A row's droplets rest inside the host; the canvas keeps room for the furthest one's swing past its place.
+        const swing = row ? Math.ceil((buds[buds.length - 1].x - (w / 2 - budPull)) * BUD.overshoot) + 2 : 0
+        const reach = Math.max((w / 2) * k + grow * growX.x, !row && t > 0.001 ? dropX + hy : 0)
         // A pull stretches the host. That stretch is undone on this canvas and drawn by the glass
         // itself: it stays a pill with round ends, as long and as thin as the pull makes it, and
         // bends what really lies behind it (not a picture of it, pulled out of shape with the host).
@@ -462,12 +562,19 @@ export function GlassLayer({
         const most = px === 1 && py === 1 ? 0 : Math.max(w, h) <= PULL.smallUntil ? PULL.smallStretchMax : PULL.stretchMax
         // A button also keeps room for its side of a bridge to glass it melts into (COHESION).
         const melt = swell ? Math.ceil(cohesionSoftness(h) / 4) + 3 : 0
-        const padX = Math.max(8, Math.ceil(reach * (1 + most) - w / 2 + 2), melt)
-        const padTop = Math.max(10, Math.ceil(hy * (1 + most) - h / 2 + 2), melt)
+        // A drop shadow tuned softer or further than the kit's own (GlassOptics) needs more room
+        // below and beside the glass; the kit's own keeps the room it always had.
+        const tuned = tuneRef.current.optics
+        const cast = (tuned?.shadow ?? 1) > 0
+        const softly = (swell ? 34 : 34 * 0.6) * Math.max(0.05, tuned?.shadowSoftness ?? 1) * 1.5
+        const below = ((swell ? 22 : 22 * 0.5) * Math.max(0, tuned?.shadowOffset ?? 1) * 1.6 + softly) / DESIGN_HEIGHT
+        const beside = cast && (tuned?.shadowSoftness ?? 1) > 1 ? Math.ceil((sh * softly) / DESIGN_HEIGHT) + 8 : 0
+        const padX = Math.max(8, Math.ceil(reach * (1 + most) - w / 2 + 2), melt, swing, beside)
+        const padTop = Math.max(10, Math.ceil(hy * (1 + most) - h / 2 + 2), melt, Math.ceil(beside / 3))
         // Below the glass the canvas keeps room for its drop shadow. Glass that casts none (a card:
         // its shadow is CSS) needs no more there than above it, and a canvas that much smaller is
         // that much less to paint, upload, shade and copy on every frame.
-        const padBottom = (tuneRef.current.optics?.shadow ?? 1) <= 0 ? padTop : Math.round(h * 0.8 + 4)
+        const padBottom = !cast ? padTop : Math.round(sh * Math.max(0.8, below + 0.08) + 4) + (beside ? 8 : 0)
         const origin = `${padX + w / 2}px ${padTop + h / 2}px`
         const undo = px === 1 && py === 1 ? '' : `${(1 / px).toFixed(6)} ${(1 / py).toFixed(6)}`
         if (undo !== unstretched || (undo && origin !== unstretchedAt)) {
@@ -476,7 +583,7 @@ export function GlassLayer({
         }
         const rect = host.getBoundingClientRect()
         const pc = clamp(press.x)
-        const unit = h / DESIGN_HEIGHT
+        const unit = sh / DESIGN_HEIGHT
         const bevel = lerp(DESIGN_HEIGHT * 0.42, 62, pc)
         // Square corners swell with the glass.
         const radius = corner === null ? 999 : corner * (hy / (h / 2))
@@ -489,6 +596,20 @@ export function GlassLayer({
         // swell that end past the body (it grew, then shrank as the droplet went). There the
         // bridge only fills the dip between the two: the end stays as tall as the rest.
         const dip = Math.hypot(hy * py, (pull * k * px) / 2) - hy * py
+        // A row: the first droplet swells where it belongs, as the body's end passes it; the others
+        // leave its far side, small, and grow on the way to their own places. Their elements ride along.
+        const droplets = !row
+          ? undefined
+          : buds.flatMap((b, i) => {
+              const d = Math.min(budSprings[i]?.x ?? 0, 1 + BUD.overshoot)
+              const size = lerp(BUD.seed, 1, smooth(0, Math.min(1, BUD.grown + i * BUD.grownStep), d))
+              const x = lerp(lerp(buds[0].x, b.x, clamp(BUD.from)), b.x, d)
+              ride(i, x - b.x, size, clamp(d))
+              if (d <= 0.001) return []
+              const soft = sh * BUD.softness * smooth(0, 0.15, d) * (1 - smooth(0.8, 1, d))
+              // On its way in a droplet is let go of sooner: its bridge would swell the body's end.
+              return [{ x, y: b.y, r: b.r * size, k: soft * (1 - 0.6 * closing) }]
+            })
         return {
           // The canvas is placed against the padding box; the glass is measured on the border box.
           left: -padX - host.clientLeft,
@@ -502,8 +623,9 @@ export function GlassLayer({
           hy: hy * py,
           radius,
           bodyX: (-pull / 2) * k * px,
+          droplets,
           droplet:
-            t > 0.001
+            !row && t > 0.001
               ? {
                   x: dropX * px,
                   r: hy * py,
@@ -517,6 +639,7 @@ export function GlassLayer({
           shadow: (0.12 * lerp(0.55, 1, pc) * Math.max(0, o?.shadow ?? 1)) / strength,
           shadowSoftness: 34 * lerp(0.6, 1, pc) * Math.max(0.05, o?.shadowSoftness ?? 1),
           shadowOffset: 22 * lerp(0.5, 1, pc) * Math.max(0, o?.shadowOffset ?? 1),
+          shadowFlush: o?.shadowFlush,
           strength,
           tune: o && {
             rim: o.rim,
@@ -535,13 +658,14 @@ export function GlassLayer({
           border: border ? mixRgb(border[0], border[1], colorT) : undefined,
           borderAlpha: clear ? borderAlpha : undefined,
           borderWidth: clear ? o?.borderWidth : undefined,
+          outline: clear && outline ? { ...outline, width: Math.max(0, o?.outlineWidth ?? 1) } : undefined,
           surface,
           edgeClear: 0.2,
           cursorLight: o?.cursorLight ?? true,
           pointerLight: true,
           // What the rim of clear glass mirrors: the page around it. Tinted glass mirrors nothing.
           reflection: !clear ? undefined : {
-            height: h,
+            height: sh,
             live,
             paint: (around, reach) => {
               const r = host.getBoundingClientRect()
@@ -716,6 +840,8 @@ export function GlassLayer({
     io.observe(host)
     const ro = new ResizeObserver(dirty)
     ro.observe(host)
+    // The host's owner resized it by hand and says so (see the top of this file).
+    host.addEventListener('glass-measure', dirty)
     // Content changes (label, selected state) re-check the droplet and colours.
     const mo = new MutationObserver(dirty)
     mo.observe(host, {
@@ -736,6 +862,7 @@ export function GlassLayer({
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       io.disconnect()
       ro.disconnect()
+      host.removeEventListener('glass-measure', dirty)
       mo.disconnect()
       removeEventListener('scroll', onScroll, { capture: true })
       target.removeEventListener('pointerdown', onDown)
@@ -746,6 +873,7 @@ export function GlassLayer({
       delete host.dataset.glassReady
       delete host.dataset.glassTone
       host.style.removeProperty('--glass-bend')
+      for (const b of buds) for (const name of ['--glass-drop-x', '--glass-drop-size', '--glass-drop-out']) b.el.style.removeProperty(name)
       canvas.style.scale = ''
       pokeRef.current = null
       pulseRef.current = null

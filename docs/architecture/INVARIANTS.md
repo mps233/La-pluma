@@ -14,6 +14,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | Run status strings, classification, DTO links, and optional fields stay stable | `internal/domain/agentrun/status_test.go` | `cd go && go test ./internal/domain/agentrun` |
 | Atomic file replacement has one implementation (0600 temp file, fsync, rename) | `internal/util/jsonstore/store_test.go` | `cd go && go test ./internal/util/jsonstore` |
 | Application code imports Liquid Glass only through `@/components/glass` (documented preview exception) | ESLint `no-restricted-imports` | `npm run lint --prefix client` |
+| The sidebar search uses the official GlassSearch adapter and workspace layer; selecting navigates | `Layout.test.tsx` | `npm run test --prefix client` |
 | Environment access stays in the config layer (`internal/config`, `internal/app/config`); entry points may snapshot env into Config | `TestEnvironmentReadsStayInConfig` | `cd go && go test ./internal/archguard` |
 | The `internal/app` and `internal/infra` layers own no HTTP handlers (`ServeHTTP`/`http.Handler`) | `TestHTTPHandlersStayInTransport` | `cd go && go test ./internal/archguard` |
 | Agent API endpoint files stay split by domain (≤ 800 production lines per file) | `TestAgentAPIFilesStaySmall` | `cd go && go test ./internal/archguard` |
@@ -27,12 +28,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | Strict TypeScript, including `noUnusedLocals` and `noUnusedParameters` | `tsc --noEmit` | `npm run type-check --prefix client` |
 | Pages are code-split and PWA/page caching configuration is covered | `vite.config.test.ts` | `npm run test --prefix client` |
 | The entry preload excludes the animation vendor: framer-motion is never a named manual chunk | `vite.config.test.ts` (entry chunk policy) | `npm run test --prefix client` |
-| Glass controls stay readable before the shared renderer loads: Switch and CheckboxField render solid fallbacks | `common/Switch.test.tsx` + `common/fields.test.tsx` | `npm run test --prefix client` |
-| The glass renderer is only created after the first interaction, and one load upgrades every mounted canvas | `controls/glass/useGlassCanvas.test.tsx` | `npm run test --prefix client` |
 | The island provider, surface, activity adapters, and icon package stay behind the lazy `IslandLayer` boundary | `components/islandBoundary.test.ts` + `IslandHost.test.tsx` | `npm run test --prefix client` |
-| The glass menu kit stays behind the lazy `GlassMenu` boundary; glass/common modules are side-effect-free for tree-shaking | `components/glassMenuBoundary.test.ts` + `vite.config.test.ts` | `npm run test --prefix client` |
-| Glass button groups use the lightweight popup anchor; the heavy popup surface stays behind menus/selects | `components/glassPopupBoundary.test.ts` | `npm run test --prefix client` |
-| Glass hosts reach the engine through the deferred layer/lens wrappers; the engine stays off the entry preload | `components/glassEngineBoundary.test.ts` | `npm run test --prefix client` |
 
 ## Not yet enforceable
 

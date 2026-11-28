@@ -34,9 +34,8 @@ import {
   type ReactNode,
 } from 'react'
 
-import { GlassLayer } from './glass-layer-lazy'
-import type { GlassMaterial } from './glass-layer'
-import { GlassPopupAnchor, GlassPopupContext } from './glass-popup-anchor'
+import { GlassLayer, type GlassMaterial } from './glass-layer'
+import { GlassPopupAnchor, GlassPopupContext } from './glass-popup'
 
 export type GlassButtonGroupSize = 'sm' | 'md' | 'lg'
 export type GlassButtonGroupOrientation = 'horizontal' | 'vertical'

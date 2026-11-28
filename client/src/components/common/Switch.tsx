@@ -52,10 +52,6 @@ export default function Switch({
       className={`app-switch${compact ? ' app-switch-compact' : ''}${disabled ? ' is-disabled' : ''}${className ? ` ${className}` : ''}`}
     >
       <span ref={hostRef} className="lg-host lg-switch app-switch-control inline-flex items-center">
-        {/* Solid fallback until the shared glass renderer takes over. */}
-        <span aria-hidden="true" data-glass-fallback="switch" className={`app-switch-fallback${checked ? ' is-on' : ''}`}>
-          <span className="app-switch-fallback-knob" />
-        </span>
         <OfficialSwitch
           checked={checked}
           onChange={onChange}

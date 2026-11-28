@@ -71,3 +71,10 @@ export {
   type GlassSegmentedOption,
   type GlassSegmentedProps,
 } from './GlassSegmented'
+
+export {
+  GlassSearch,
+  type GlassSearchItem,
+  type GlassSearchLayer,
+  type GlassSearchProps,
+} from '@/components/liquid-glass/glass-search'

@@ -30,8 +30,7 @@
 
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react'
 
-import { GlassLayer } from './glass-layer-lazy'
-import type { GlassMaterial } from './glass-layer'
+import { GlassLayer, type GlassMaterial } from './glass-layer'
 
 export type GlassActionState = 'idle' | 'pending' | 'success'
 

@@ -57,10 +57,11 @@
 // Without WebGL2 the surface is a plain frosted panel and the anchor keeps its CSS look.
 // COPY VERBATIM. MIT — https://github.com/bilalgursen/liquid-glass
 
-import { Children, useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
+import { Children, createContext, useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react'
 
 import { drawAround, drawDom } from './dom-snapshot'
 import { GLOW, GLOW_SMALL, GOOEY, HANDED_ON, MENU, MORPH, MORPH_GLOW, MORPH_GLOW_SMALL, SPRINGS, clamp, getGlassEngine, lerp, rgbCss, smooth, stepSpring, surfaceColorOf, type GlassEngine, type GlassLens, type GlassView, type Rgb, type Spring } from './engine'
+import { GlassStyles } from './glass-layer'
 
 const DESIGN_HEIGHT = 120
 /** The control is GlassButton's glass: its tint, no frost, its light and shadow. */
@@ -102,6 +103,8 @@ const SETTLE = 0.16
 const SETTLE_GLOW = 0.7
 /** What a morphing popup's light does to the content on it: how much it brightens it (× the light there), and the soft white bloom it leaves around it (px, alpha). */
 const CONTENT_GLOW = { lift: 0.55, bloom: 7, alpha: 0.65 }
+/** Each letter of it: how long it takes (seconds), how long after the one before it starts, how soft it starts (CSS px). */
+const LETTER = { duration: 0.4, gap: 0.01, blur: 10 }
 /** A morphing surface's content follows each side of the glass, at most this much (×) off its even size: past it, text would look stretched. */
 const MAX_STRETCH = 1.06
 /**
@@ -137,6 +140,34 @@ function fitIn(g: { hx: number; hy: number; r: number }, ox: number, oy: number,
   return lo
 }
 
+const CSS = `
+[data-glass-popup]{isolation:isolate;overflow:visible!important;background:transparent}
+[data-glass-popup][data-glass-off]{background:rgb(255 255 255 / .86);border:1px solid rgb(0 0 0 / .1);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+:is(.dark,[data-theme=dark]) [data-glass-popup][data-glass-off]{background:rgb(23 23 23 / .86);border-color:rgb(255 255 255 / .14)}
+[data-glass-popup] :is([role=option],[role=menuitem],[data-glass-item]){transition:background-color .12s ease}
+[data-glass-popup]:not([data-glass-off]) :is([role=listbox],[role=menu],[data-glass-list]){opacity:var(--glass-out,0)}
+[data-glass-popup]:not([data-glass-off]) :is([role=option],[role=menuitem],[data-glass-item]){--glass-in:clamp(0,calc((var(--glass-items,0) - var(--glass-i,0) * var(--glass-gap)) / var(--glass-fade)),1);opacity:calc(var(--glass-base,1) * var(--glass-in));translate:0 calc((1 - var(--glass-in)) * 6px)}
+[data-glass-popup] :is([role=option],[role=menuitem],[data-glass-item])[data-disabled]{--glass-base:.4}
+[data-glass-popup][data-glass-arriving] :is([role=listbox],[role=menu],[data-glass-list]){overflow:hidden}
+[data-glass-popup][data-glass-off] :is([role=listbox],[role=menu],[data-glass-list]){transition:opacity .16s ease}
+[data-glass-popup][data-glass-off]:is([data-starting-style],[data-ending-style]) :is([role=listbox],[role=menu],[data-glass-list]){opacity:0}
+[data-glass-anchor]>:not(canvas){translate:0 var(--glass-sway-y,0px);scale:var(--glass-sway-sx,1) var(--glass-sway-sy,1);filter:var(--glass-lit,none)}
+[data-glass-popup]:not([data-glass-off]) :is([role=listbox],[role=menu],[data-glass-list]){translate:var(--glass-ride-x,0px) var(--glass-ride-y,0px);scale:var(--glass-zoom,1);clip-path:var(--glass-clip,none);filter:var(--glass-lit,) var(--glass-soft,)}
+[data-glass-anchor][data-glass-morphing]>:not(canvas){filter:var(--glass-lit,) blur(var(--glass-label-blur,0px)) opacity(var(--glass-label,1))}
+[data-glass-hold]{position:absolute;width:0;height:0;opacity:1;pointer-events:none}
+[data-glass-card-shadow]{position:absolute;inset:0;z-index:-2;border-radius:inherit;pointer-events:none;opacity:0;box-shadow:0 20px 48px oklch(0 0 0 / .105),0 3px 10px oklch(0 0 0 / .045)}
+[data-glass-popup][data-glass-tone=dark]>[data-glass-card-shadow]{box-shadow:0 22px 55px oklch(0 0 0 / .34)}
+[data-glass-popup][data-glass-off]>[data-glass-card-shadow]{opacity:1!important}
+[data-glass-anchor][data-glass-label=in] :is([data-glass-char],svg){animation:glass-char ${LETTER.duration}s ease-out both;animation-delay:calc(var(--glass-at,0s) + var(--glass-c,0) * ${LETTER.gap}s)}
+[data-glass-anchor][data-glass-morphing] :is([data-glass-char],svg){opacity:0}
+@keyframes glass-char{from{opacity:0;filter:blur(${LETTER.blur}px) brightness(0)}to{opacity:1;filter:blur(0) brightness(1)}}
+@keyframes glass-hold{to{opacity:0}}
+[data-glass-popup]:not([data-glass-off])[data-ending-style]>[data-glass-hold]{animation:glass-hold 60s linear forwards}
+@media (prefers-reduced-motion:reduce){
+[data-glass-char],[data-glass-anchor] svg{opacity:1!important;animation:none!important}
+[data-glass-popup]:not([data-glass-off])[data-ending-style]>[data-glass-hold]{animation:none}
+}
+`
 
 type Box = { L: number; T: number; W: number; H: number }
 type Page = {
@@ -739,7 +770,7 @@ function createMorph(matchWidth: boolean, opening: GlassPopupOpening, from: Glas
   }
 
   /** `card`: 0 draws the control's glass (the surface melted into it wears its own), 1 the surface alone. */
-  const lensFor = (box: Box, s: NonNullable<ReturnType<typeof shape>>, page: Page, repaint: () => void, card = 0, plain = false): Omit<GlassLens, 'left' | 'top'> => {
+  const lensFor = (box: Box, s: NonNullable<ReturnType<typeof shape>>, page: Page, repaint: () => void, card = 0): Omit<GlassLens, 'left' | 'top'> => {
     // A swollen control's bevel and shadow swell with it, on both canvases alike.
     const unit = (s.a.height * s.sc) / DESIGN_HEIGHT
     return {
@@ -769,10 +800,7 @@ function createMorph(matchWidth: boolean, opening: GlassPopupOpening, from: Glas
       cursorLight: card < 0.5,
       // The light may spill past the surface's edge, never past the control's.
       glow: s.lit && (s.blob && !s.parted && s.lit.blob ? { ...s.lit, halo: { around: 'blob' as const, amount: s.out * s.lit.spill } } : s.lit),
-      // A plain control takes its surface from its own tint alone: it does not snapshot the page
-      // behind it. The snapshot redraws the surrounding DOM, and a trigger that sits over a
-      // scrolling page pays for it on a timer.
-      refraction: plain ? undefined : {
+      refraction: {
         paint: (back) => {
           const fill = rgbCss(surface)
           const recoloured = fill !== page.fill
@@ -1170,13 +1198,10 @@ function createMorph(matchWidth: boolean, opening: GlassPopupOpening, from: Glas
             ? `inset(${s.seam.top - box.T - o}px ${box.L + box.W - s.seam.right - o}px ${box.T + box.H - s.seam.bottom - o}px ${s.seam.left - box.L - o}px)`
             : '',
         )
-        // A trigger marked `data-glass-plain` keeps its own tint and gives up both captures:
-        // the page snapshot behind it and the rim that mirrors it.
-        const plain = !!host?.hasAttribute('data-glass-plain')
         return {
-          ...lensFor(box, s, page, dirty, s.grow ? s.card : 0, plain),
+          ...lensFor(box, s, page, dirty, s.grow ? s.card : 0),
           // What the control's rim mirrors while it is clear glass: the page around it. (Painted in its own fill it mirrors nothing, and neither does the surface: it is unlit.)
-          reflection: plain || s.parted ? undefined : mirrorOf(box, a.height),
+          reflection: mirrorOf(box, a.height),
           blob: s.parted ? undefined : s.blob,
           ...single(s, box),
           left: box.L - a.left - s.edge.hostLeft,
@@ -1515,7 +1540,7 @@ export const OVER_CENTER =
  */
 export const OVER_EDGE = 'data-[side=bottom]:[transform:translateY(calc(var(--anchor-height)*-1))] data-[side=top]:[transform:translateY(var(--anchor-height))]'
 
-export { GlassPopupAnchor, GlassPopupContext } from './glass-popup-anchor'
+export const GlassPopupContext = createContext<GlassPopup | null>(null)
 
 const canvasStyle = { position: 'absolute', zIndex: -1, maxWidth: 'none', pointerEvents: 'none', width: 0, height: 0 } as const
 
@@ -1530,6 +1555,21 @@ export function GlassPopupSurface({ popup: morph }: { popup: GlassPopup }) {
       <canvas ref={canvasRef} aria-hidden style={canvasStyle} />
       <span ref={holdRef} aria-hidden data-glass-hold="" />
       <span ref={shadowRef} aria-hidden data-glass-card-shadow="" />
+    </>
+  )
+}
+
+/** The anchor's share of the glass: the first child of the control that opens the popup. */
+export function GlassPopupAnchor({ popup }: { popup: GlassPopup }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  useEffect(() => popup.setTrigger(canvasRef.current), [popup])
+  return (
+    <>
+      <GlassStyles />
+      <style href="liquid-glass-popup" precedence="default">
+        {CSS}
+      </style>
+      <canvas ref={canvasRef} aria-hidden style={canvasStyle} />
     </>
   )
 }

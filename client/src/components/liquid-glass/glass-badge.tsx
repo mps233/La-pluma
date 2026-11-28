@@ -16,7 +16,7 @@
 import { useEffect, useRef } from 'react'
 
 import { drawAround, drawDom } from './dom-snapshot'
-import { GlassStyles } from './glass-styles'
+import { GlassStyles } from './glass-layer'
 import { getGlassEngine, rgbCss, surfaceColorOf, type GlassView, type Rgb } from './engine'
 
 export type GlassBadgeProps = {

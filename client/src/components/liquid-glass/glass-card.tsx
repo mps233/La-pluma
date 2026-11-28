@@ -15,8 +15,7 @@
 
 import { useMemo, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 
-import { GlassLayer } from './glass-layer-lazy'
-import type { GlassMaterial, GlassOptics } from './glass-layer'
+import { GlassLayer, type GlassMaterial, type GlassOptics } from './glass-layer'
 
 export type GlassCardProps = {
   children?: ReactNode

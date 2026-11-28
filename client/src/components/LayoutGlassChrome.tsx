@@ -1,107 +1,98 @@
-import { lazy, Suspense, useId, useRef, useState, type ChangeEvent, type InputHTMLAttributes, type KeyboardEventHandler, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ChangeEvent, type InputHTMLAttributes, type KeyboardEventHandler, type ReactNode } from 'react'
 
 import { GlassCard, GlassButtonGroup, GlassButtonGroupItem } from '@/components/glass'
 import {
-  DEFAULT_MENU_TRIGGER_CLASS,
-  MENU_TRIGGER_SIZES,
-  type GlassMenuProps,
-} from './GlassMenuTypes'
-
-export type { GlassMenuItem, GlassMenuProps } from './GlassMenuTypes'
+  GlassDropdownMenu,
+  GlassDropdownMenuContent,
+  GlassDropdownMenuItem,
+  GlassDropdownMenuTrigger,
+} from '@/components/glass'
 
 const HOST = 'lg-host'
 
-// The glass menu pulls the popup, menu, and select foundations. Load it when
-// the trigger is hovered or activated; the placeholder keeps the same button.
-const GlassMenuImpl = lazy(() => import('./GlassMenuImpl'))
+export interface GlassMenuItem {
+  label: ReactNode
+  icon?: ReactNode
+  checked?: boolean
+  destructive?: boolean
+  disabled?: boolean
+  onSelect?: () => void
+}
 
-interface GlassMenuTriggerPlaceholderProps {
+export interface GlassMenuProps {
   icon: ReactNode
-  ariaLabel: string
-  size: NonNullable<GlassMenuProps['size']>
-  triggerClassName: string
-  plainTrigger: boolean
-  onPreload: () => void
-  onOpen: () => void
+  items: GlassMenuItem[]
+  'aria-label': string
+  align?: 'start' | 'center' | 'end'
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+  menuClassName?: string
+  /** Override the trigger geometry (the tabbar More uses the floating height). */
+  triggerClassName?: string
+  /**
+   * Keep the trigger's own tint instead of snapshotting the page behind it. A control
+   * that sits over scrolling content pays for that snapshot on a timer.
+   */
+  plainTrigger?: boolean
 }
 
-function GlassMenuTriggerPlaceholder({
-  icon,
-  ariaLabel,
-  size,
-  triggerClassName,
-  plainTrigger,
-  onPreload,
-  onOpen,
-}: GlassMenuTriggerPlaceholderProps) {
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      aria-haspopup="menu"
-      aria-expanded={false}
-      data-icon-only=""
-      data-glass-host=""
-      {...(plainTrigger ? { 'data-glass-plain': '' } : {})}
-      className={`lg-button ${MENU_TRIGGER_SIZES[size]} ${triggerClassName || DEFAULT_MENU_TRIGGER_CLASS}`}
-      onPointerEnter={onPreload}
-      onClick={onOpen}
-    >
-      {icon}
-    </button>
-  )
+const MENU_TRIGGER_SIZES: Record<NonNullable<GlassMenuProps['size']>, string> = {
+  sm: '!h-9 !w-9',
+  md: '!h-11 !w-11',
+  lg: '!h-[3.25rem] !w-[3.25rem]',
 }
 
-export function GlassMenu({
-  icon,
-  items,
-  'aria-label': ariaLabel,
-  align = 'end',
-  size = 'md',
-  className = '',
-  menuClassName = '',
-  triggerClassName = '',
-  plainTrigger = false,
-}: GlassMenuProps) {
+export function GlassMenu({ icon, items, 'aria-label': ariaLabel, align = 'end', size = 'md', className = '', menuClassName = '', triggerClassName = '', plainTrigger = false }: GlassMenuProps) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
-  const [loaded, setLoaded] = useState(false)
-  const [openOnLoad, setOpenOnLoad] = useState(false)
 
-  const preload = () => setLoaded(true)
-  const open = () => {
-    setOpenOnLoad(true)
-    setLoaded(true)
-  }
-  const placeholder = (
-    <GlassMenuTriggerPlaceholder
-      icon={icon}
-      ariaLabel={ariaLabel}
-      size={size}
-      triggerClassName={triggerClassName}
-      plainTrigger={plainTrigger}
-      onPreload={preload}
-      onOpen={open}
-    />
-  )
+  useEffect(() => {
+    if (!container) return
+    const fix = () => {
+      container.querySelectorAll<HTMLElement>('[role="menuitem"][aria-checked]').forEach((el) => {
+        el.setAttribute('role', 'menuitemradio')
+      })
+    }
+    fix()
+    if (typeof MutationObserver === 'undefined') return
+    const observer = new MutationObserver(fix)
+    observer.observe(container, { subtree: true, childList: true, attributes: true, attributeFilter: ['role', 'aria-checked'] })
+    return () => observer.disconnect()
+  }, [container])
 
   return (
     <div ref={setContainer} className={`${HOST} lg-menu relative inline-flex ${className}`.trim()}>
-      {loaded ? (
-        <Suspense fallback={placeholder}>
-          <GlassMenuImpl
-            container={container}
-            initialOpen={openOnLoad}
-            icon={icon}
-            items={items}
-            aria-label={ariaLabel}
-            align={align}
-            size={size}
-            menuClassName={menuClassName}
-            triggerClassName={triggerClassName}
-            plainTrigger={plainTrigger}
-          />
-        </Suspense>
-      ) : placeholder}
+      <GlassDropdownMenu container={container}>
+        <GlassDropdownMenuTrigger
+          aria-label={ariaLabel}
+          data-icon-only=""
+          {...(plainTrigger ? { 'data-glass-plain': '' } : {})}
+          className={`lg-button ${MENU_TRIGGER_SIZES[size]} ${triggerClassName || '!h-[var(--la-pluma-tabbar-floating-height)] !w-[var(--la-pluma-tabbar-floating-height)] !px-0'}`}
+        >
+          {icon}
+        </GlassDropdownMenuTrigger>
+        <GlassDropdownMenuContent align={align} aria-label={ariaLabel} className={menuClassName}>
+          {items.map((item, index) => {
+            const isRadio = typeof item.checked === 'boolean'
+            return (
+              <GlassDropdownMenuItem
+                key={index}
+                role={isRadio ? 'menuitemradio' : undefined}
+                aria-checked={isRadio ? item.checked : undefined}
+                disabled={item.disabled}
+                onSelect={item.onSelect}
+              >
+                <span className="inline-flex items-center gap-2">
+                  {item.icon}
+                  <span>{item.label}</span>
+                  {isRadio && (
+                    <span aria-hidden="true" className="ml-auto pl-2">{item.checked ? '✓' : ''}</span>
+                  )}
+                </span>
+              </GlassDropdownMenuItem>
+            )
+          })}
+        </GlassDropdownMenuContent>
+      </GlassDropdownMenu>
     </div>
   )
 }

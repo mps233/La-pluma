@@ -39,6 +39,12 @@ export type GlassLens = {
   /** Separated droplet: centre x relative to the lens centre, radius, gooey bridge softness. */
   droplet?: { x: number; r: number; k: number }
   /**
+   * More droplets, four at most, each melted into the shape before it (the body, then the
+   * droplets listed earlier), so a row of them buds off as one chain (see BUD): centre relative
+   * to the lens centre, radius and gooey bridge softness, in CSS px.
+   */
+  droplets?: { x: number; y: number; r: number; k: number }[]
+  /**
    * A second rounded box melted into the body, in any direction: centre relative to the body's
    * centre, half size, corner radius and gooey bridge softness (all CSS px). Omit it and the
    * shape is exactly the body (and droplet) alone.
@@ -72,6 +78,8 @@ export type GlassLens = {
   shadow: number
   shadowSoftness: number
   shadowOffset: number
+  /** `true`: the drop shadow begins right at the glass's edge. Left out, it comes up a little way off the edge, as the kit's buttons cast it. */
+  shadowFlush?: boolean
   /** 0 = flat liquid (no light or shadow), 1 = full glass lighting. */
   strength: number
   color: Rgb
@@ -83,6 +91,8 @@ export type GlassLens = {
   borderAlpha?: number
   /** Width of the border line in CSS px (default 1). */
   borderWidth?: number
+  /** An outline: a second flat line on the very edge of the glass, `width` CSS px wide. The border line, if any, then lies just inside it. */
+  outline?: { color: Rgb; alpha: number; width: number }
   /** Textured lens: paints what lies beneath and bends it. */
   refraction?: {
     /**
@@ -415,6 +425,10 @@ export const SPRINGS = {
   dropletOut: { omega: 5, zeta: 0.72 },
   /** The droplet melting back in (pointer leaves or presses). */
   dropletIn: { omega: 13, zeta: 0.7 },
+  /** A row of droplets budding off (BUD): the body pulling back, a droplet on its way out, and all of it going back in. */
+  budBody: { omega: 9, zeta: 0.6 },
+  budOut: { omega: 10.8, zeta: 0.75 },
+  budIn: { omega: 31.46, zeta: 1 },
   /** A lens sliding to the newly selected option. */
   slide: { omega: 14, zeta: 0.75 },
   /** A dragged lens following the finger. */
@@ -509,6 +523,36 @@ export const COHESION = {
 export function cohesionSoftness(height: number) {
   if (!COHESION.on) return 0
   return Math.min(Math.max(COHESION.reach * height, COHESION.reachMin), Math.max(COHESION.reachMin, COHESION.reachMax))
+}
+
+/**
+ * Budding: a row of droplets let out of a body's end as one chain (GlassLayer with more than one
+ * `data-glass-drop`; GlassSearch's layers). The body pulls back, and its end leaves the first
+ * droplet behind where that one belongs: it swells there and pinches off. The others come out
+ * of the first one's far side as one small string, and grow as they spread to their places,
+ * letting go of each other on the way. Going back in is one quick motion (SPRINGS.budIn). Each
+ * droplet's own element rides with it (GlassLayer writes where it is and how far out). These
+ * values are the look: do not tune them casually.
+ */
+export const BUD = {
+  /**
+   * The body has pulled back for this long (seconds) before the first droplet shows. The others
+   * follow it together, `lead` later, each of them `stagger` after the one before: the first is
+   * out and free of the body while the rest are still a small cluster at its end.
+   */
+  wait: 0.117,
+  lead: 0.05,
+  stagger: 0.02,
+  /** Where the others start from: this share of the way from the first droplet's place to their own (0 = all out of the first, 1 = each in its place). */
+  from: 0.5,
+  /** A droplet's size as it comes out (× its own). It is full size this far along its way (0–1), each one after the first that much later. */
+  seed: 0.35,
+  grown: 0.55,
+  grownStep: 0.05,
+  /** The furthest a droplet swings past its place (× its way there). The canvas keeps room for it. */
+  overshoot: 0.06,
+  /** The bridge between a droplet and what it buds from: its softness at most, × the glass's height at rest. */
+  softness: 0.26,
 }
 
 /**
@@ -726,6 +770,9 @@ export function surfaceColorOf(el: Element | null): string {
 /** The lens is designed 120 units tall; every optic below is in those units. */
 export const DESIGN_HEIGHT = 120
 
+/** The shader's uniforms for a row of droplets (GlassLens.droplets): four at most. */
+const DROP_NAMES = ['uDrops[0]', 'uDrops[1]', 'uDrops[2]', 'uDrops[3]']
+
 const VERTEX = `#version 300 es
 in vec2 a;
 void main() { gl_Position = vec4(a, 0.0, 1.0); }
@@ -736,13 +783,19 @@ precision highp float;
 uniform vec2 uSize, uCenter, uHalf, uLightDir;
 uniform float uUnit, uDevicePx, uRadius, uBevel, uBodyX, uBand, uFieldRadius;
 uniform vec3 uDrop;
+// More droplets (GlassLens.droplets), four at most: centre, radius, bridge softness.
+uniform vec4 uDrops[4];
+uniform float uDropCount;
 uniform vec4 uBlob;
 uniform vec2 uBlobShape, uBlobNeck, uBlobFade;
 uniform float uRim, uCaustic, uInner, uTopRefl, uTopBase, uRimWidth, uFresnel;
-uniform float uShadow, uShadowSoft, uShadowOffset;
+uniform float uShadow, uShadowSoft, uShadowOffset, uShadowFlush;
 uniform float uLightMix, uEdgeClear;
 uniform vec3 uSurface, uColor, uBorder;
 uniform float uBorderWidth, uBorderAlpha;
+// An outline (GlassLens.outline): its colour and opacity, and its width.
+uniform vec4 uOutline;
+uniform float uOutlineWidth;
 uniform sampler2D uBack, uFront;
 uniform float uTextured, uRefract, uMag, uDisp, uBlurCenter, uBlurEdge, uBlurShift, uFrost, uFrostBlur, uFrostMix;
 uniform float uFrostEdge, uSaturation, uBendCurve, uEdgeBand;
@@ -837,11 +890,18 @@ float melt(float a, float b, float k) {
 // The glass shape: a pill body, smoothly unioned with a separating droplet.
 float bodyShape(vec2 p) {
   float body = roundRect(p - vec2(uBodyX, 0.0), uHalf, uRadius);
-  if (uDrop.y <= 0.0) return body;
-  float d = length(p - vec2(uDrop.x, 0.0)) - uDrop.y;
-  float k = max(uDrop.z, 1e-3);
-  float h = clamp(0.5 + 0.5 * (d - body) / k, 0.0, 1.0);
-  return mix(d, body, h) - k * h * (1.0 - h);
+  if (uDrop.y > 0.0) {
+    float d = length(p - vec2(uDrop.x, 0.0)) - uDrop.y;
+    float k = max(uDrop.z, 1e-3);
+    float h = clamp(0.5 + 0.5 * (d - body) / k, 0.0, 1.0);
+    body = mix(d, body, h) - k * h * (1.0 - h);
+  }
+  // A row of droplets: each melts into the body and the droplets before it, so they leave as a chain.
+  for (int i = 0; i < 4; i++) {
+    if (float(i) >= uDropCount) break;
+    body = melt(length(p - uDrops[i].xy) - uDrops[i].z, body, max(uDrops[i].w, 1e-3));
+  }
+  return body;
 }
 // ...and with the optional second box (uBlobShape.y = its bridge softness, 0 = none).
 float blobSoft(vec2 p) {
@@ -1059,7 +1119,8 @@ void main() {
 
   // Drop shadow: tight + ambient, kept near the glass, faded before the canvas edge.
   float vFade = smoothstep(-0.1, 0.9, ny) * 0.92 + 0.08;
-  float outside = smoothstep(-4.0 * scale, 14.0 * scale, dist);
+  // (uShadowFlush: the shadow is whole from the edge on, with no lighter band between it and the glass.)
+  float outside = mix(smoothstep(-4.0 * scale, 14.0 * scale, dist), 1.0, uShadowFlush);
   float near = 1.0 - smoothstep(-6.0 * scale, shadowSoft, caster(local - vec2(0.0, shadowOffset)));
   float far = 1.0 - smoothstep(-10.0 * scale, shadowSoft * 1.5, caster(local - vec2(0.0, shadowOffset * 1.6)));
   float border = min(min(px.x, px.y), min(uSize.x - px.x, uSize.y - px.y));
@@ -1319,6 +1380,8 @@ void main() {
 
   // Bordered body (outline buttons): a flat line just inside the edge.
   glass = mix(glass, lineColor, smoothstep(-lineWidth - aa, -lineWidth + aa, dist) * lineAlpha);
+  // An outline on the very edge, over that line: what is left of the line shows just inside it.
+  if (uOutlineWidth > 0.0) glass = mix(glass, uOutline.rgb, smoothstep(-uOutlineWidth - aa, -uOutlineWidth + aa, dist) * uOutline.a);
   // ...and the white line of a blob with its own glass.
   glass = mix(glass, vec3(1.0), smoothstep(-uBlobLine.x - aa, -uBlobLine.x + aa, dist) * uBlobLine.y * own);
   vec4 col = mix(outsideCol, vec4(clamp(glass, 0.0, 1.0), 1.0), mask * cover);
@@ -2190,6 +2253,10 @@ function createEngine(): GlassEngine | null {
     set('uFieldRadius', Math.min(Math.max(radius, band), Math.max(0, (Math.min(m.hx, m.hy) - 0.5) / unit)))
     set('uBodyX', m.bodyX / unit)
     set('uDrop', (m.droplet?.x ?? 0) / unit, (m.droplet?.r ?? 0) / unit, (m.droplet?.k ?? 0) / unit)
+    const drops = m.droplets
+    const dropCount = drops ? Math.min(DROP_NAMES.length, drops.length) : 0
+    set('uDropCount', dropCount)
+    for (let i = 0; i < dropCount; i++) set(DROP_NAMES[i], drops![i].x / unit, drops![i].y / unit, drops![i].r / unit, drops![i].k / unit)
     const blob = m.blob
     set('uBlob', (blob?.x ?? 0) / unit, (blob?.y ?? 0) / unit, (blob?.hx ?? 0) / unit, (blob?.hy ?? 0) / unit)
     set('uBlobShape', (blob?.r ?? 0) / unit, (blob?.k ?? 0) / unit)
@@ -2224,11 +2291,16 @@ function createEngine(): GlassEngine | null {
     set('uShadow', m.shadow * m.strength)
     set('uShadowSoft', m.shadowSoftness)
     set('uShadowOffset', m.shadowOffset)
+    set('uShadowFlush', m.shadowFlush ? 1 : 0)
     set('uSurface', ...m.surface)
     set('uColor', ...m.color)
     set('uEdgeClear', m.edgeClear)
     set('uBorder', ...(m.border ?? m.color))
-    set('uBorderWidth', m.border ? Math.max(0, m.borderWidth ?? 1) / unit : 0)
+    // Under an outline the border line is as much wider as the outline covers of it.
+    const outlined = m.outline && m.outline.alpha > 0 ? Math.max(0, m.outline.width) : 0
+    set('uBorderWidth', m.border ? (Math.max(0, m.borderWidth ?? 1) + outlined) / unit : 0)
+    set('uOutline', ...(m.outline?.color ?? m.color), outlined ? clamp(m.outline!.alpha) : 0)
+    set('uOutlineWidth', outlined / unit)
     set('uBorderAlpha', clamp(m.borderAlpha ?? 1))
     const { aim, mix: lightMix } = aimOf(m)
     set('uLightDir', Math.cos(aim), Math.sin(aim))
@@ -2435,23 +2507,15 @@ function createEngine(): GlassEngine | null {
     wake()
   }
 
-  // A mouse moving over the page asks for nothing by itself: the glass only takes the
-  // pointer's light while it is held (LIGHT, and `lightMoved` below), and the pointer's
-  // presence reaches the shader through `pointer.mix`, which settles at 1 and stays there.
-  // Setting `moved` here made every surface redraw on every frame the cursor travelled,
-  // for pixels that could not change: ~530 ms of script in three seconds of moving.
   window.addEventListener(
     'pointermove',
     (e) => {
       if (e.pointerType !== 'mouse') return
-      const entered = !pointer.active
       pointer.x = e.clientX
       pointer.y = e.clientY
       pointer.active = true
-      // Only the pointer entering asks for frames: it starts `pointer.mix` moving, and
-      // that is the one thing a moving cursor changes in the shader. Waking on every
-      // move kept the shared loop running over all surfaces for no visible difference.
-      if (entered) wake()
+      pointer.moved = true
+      wake()
     },
     { passive: true },
   )
