@@ -485,7 +485,7 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite (705 tests / 49 packages), vet, gofmt.
 - Follow-up: G1c holds the last mixed domain/coercion files.
 
-### Round 35 — typed operbox/depot readers (2026-11-28)
+### Round 35 — typed operbox/depot readers (2026-11-28, `6aafe63`)
 
 - G3: training and mastery each decoded `operbox.json`/`depot.json` into
   untyped maps and re-derived the same field names; the `/data/operbox` and
