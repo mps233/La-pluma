@@ -1,17 +1,15 @@
 package activity
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/mps233/la-pluma/go/internal/util/jsval"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
+
+	prtsinfra "github.com/mps233/la-pluma/go/internal/infra/prts"
+	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
 
 const (
@@ -21,9 +19,7 @@ const (
 
 // HTTPClient is the narrow seam used by tests with httptest.Server. The
 // production client uses net/http; tests never reach the real services.
-type HTTPClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
+type HTTPClient = prtsinfra.HTTPClient
 
 // PRTSOptions configures the public PRTS copilot client.
 type PRTSOptions struct {
@@ -35,24 +31,11 @@ type PRTSOptions struct {
 }
 
 type prtsClient struct {
-	baseURL     string
-	httpClient  HTTPClient
-	timeout     time.Duration
-	maxAttempts int
-	sleep       func(ctx context.Context, duration time.Duration) error
+	client   *prtsinfra.Client
+	attempts int
 }
-
-type httpStatusError struct {
-	status int
-}
-
-func (e *httpStatusError) Error() string { return fmt.Sprintf("HTTP %d", e.status) }
 
 func NewPRTSClient(options PRTSOptions) *prtsClient {
-	baseURL := strings.TrimRight(strings.TrimSpace(options.BaseURL), "/")
-	if baseURL == "" {
-		baseURL = defaultPRTSBaseURL
-	}
 	timeout := options.Timeout
 	if timeout <= 0 {
 		timeout = defaultPRTSTimeout
@@ -61,28 +44,32 @@ func NewPRTSClient(options PRTSOptions) *prtsClient {
 	if attempts <= 0 {
 		attempts = defaultPRTSMaxAttempts
 	}
-	client := options.HTTPClient
-	if client == nil {
-		client = &http.Client{}
-	}
-	sleep := options.Sleep
-	if sleep == nil {
-		sleep = sleepContext
-	}
 	return &prtsClient{
-		baseURL:     baseURL,
-		httpClient:  client,
-		timeout:     timeout,
-		maxAttempts: attempts,
-		sleep:       sleep,
+		client: prtsinfra.New(prtsinfra.Options{
+			BaseURL:    options.BaseURL,
+			HTTPClient: options.HTTPClient,
+			Timeout:    timeout,
+			Sleep:      options.Sleep,
+		}),
+		attempts: attempts,
 	}
 }
 
-func (c *prtsClient) BaseURL() string { return c.baseURL }
+func (c *prtsClient) BaseURL() string { return c.client.BaseURL() }
+
+// retryPolicy preserves the activity search cadence (250 ms × attempt).
+func (c *prtsClient) retryPolicy() prtsinfra.RetryPolicy {
+	return prtsinfra.RetryPolicy{
+		Attempts: c.attempts,
+		Delay: func(attempt int) time.Duration {
+			return time.Duration(250*(attempt+1)) * time.Millisecond
+		},
+	}
+}
 
 // GetCopilot reads /copilot/get/{id} and unwraps data or the payload itself.
 func (c *prtsClient) GetCopilot(ctx context.Context, id int) (map[string]any, error) {
-	value, err := c.fetchJSON(ctx, http.MethodGet, c.baseURL+"/copilot/get/"+url.PathEscape(strconv.Itoa(id)), nil)
+	value, err := c.client.Do(ctx, http.MethodGet, c.client.BaseURL()+"/copilot/get/"+url.PathEscape(strconv.Itoa(id)), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -98,20 +85,24 @@ func (c *prtsClient) GetCopilot(ctx context.Context, id int) (map[string]any, er
 
 // GetCopilotWithRetry mirrors fetchCopilotRecord's three attempts.
 func (c *prtsClient) GetCopilotWithRetry(ctx context.Context, id int) (map[string]any, error) {
-	var lastError error
-	for attempt := 0; attempt < c.maxAttempts; attempt++ {
-		value, err := c.GetCopilot(ctx, id)
-		if err == nil {
-			return value, nil
+	value, err := c.client.DoWithRetry(
+		ctx,
+		http.MethodGet,
+		c.client.BaseURL()+"/copilot/get/"+url.PathEscape(strconv.Itoa(id)),
+		nil,
+		c.retryPolicy(),
+	)
+	if err == nil {
+		record := jsval.Record(value)
+		if data := jsval.Record(record["data"]); data != nil {
+			return data, nil
 		}
-		lastError = err
-		if attempt < c.maxAttempts-1 {
-			if sleepErr := c.sleep(ctx, time.Duration(250*(attempt+1))*time.Millisecond); sleepErr != nil {
-				return nil, sleepErr
-			}
+		if record != nil {
+			return record, nil
 		}
+		return map[string]any{}, nil
 	}
-	message := errorMessage(lastError)
+	message := errorMessage(err)
 	if message == "" {
 		message = "网络异常"
 	}
@@ -119,50 +110,44 @@ func (c *prtsClient) GetCopilotWithRetry(ctx context.Context, id int) (map[strin
 }
 
 // QueryCopilots reads /copilot/query and returns data.data only on an explicit
-// status_code 200 envelope.
+// status_code 200 envelope. A non-200 envelope is retryable like a transport
+// error.
 func (c *prtsClient) QueryCopilots(ctx context.Context, keyword string, page, limit int, orderBy string) ([]any, error) {
-	var lastError error
-	for attempt := 0; attempt < c.maxAttempts; attempt++ {
-		endpoint := fmt.Sprintf("%s/copilot/query?level_keyword=%s&page=%d&limit=%d&order_by=%s",
-			c.baseURL, url.QueryEscape(keyword), page, limit, url.QueryEscape(orderBy))
-		value, err := c.fetchJSON(ctx, http.MethodGet, endpoint, nil)
-		if err == nil {
-			payload := jsval.Record(value)
-			status := -1.0
-			if payload != nil {
-				status = jsval.NumberOrZero(payload["status_code"])
-			}
-			if payload != nil && status == 200 {
-				data := jsval.Record(payload["data"])
-				if data == nil {
-					return []any{}, nil
-				}
-				return jsval.Array(data["data"]), nil
-			}
-			lastError = fmt.Errorf("作业站查询失败: status_code %v", status)
-		} else {
-			lastError = err
+	endpoint := fmt.Sprintf("%s/copilot/query?level_keyword=%s&page=%d&limit=%d&order_by=%s",
+		c.client.BaseURL(), url.QueryEscape(keyword), page, limit, url.QueryEscape(orderBy))
+	value, err := c.client.DoWithRetryFunc(ctx, func() (any, error) {
+		value, err := c.client.Do(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, err
 		}
-		if attempt < c.maxAttempts-1 {
-			if sleepErr := c.sleep(ctx, time.Duration(250*(attempt+1))*time.Millisecond); sleepErr != nil {
-				return nil, sleepErr
-			}
+		payload := jsval.Record(value)
+		if payload == nil {
+			return nil, fmt.Errorf("作业站查询失败: status_code %v", -1)
 		}
+		if status := jsval.NumberOrZero(payload["status_code"]); status != 200 {
+			return nil, fmt.Errorf("作业站查询失败: status_code %v", status)
+		}
+		return value, nil
+	}, c.retryPolicy())
+	if err != nil {
+		return nil, err
 	}
-	if lastError == nil {
-		lastError = fmt.Errorf("作业站查询失败")
+	payload := jsval.Record(value)
+	data := jsval.Record(payload["data"])
+	if data == nil {
+		return []any{}, nil
 	}
-	return nil, lastError
+	return jsval.Array(data["data"]), nil
 }
 
 // QuerySets reads /set/query and returns data.data only on an explicit
 // status_code 200 envelope.
 func (c *prtsClient) QuerySets(ctx context.Context, keyword string, page, limit int) ([]any, error) {
-	body, err := json.Marshal(map[string]any{"keyword": keyword, "page": page, "limit": limit})
-	if err != nil {
-		return nil, err
-	}
-	value, err := c.fetchJSON(ctx, http.MethodPost, c.baseURL+"/set/query", body)
+	value, err := c.client.Do(ctx, http.MethodPost, c.client.BaseURL()+"/set/query", map[string]any{
+		"keyword": keyword,
+		"page":    page,
+		"limit":   limit,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -175,50 +160,4 @@ func (c *prtsClient) QuerySets(ctx context.Context, keyword string, page, limit 
 		return []any{}, nil
 	}
 	return jsval.Array(data["data"]), nil
-}
-
-func (c *prtsClient) fetchJSON(ctx context.Context, method, endpoint string, body []byte) (any, error) {
-	requestCtx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
-	var reader io.Reader
-	if body != nil {
-		reader = bytes.NewReader(body)
-	}
-	request, err := http.NewRequestWithContext(requestCtx, method, endpoint, reader)
-	if err != nil {
-		return nil, err
-	}
-	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	response, err := c.httpClient.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		_, _ = io.Copy(io.Discard, response.Body)
-		return nil, &httpStatusError{status: response.StatusCode}
-	}
-	var value any
-	decoder := json.NewDecoder(response.Body)
-	decoder.UseNumber()
-	if err := decoder.Decode(&value); err != nil {
-		return nil, err
-	}
-	return value, nil
-}
-
-func sleepContext(ctx context.Context, duration time.Duration) error {
-	if duration <= 0 {
-		return nil
-	}
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }

@@ -63,6 +63,7 @@ transport → app → infra / domain
 | JS value coercion for upstream JSON | `internal/util/jsval` | `Record`/`Array`/`Text`/`TextOK`/`String`/`StringJSON`/`Number`/`FiniteNumber`/`FiniteNumberOrNull`/`Numeric`/`Truthy`; remaining packages tracked in G1c |
 | API timestamp format | `internal/util/timefmt` | One millis layout + UTC formatter; offset/date layouts |
 | Public Agent API contract | `internal/contract` | Manifest and OpenAPI derive from one registry |
+| PRTS HTTP transport | `internal/infra/prts` | Request construction, timeout, status, JSON decode, retry loop; callers own envelope parsing and retry policy |
 | HTTP envelope and error mapping | `internal/transport/httpx` | `success/message/data/error/meta` |
 | Agent route registration | `internal/transport/agentapi` | Every advertised operation must resolve (tested) |
 | Scheduler state and flows | `internal/app/scheduler` | Startup resume + tracked runs |

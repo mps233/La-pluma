@@ -1,11 +1,8 @@
 package copilot
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -13,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	prtsinfra "github.com/mps233/la-pluma/go/internal/infra/prts"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
 )
@@ -31,9 +29,7 @@ const (
 // HTTPClient is the narrow seam used by tests with httptest.Server. The
 // production client uses net/http; tests always inject a test server so the
 // suite never reaches the real PRTS or PenguinStats services.
-type HTTPClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
+type HTTPClient = prtsinfra.HTTPClient
 
 // PRTSClientOptions configures the PRTS HTTP client. Zero values fall back to
 // the public PRTS endpoint, a 15 second timeout and three attempts.
@@ -50,12 +46,9 @@ type PRTSClientOptions struct {
 // PRTSClient talks to the public copilot service and the optional stage
 // statistics fallback. All requests are retried like the Node fetchJson helper.
 type PRTSClient struct {
-	baseURL       string
+	client        *prtsinfra.Client
 	stageStatsURL string
-	httpClient    HTTPClient
-	timeout       time.Duration
-	maxAttempts   int
-	sleep         func(context.Context, time.Duration) error
+	attempts      int
 
 	levelMu    sync.Mutex
 	levelCache *levelCatalogCache
@@ -72,45 +65,45 @@ type levelCatalogCache struct {
 }
 
 func NewPRTSClient(options PRTSClientOptions) *PRTSClient {
-	baseURL := strings.TrimRight(strings.TrimSpace(options.BaseURL), "/")
-	if baseURL == "" {
-		baseURL = defaultPRTSBaseURL
-	}
 	stageStatsURL := options.StageStatsURL
 	if stageStatsURL == "" {
 		stageStatsURL = defaultStageStatsURL
-	}
-	client := options.HTTPClient
-	if client == nil {
-		client = &http.Client{Timeout: 20 * time.Second}
-	}
-	timeout := options.Timeout
-	if timeout <= 0 {
-		timeout = 15 * time.Second
 	}
 	attempts := options.MaxAttempts
 	if attempts <= 0 {
 		attempts = 3
 	}
-	sleep := options.Sleep
-	if sleep == nil {
-		sleep = sleepContext
+	timeout := options.Timeout
+	if timeout <= 0 {
+		timeout = 15 * time.Second
 	}
 	return &PRTSClient{
-		baseURL:       baseURL,
+		client: prtsinfra.New(prtsinfra.Options{
+			BaseURL:    options.BaseURL,
+			HTTPClient: options.HTTPClient,
+			Timeout:    timeout,
+			Sleep:      options.Sleep,
+		}),
 		stageStatsURL: stageStatsURL,
-		httpClient:    client,
-		timeout:       timeout,
-		maxAttempts:   attempts,
-		sleep:         sleep,
+		attempts:      attempts,
 	}
 }
 
-func (c *PRTSClient) BaseURL() string { return c.baseURL }
+func (c *PRTSClient) BaseURL() string { return c.client.BaseURL() }
+
+// retryPolicy preserves the copilot cadence (500 ms × attempt).
+func (c *PRTSClient) retryPolicy() prtsinfra.RetryPolicy {
+	return prtsinfra.RetryPolicy{
+		Attempts: c.attempts,
+		Delay: func(attempt int) time.Duration {
+			return time.Duration(500*(attempt+1)) * time.Millisecond
+		},
+	}
+}
 
 // GetSet reads /set/get?id=... and returns the unwrapped data object.
 func (c *PRTSClient) GetSet(ctx context.Context, setId string) (map[string]any, error) {
-	value, err := c.fetchJSON(ctx, http.MethodGet, fmt.Sprintf("%s/set/get?id=%s", c.baseURL, url.QueryEscape(setId)), nil)
+	value, err := c.fetchJSON(ctx, http.MethodGet, fmt.Sprintf("%s/set/get?id=%s", c.client.BaseURL(), url.QueryEscape(setId)), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +112,7 @@ func (c *PRTSClient) GetSet(ctx context.Context, setId string) (map[string]any, 
 
 // GetSetRaw returns the raw /set/get envelope, matching the Node proxy.
 func (c *PRTSClient) GetSetRaw(ctx context.Context, setId string) (map[string]any, error) {
-	value, err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("%s/set/get?id=%s", c.baseURL, url.QueryEscape(setId)), nil)
+	value, err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("%s/set/get?id=%s", c.client.BaseURL(), url.QueryEscape(setId)), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +122,7 @@ func (c *PRTSClient) GetSetRaw(ctx context.Context, setId string) (map[string]an
 // GetCopilotRaw returns the raw /copilot/get/{id} envelope, matching the Node
 // proxy. Plan builders still use GetCopilot for the unwrapped content.
 func (c *PRTSClient) GetCopilotRaw(ctx context.Context, id string) (map[string]any, error) {
-	value, err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("%s/copilot/get/%s", c.baseURL, id), nil)
+	value, err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("%s/copilot/get/%s", c.client.BaseURL(), id), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +131,7 @@ func (c *PRTSClient) GetCopilotRaw(ctx context.Context, id string) (map[string]a
 
 // GetCopilot reads /copilot/get/{id} and returns the unwrapped data object.
 func (c *PRTSClient) GetCopilot(ctx context.Context, id string) (map[string]any, error) {
-	value, err := c.fetchJSON(ctx, http.MethodGet, fmt.Sprintf("%s/copilot/get/%s", c.baseURL, id), nil)
+	value, err := c.fetchJSON(ctx, http.MethodGet, fmt.Sprintf("%s/copilot/get/%s", c.client.BaseURL(), id), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +143,7 @@ func (c *PRTSClient) GetCopilot(ctx context.Context, id string) (map[string]any,
 // service, which only trusts an explicit success envelope.
 func (c *PRTSClient) QueryCopilots(ctx context.Context, keyword string, page, limit int, orderBy string) ([]any, error) {
 	endpoint := fmt.Sprintf("%s/copilot/query?level_keyword=%s&page=%d&limit=%d&order_by=%s",
-		c.baseURL, url.QueryEscape(keyword), page, limit, url.QueryEscape(orderBy))
+		c.client.BaseURL(), url.QueryEscape(keyword), page, limit, url.QueryEscape(orderBy))
 	payload, err := c.doJSON(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
@@ -169,7 +162,7 @@ func (c *PRTSClient) QueryCopilots(ctx context.Context, keyword string, page, li
 // QuerySets posts /set/query and returns the data.data array.
 func (c *PRTSClient) QuerySets(ctx context.Context, keyword string, page, limit int) ([]any, error) {
 	body := map[string]any{"keyword": keyword, "page": page, "limit": limit}
-	payload, err := c.doJSON(ctx, http.MethodPost, c.baseURL+"/set/query", body)
+	payload, err := c.doJSON(ctx, http.MethodPost, c.client.BaseURL()+"/set/query", body)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +226,7 @@ func (c *PRTSClient) levelCatalog(ctx context.Context) *levelCatalogCache {
 func (c *PRTSClient) fetchLevelCatalog(ctx context.Context) (*levelCatalogCache, error) {
 	fetchCtx, cancel := context.WithTimeout(ctx, levelCatalogTimeout)
 	defer cancel()
-	payload, err := c.doJSON(fetchCtx, http.MethodGet, c.baseURL+levelCatalogPath, nil)
+	payload, err := c.doJSON(fetchCtx, http.MethodGet, c.client.BaseURL()+levelCatalogPath, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -366,24 +359,17 @@ func dataArray(data map[string]any) any {
 // non-200 status_code fails, and the `data` field is unwrapped when truthy.
 // API-level failures are retried like the Node helper.
 func (c *PRTSClient) fetchJSON(ctx context.Context, method, endpoint string, body any) (any, error) {
-	var lastErr error
-	for attempt := 1; attempt <= c.maxAttempts; attempt++ {
-		payload, err := c.doJSONOnce(ctx, method, endpoint, body)
-		if err == nil {
-			value, unwrapErr := unwrapPayload(payload)
-			if unwrapErr == nil {
-				return value, nil
-			}
-			err = unwrapErr
+	value, err := c.client.DoWithRetryFunc(ctx, func() (any, error) {
+		payload, err := c.client.Do(ctx, method, endpoint, body)
+		if err != nil {
+			return nil, err
 		}
-		lastErr = err
-		if attempt < c.maxAttempts {
-			if sleepErr := c.sleep(ctx, time.Duration(attempt)*500*time.Millisecond); sleepErr != nil {
-				return nil, prtsRequestError(sleepErr)
-			}
-		}
+		return unwrapPayload(payload)
+	}, c.retryPolicy())
+	if err != nil {
+		return nil, prtsRequestError(err)
 	}
-	return nil, prtsRequestError(lastErr)
+	return value, nil
 }
 
 func unwrapPayload(payload any) (any, error) {
@@ -406,59 +392,11 @@ func unwrapPayload(payload any) (any, error) {
 
 // doJSON performs a retried request and decodes the raw JSON payload.
 func (c *PRTSClient) doJSON(ctx context.Context, method, endpoint string, body any) (any, error) {
-	var lastErr error
-	for attempt := 1; attempt <= c.maxAttempts; attempt++ {
-		value, err := c.doJSONOnce(ctx, method, endpoint, body)
-		if err == nil {
-			return value, nil
-		}
-		lastErr = err
-		if attempt < c.maxAttempts {
-			if sleepErr := c.sleep(ctx, time.Duration(attempt)*500*time.Millisecond); sleepErr != nil {
-				return nil, prtsRequestError(sleepErr)
-			}
-		}
-	}
-	return nil, prtsRequestError(lastErr)
-}
-
-func (c *PRTSClient) doJSONOnce(ctx context.Context, method, endpoint string, body any) (any, error) {
-	var reader io.Reader
-	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
-			return nil, err
-		}
-		reader = bytes.NewReader(encoded)
-	}
-	requestCtx, cancel := context.WithTimeout(ctx, c.timeout)
-	defer cancel()
-	request, err := http.NewRequestWithContext(requestCtx, method, endpoint, reader)
+	value, err := c.client.DoWithRetry(ctx, method, endpoint, body, c.retryPolicy())
 	if err != nil {
-		return nil, err
+		return nil, prtsRequestError(err)
 	}
-	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	response, err := c.httpClient.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		// Drain a small amount so the connection can be reused.
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4*1024))
-		return nil, fmt.Errorf("作业站请求失败: %d", response.StatusCode)
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, 64*1024*1024))
-	if err != nil {
-		return nil, err
-	}
-	var payload any
-	if err := jsval.DecodeJSON(data, &payload); err != nil {
-		return nil, err
-	}
-	return payload, nil
+	return value, nil
 }
 
 func prtsRequestError(cause error) *apperrors.Error {
@@ -469,15 +407,4 @@ func prtsRequestError(cause error) *apperrors.Error {
 	return apperrors.WithStatus(PRTSRequestCode, "作业站请求失败: "+message, http.StatusBadGateway, true, map[string]any{
 		"cause": message,
 	})
-}
-
-func sleepContext(ctx context.Context, duration time.Duration) error {
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }

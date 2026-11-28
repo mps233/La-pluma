@@ -507,6 +507,29 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite (709 tests / 49 packages), vet, gofmt.
 - Follow-up: G2 (one PRTS client) is the next P1.
 
+### Round 36 — one PRTS transport (2026-11-28)
+
+- G2: activity and copilot each carried HTTP request construction, a
+  per-attempt timeout, status handling, JSON decoding, and a retry loop with a
+  context-aware sleep. The only intentional difference was the backoff
+  schedule (250 ms × attempt vs 500 ms × attempt), which PD5 has not decided.
+- Added `internal/infra/prts.Client` with `Do`, `DoWithRetry`,
+  `DoWithRetryFunc` (application-level status codes can join the retry
+  decision), `RetryPolicy`, `StatusError`, and `SleepContext`.
+- Both service clients now delegate: removed activity's `fetchJSON`,
+  `httpStatusError`, and `sleepContext`, and copilot's `doJSONOnce`, both
+  private retry loops, and its sleep helper. Envelope parsing, error wrapping,
+  level caching, and stage-stat URLs stay with their services.
+- Retry behavior is unchanged: activity passes 250 ms × attempt, copilot
+  500 ms × attempt. Choosing the canonical schedule remains PD5.
+- Error text now uses `HTTP <status>` from the shared `StatusError`; copilot's
+  previous double "作业站请求失败" prefix is gone. No test depended on either.
+- Added transport tests: number-preserving decode, status errors, policy
+  delays, sleep cancellation, application-level retries, and JSON bodies.
+- Verified: full Go test suite (715 tests / 50 packages), vet, gofmt.
+- Follow-up: G6 (assets router) and C5 (client run projection) are the
+  remaining P1 items; PD5 still needs a product decision.
+
 
 
 

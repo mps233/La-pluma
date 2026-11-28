@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"fmt"
+	prtsinfra "github.com/mps233/la-pluma/go/internal/infra/prts"
 	"github.com/mps233/la-pluma/go/internal/util/jsval"
 	"net/url"
 	"regexp"
@@ -231,8 +232,8 @@ func (s *Service) findMatchingCopilotSets(
 	}
 	sets, err := s.prts.QuerySets(ctx, keyword, 1, 20)
 	if err != nil {
-		if status, ok := err.(*httpStatusError); ok {
-			return nil, fmt.Errorf("作业集查询失败: HTTP %d", status.status)
+		if status, ok := err.(*prtsinfra.StatusError); ok {
+			return nil, fmt.Errorf("作业集查询失败: HTTP %d", status.StatusCode)
 		}
 		return nil, err
 	}
@@ -564,8 +565,8 @@ func (s *Service) queryStageCandidatesForKeywords(
 			lastQuery = &query
 			items, err := s.prts.QueryCopilots(ctx, keyword, pageNumber, limit, "hot")
 			if err != nil {
-				if status, ok := err.(*httpStatusError); ok {
-					lastError = fmt.Errorf("作业站请求失败: HTTP %d", status.status)
+				if status, ok := err.(*prtsinfra.StatusError); ok {
+					lastError = fmt.Errorf("作业站请求失败: HTTP %d", status.StatusCode)
 				} else {
 					lastError = err
 				}

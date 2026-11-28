@@ -10,7 +10,6 @@ without re-investigation.
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
 | G1c | P2 | go | Finish the `internal/util/jsval` migration in mixed domain/coercion files: `mastery`, `scheduler`, `updates`, `app/run_resume`, `agentapi` | These files mix JS coercion with domain field accessors; move only the coercion bodies and keep the accessors documented |
-| G2 | P1 | go | One PRTS client in `internal/infra/prts`; unify retry/timeout semantics | `activity/prts.go:50-223` vs `copilot/prts.go:73-473` |
 | G12 | P2 | go | Raise `agentapi` route coverage beyond the current ~18 of 107 paths | `handler_test.go` exercises ~18 distinct routes; contract tests cover the registry, not handler behavior |
 | G13 | P3 | go | Surface persistence errors discarded by stop/settle paths | `agentrun.Scope.Stop` ignores `releaseIdempotency` errors and `Settle` ignores `fail` errors, matching the pre-scope transport; decide whether a failed terminal write must fail the request |
 
@@ -37,7 +36,7 @@ without re-investigation.
 | PD1 | Add client verify/gofmt/race jobs to `.github/workflows` | `AGENTS.md` forbids workflow edits without an explicit request; record and wait |
 | PD2 | Implement the primitive/semantic/component token layers from `DESIGN.md` | Visual system change; needs rendered light/dark/mobile verification |
 | PD3 | Make the global run projection the only owner of page run state | Changes polling and keep-alive semantics; needs product confirmation |
-| PD5 | Choose one PRTS retry contract (activity starts at attempt 0, copilot at 1) | Product-visible retry count; pick canonical semantics first |
+| PD5 | Choose one PRTS retry contract (activity starts at attempt 0, copilot at 1) | Transport is now shared in `internal/infra/prts`; activity keeps 250 ms × attempt and copilot 500 ms × attempt. Pick the canonical schedule before changing either. |
 
 ## Completed
 
@@ -73,3 +72,4 @@ without re-investigation.
 - G1b: `gamedata`, `recognition`, and `customtools` local coercion copies deleted; `jsval` gained `Numeric`, `TextOK`, and `FiniteNumberOrNull` (Round 33).
 - G1b: `training` migrated to `jsval.FiniteNumber`/`Numeric`/`Truthy`/`StringOrNullish`; only the settings-map adapters remain (Round 34).
 - G3: operbox/depot readers decode through `domain/snapshot` (`DecodeOperBox`/`DecodeDepot`); training, mastery, and the `/data` endpoints share the schema. Activity's legacy own-flag heuristic still reads the raw document (Round 35).
+- G2: one PRTS transport in `internal/infra/prts`; activity and copilot keep their own retry policies and envelope parsing (Round 36).
