@@ -931,7 +931,7 @@ deleted, verification, and follow-ups.
 - Verified: client production build (type-check included); CSS-only change.
 - Follow-up: PD2 remainder and PD1 CI rollout observation.
 
-### Round 62 — primitive surfaces, spacing, and component tokens (2026-11-28)
+### Round 62 — primitive surfaces, spacing, and component tokens (2026-11-28, `d650a2b`)
 
 - PD2 phase 2/3: added neutral/surface (`--la-gray-*`, `--la-slate-*`),
   spacing (`--la-space-*`), radius (`--la-radius-*`), control
